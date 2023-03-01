@@ -6,9 +6,9 @@ Created using: Unreal Engine 5.1.1, Ubuntu Linux 22.04, ChatGPT 3.5
 
 Licence to be determined (open source).
 
-==
+---
 
-#### description of the gameplay:
+### description of the gameplay:
 
 be an ai
 start on a planet with established industry
