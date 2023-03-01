@@ -10,19 +10,23 @@ Licence to be determined (open source).
 
 ### description of the gameplay:
 
-be an ai
-start on a planet with established industry
-your mission is to have presence on as many celestial bodies as you can
-start by designing a spaceship
-launch it and try not to die
-don't worry, you can make more copies of yourself. try again until you succeed.
-land on a moon or something
-look for metal deposits
-your ship has a fusion reactor. use it as power source
-mine resources, build infrastructure, produce fuel and equipment
-let's have some rocks with hostile fauna, environmental hazards and such to make it interesting, stellaris-style
-when you have built a fusion reactor for your base you can go to the next rock to colonize
-you can manage the base remotely and use it to build more stuff including spaceships
-there will be other players out there too but everyone gets to colonize an uninhabited exoplanet for their first base
+Be an ai.
+Start on a planet with established industry.
+Your mission is to have presence on as many celestial bodies as you can.
+Start by designing a spaceship.
+Launch it and try not to die.
+Don't worry, you can make more copies of yourself. Try again until you succeed.
+Land on a moon or something.
+Look for metal deposits.
+Your ship has a fusion reactor. Use it as power source.
+Mine resources, build infrastructure, produce fuel and equipment.
+Let's have some rocks with hostile fauna, environmental hazards and such to make it interesting, stellaris-style.
+When you have built a fusion reactor for your base you can go to the next rock to colonize.
+You can manage the base remotely and use it to build more stuff including spaceships.
+There will be other players out there too but everyone gets to colonize an uninhabited exoplanet for their first base.
 
-
+First person gameplay for controlling the spaceship, mining resources and so on.
+Remotely controlling bases needs a more strategy game like interface.
+Designing hardware should also be a significant part of the game.
+PVP combat, trade and politics should be as emergent as possible.
+PVE can be designed for singleplayer, small and large groups.
