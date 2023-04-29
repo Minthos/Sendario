@@ -5,10 +5,21 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
+num_samples = 50000
+difficulty = 1
 
-def generate_addition_question(max_digits: int) -> str:
+# 
+allowed_functions = {
+    "sin": math.sin,
+    "cos": math.cos,
+    "tan": math.tan,
+    "sqrt": math.sqrt,
+    "pi": math.pi,
+}
+
+def generate_question(difficulty: int) -> str:
     min_value = 1
-    max_value = (10 ** max_digits) - 1
+    max_value = (10 ** difficulty) - 1
 
     operand1 = random.randint(min_value, max_value)
     operand2 = random.randint(min_value, max_value)
@@ -18,31 +29,20 @@ def generate_addition_question(max_digits: int) -> str:
 
 def evaluate_expression(expression: str) -> float:
     try:
-        # Whitelist functions and variables for the AI
-        allowed_functions = {
-            "sin": math.sin,
-            "cos": math.cos,
-            "tan": math.tan,
-            "sqrt": math.sqrt,
-            "pi": math.pi,
-        }
-
         result = eval(expression, {"__builtins__": None}, allowed_functions)
         return result
     except Exception as e:
         print(f"Error: {e}")
         return None
 
-# Generate the dataset
-def generate_dataset(num_samples, max_digits):
+def generate_dataset(num_samples, difficulty):
     data = []
     for _ in range(num_samples):
-        expression = generate_addition_question(max_digits)
+        expression = generate_question(difficulty)
         result = evaluate_expression(expression)
         data.append((expression, result))
     return data
 
-# Define the neural network
 class SimpleNN(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super(SimpleNN, self).__init__()
@@ -54,8 +54,7 @@ class SimpleNN(nn.Module):
         x = self.layer2(x)
         return x
 
-# Prepare the data
-def prepare_data(data, max_digits):
+def prepare_data(data, difficulty):
     X = []
     Y = []
 
@@ -71,53 +70,39 @@ def prepare_data(data, max_digits):
 
     return X, Y
 
+def test_and_print(difficulty, model):
+    # Test the trained model
+    test_expression = generate_question(difficulty)
+    test_x, _ = prepare_data([(test_expression, 0)], difficulty)
+    test_output = model(test_x).item()
+    print(f"{test_expression} = {test_output} ({evaluate_expression(test_expression)})")
+
+
 # Train the neural network
 def train(model, criterion, optimizer, X, Y, epochs):
     for epoch in range(1, epochs + 1):
         optimizer.zero_grad()
-
         outputs = model(X)
         loss = criterion(outputs, Y)
-
         loss.backward()
         optimizer.step()
-
         if epoch % 10 == 0:
             print(f"Epoch: {epoch}, Loss: {loss.item()}")
+            test_and_print(difficulty, model)
 
-# Main function
 def main():
-    # Generate the dataset
-    num_samples = 5000
-    max_digits = 3
-    data = generate_dataset(num_samples, max_digits)
-
-    # Prepare the data
-    X, Y = prepare_data(data, max_digits)
-
-    # Define the neural network
+    data = generate_dataset(num_samples, difficulty)
+    X, Y = prepare_data(data, difficulty)
     input_size = 2
     hidden_size = 64
     output_size = 1
     model = SimpleNN(input_size, hidden_size, output_size)
-
     # Define the loss function and optimizer
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-
-    # Train the neural network
     epochs = 100
     train(model, criterion, optimizer, X, Y, epochs)
-
-    # Test the trained model
-    test_expression = generate_addition_question(max_digits)
-    print(f"Test expression: {test_expression}")
-
-    test_x, _ = prepare_data([(test_expression, 0)], max_digits)
-    test_output = model(test_x).item()
-
-    print(f"Predicted result: {test_output}")
-    print(f"Actual result: {evaluate_expression(test_expression)}")
+    test_and_print(difficulty, model)
 
 if __name__ == "__main__":
     main()
