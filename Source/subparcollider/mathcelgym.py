@@ -5,10 +5,19 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-num_samples = 50000
 difficulty = 1
+epochs = 1000000000
+samples_per_difficulty = 10000
+num_samples = 10000
+input_size = 20
+hidden_size = 64
+output_size = 1
 
-# 
+# Operators, allowed functions, the numbers 0 to 9 go into the vocabulary.
+operators = list("+-*/")
+other_characters = list("() ")
+# These are the functions that eval will accept from the AI. They go into the question generator's vocabulary.
+# Higher difficulty levels unlock more functions.
 allowed_functions = {
     "sin": math.sin,
     "cos": math.cos,
@@ -18,13 +27,16 @@ allowed_functions = {
 }
 
 def generate_question(difficulty: int) -> str:
-    min_value = 1
-    max_value = (10 ** difficulty) - 1
+    min_value = 0
+    max_value = (3 ** difficulty)
 
     operand1 = random.randint(min_value, max_value)
     operand2 = random.randint(min_value, max_value)
 
-    return f"{operand1} + {operand2}"
+    operator = operators[random.randint(0, len(operators)-1)]
+    if operator == "/" and operand2 == 0:
+        operand2 = 1
+    return f"{operand1} {operator} {operand2}"
 
 
 def evaluate_expression(expression: str) -> float:
@@ -54,15 +66,25 @@ class SimpleNN(nn.Module):
         x = self.layer2(x)
         return x
 
+def tokenize(expression):
+    tokens = []
+    for i in range(len(expression)):
+        if expression[i].isdigit():
+            tokens.append(int(expression[i]))
+        else:
+            tokens.append((operators + other_characters).index(expression[i]) + 11)
+    if len(tokens) < input_size:
+        tokens += [10] * (input_size - len(tokens))
+    return tokens
+
 def prepare_data(data, difficulty):
     X = []
     Y = []
 
     for expression, result in data:
         # Convert expression to feature vector
-        tokens = expression.split()
-        x = [int(tokens[0]), int(tokens[2])]
-        X.append(x)
+        tokens = tokenize(expression)
+        X.append(tokens)
         Y.append(result)
 
     X = torch.tensor(X, dtype=torch.float32)
@@ -80,27 +102,32 @@ def test_and_print(difficulty, model):
 
 # Train the neural network
 def train(model, criterion, optimizer, X, Y, epochs):
+    global difficulty, data, num_samples_per_difficulty, num_samples
     for epoch in range(1, epochs + 1):
         optimizer.zero_grad()
         outputs = model(X)
         loss = criterion(outputs, Y)
         loss.backward()
         optimizer.step()
-        if epoch % 10 == 0:
+        if epoch % 500 == 0:
             print(f"Epoch: {epoch}, Loss: {loss.item()}")
             test_and_print(difficulty, model)
+            if loss.item() < 1.5:
+                difficulty += 1
+                data += generate_dataset(samples_per_difficulty, difficulty)
+                X, Y = prepare_data(data, difficulty)
+                print(f"Difficulty increased to {difficulty}")
+                print(f"New dataset size: {len(data)}")
+                num_samples = difficulty * samples_per_difficulty
+
+data = generate_dataset(num_samples, difficulty)
+X, Y = prepare_data(data, difficulty)
 
 def main():
-    data = generate_dataset(num_samples, difficulty)
-    X, Y = prepare_data(data, difficulty)
-    input_size = 2
-    hidden_size = 64
-    output_size = 1
     model = SimpleNN(input_size, hidden_size, output_size)
     # Define the loss function and optimizer
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    epochs = 100
     train(model, criterion, optimizer, X, Y, epochs)
     test_and_print(difficulty, model)
 
