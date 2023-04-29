@@ -10,7 +10,7 @@ epochs = 1000000000
 samples_per_difficulty = 10000
 num_samples = 10000
 input_size = 20
-hidden_size = 64
+hidden_size = 128
 output_size = 1
 
 # Operators, allowed functions, the numbers 0 to 9 go into the vocabulary.
@@ -59,11 +59,13 @@ class SimpleNN(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super(SimpleNN, self).__init__()
         self.layer1 = nn.Linear(input_size, hidden_size)
-        self.layer2 = nn.Linear(hidden_size, output_size)
+        self.layer2 = nn.Linear(hidden_size, hidden_size)
+        self.layer3 = nn.Linear(hidden_size, output_size)
 
     def forward(self, x):
         x = torch.relu(self.layer1(x))
         x = self.layer2(x)
+        x = self.layer3(x)
         return x
 
 def tokenize(expression):
@@ -112,7 +114,7 @@ def train(model, criterion, optimizer, X, Y, epochs):
         if epoch % 500 == 0:
             print(f"Epoch: {epoch}, Loss: {loss.item()}")
             test_and_print(difficulty, model)
-            if loss.item() < 1.5:
+            if loss.item() < 0.1:
                 difficulty += 1
                 data += generate_dataset(samples_per_difficulty, difficulty)
                 X, Y = prepare_data(data, difficulty)
