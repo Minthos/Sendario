@@ -8,11 +8,12 @@ from torch.nn.utils.rnn import pad_sequence
 
 difficulty = 1
 epochs = 1000000000
-samples_per_difficulty = 10000
-num_samples = 10000
-input_size = 20
-hidden_size = 128
+samples_per_difficulty = 1000
+num_samples = 1000
 output_size = 1
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 # Operators, allowed functions, the numbers 0 to 9 go into the vocabulary.
 operators = list("+-*/")
@@ -42,6 +43,7 @@ class TransformerModel(nn.Module):
         return output
 
 def generate_question(difficulty: int) -> str:
+    difficulty = random.randint(1, difficulty)
     min_value = 0
     max_value = (3 ** difficulty)
 
@@ -77,49 +79,50 @@ def tokenize(expression):
             tokens.append(int(expression[i]))
         else:
             tokens.append((operators + other_characters).index(expression[i]) + 11)
-    if len(tokens) < input_size:
-        tokens += [10] * (input_size - len(tokens))
     return tokens
 
 def prepare_data(data, difficulty):
     X = []
     Y = []
-
     for expression, result in data:
         # Convert expression to feature vector
         tokens = tokenize(expression)
         X.append(tokens)
         Y.append(result)
-
     X = pad_sequence([torch.LongTensor(x) for x in X], batch_first=True)
     Y = torch.tensor(Y, dtype=torch.float32).view(-1, 1)
-
     return X, Y
 
 def test_and_print(difficulty, model):
+    global device
     # Test the trained model
     test_expression = generate_question(difficulty)
     test_x, _ = prepare_data([(test_expression, 0)], difficulty)
+    test_x = test_x.to(device)
     test_output = model(test_x).item()
     print(f"{test_expression} = {test_output} ({evaluate_expression(test_expression)})")
 
 
 # Train the neural network
-def train(model, criterion, optimizer, X, Y, epochs):
-    global difficulty, data, num_samples_per_difficulty, num_samples
+def train(model, criterion, optimizer, epochs):
+    global device, difficulty, data, num_samples_per_difficulty, num_samples, X, Y
+    X = X.to(device)
+    Y = Y.to(device)
     for epoch in range(1, epochs + 1):
         optimizer.zero_grad()
         outputs = model(X)
         loss = criterion(outputs, Y)
         loss.backward()
         optimizer.step()
-        if epoch % 5 == 0:
+        if epoch % 100 == 0:
             print(f"Epoch: {epoch}, Loss: {loss.item()}")
             test_and_print(difficulty, model)
-            if loss.item() < 0.1:
+            if loss.item() < 0.8:
                 difficulty += 1
-                data += generate_dataset(samples_per_difficulty, difficulty)
+                data = generate_dataset(samples_per_difficulty * difficulty, difficulty)
                 X, Y = prepare_data(data, difficulty)
+                X = X.to(device)
+                Y = Y.to(device)
                 print(f"Difficulty increased to {difficulty}")
                 print(f"New dataset size: {len(data)}")
                 num_samples = difficulty * samples_per_difficulty
@@ -128,11 +131,12 @@ data = generate_dataset(num_samples, difficulty)
 X, Y = prepare_data(data, difficulty)
 
 def main():
-    model = TransformerModel(vocab_size=32, d_model=128, nhead=4, dim_feedforward=512, num_layers=2)
+    global device
+    model = TransformerModel(vocab_size=32, d_model=128, nhead=4, dim_feedforward=512, num_layers=2).to(device)
     # Define the loss function and optimizer
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    train(model, criterion, optimizer, X, Y, epochs)
+    train(model, criterion, optimizer, epochs)
     test_and_print(difficulty, model)
 
 if __name__ == "__main__":
