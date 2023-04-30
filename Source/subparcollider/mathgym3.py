@@ -8,9 +8,8 @@ from torch.nn.utils.rnn import pad_sequence
 
 difficulty = 1
 epochs = 1000000000
-samples_per_difficulty = 1000
-num_samples = 1000
-output_size = 1
+samples_per_difficulty = 3000
+num_samples = 3000
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -33,14 +32,19 @@ class TransformerModel(nn.Module):
         super(TransformerModel, self).__init__()
         self.embedding = nn.Embedding(vocab_size, d_model)
         self.transformer = nn.Transformer(d_model=d_model, nhead=nhead, num_encoder_layers=num_layers, num_decoder_layers=num_layers, dim_feedforward=dim_feedforward)
-        self.decoder = nn.Linear(d_model, 1)
+        self.linear1 = nn.Linear(d_model, 64)
+        self.linear2 = nn.Linear(64, 32)
+        self.decoder = nn.Linear(32, 1)
 
     def forward(self, x):
         x = self.embedding(x)
         x = x.permute(1, 0, 2)
         output = self.transformer(x, x)
-        output = self.decoder(output[-1, :, :])
+        output = self.linear1(output[-1, :, :])
+        output = self.linear2(output)
+        output = self.decoder(output)
         return output
+
 
 def generate_question(difficulty: int) -> str:
     difficulty = random.randint(1, difficulty)
@@ -117,7 +121,7 @@ def train(model, criterion, optimizer, epochs):
         if epoch % 100 == 0:
             print(f"Epoch: {epoch}, Loss: {loss.item()}")
             test_and_print(difficulty, model)
-            if loss.item() < 0.8:
+            if loss.item() < 0.1:
                 difficulty += 1
                 data = generate_dataset(samples_per_difficulty * difficulty, difficulty)
                 X, Y = prepare_data(data, difficulty)
@@ -132,7 +136,7 @@ X, Y = prepare_data(data, difficulty)
 
 def main():
     global device
-    model = TransformerModel(vocab_size=32, d_model=128, nhead=4, dim_feedforward=512, num_layers=2).to(device)
+    model = TransformerModel(vocab_size=32, d_model=64, nhead=8, dim_feedforward=128, num_layers=4).to(device)
     # Define the loss function and optimizer
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
