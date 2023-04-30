@@ -8,8 +8,9 @@ from torch.nn.utils.rnn import pad_sequence
 
 difficulty = 1
 epochs = 1000000000
-samples_per_difficulty = 3000
-num_samples = 3000
+batch_size = 2048
+samples_per_difficulty = 30000
+num_samples = 30000
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -106,7 +107,37 @@ def test_and_print(difficulty, model):
     test_output = model(test_x).item()
     print(f"{test_expression} = {test_output} ({evaluate_expression(test_expression)})")
 
+def train(model, criterion, optimizer, epochs):
+    global device, difficulty, data, batch_size, num_samples_per_difficulty, num_samples, X, Y
+    for epoch in range(1, epochs + 1):
+        epoch_loss = 0
+        num_batches = math.ceil(num_samples / batch_size)
+        for i in range(num_batches):
+            batch_start = i * batch_size
+            batch_end = min(batch_start + batch_size, num_samples)
+            X_batch = X[batch_start:batch_end].to(device)
+            Y_batch = Y[batch_start:batch_end].to(device)
 
+            optimizer.zero_grad()
+            outputs = model(X_batch)
+            loss = criterion(outputs, Y_batch)
+            loss.backward()
+            optimizer.step()
+            epoch_loss += loss.item()
+
+        if epoch % 1 == 0:
+            print(f"Epoch: {epoch}, Loss: {epoch_loss / num_batches}")
+            test_and_print(difficulty, model)
+            if epoch_loss / num_batches < 0.5:
+                difficulty += 1
+                data = generate_dataset(samples_per_difficulty * difficulty * difficulty, difficulty)
+                X, Y = prepare_data(data, difficulty)
+                X = X.to(device)
+                Y = Y.to(device)
+                print(f"Difficulty increased to {difficulty}")
+                print(f"New dataset size: {len(data)}")
+                num_samples = difficulty * samples_per_difficulty
+"""
 # Train the neural network
 def train(model, criterion, optimizer, epochs):
     global device, difficulty, data, num_samples_per_difficulty, num_samples, X, Y
@@ -130,13 +161,13 @@ def train(model, criterion, optimizer, epochs):
                 print(f"Difficulty increased to {difficulty}")
                 print(f"New dataset size: {len(data)}")
                 num_samples = difficulty * samples_per_difficulty
-
+"""
 data = generate_dataset(num_samples, difficulty)
 X, Y = prepare_data(data, difficulty)
 
 def main():
     global device
-    model = TransformerModel(vocab_size=32, d_model=64, nhead=8, dim_feedforward=128, num_layers=4).to(device)
+    model = TransformerModel(vocab_size=32, d_model=64, nhead=8, dim_feedforward=1, num_layers=2).to(device)
     # Define the loss function and optimizer
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
