@@ -277,8 +277,8 @@ void *rendererThread(void *arg) {
         pthread_mutex_unlock(&sharedData.mutex);
 
         int camIdx = sharedData.numSpheres - 1;
-//        cameraPos = glm::vec3(sharedData.spheres[camIdx].x, sharedData.spheres[camIdx].y, sharedData.spheres[camIdx].z);
-//        cameraTarget = glm::vec3(sharedData.renderMisc.camDirection[0], sharedData.renderMisc.camDirection[1], sharedData.renderMisc.camDirection[2]);
+        cameraPos = glm::vec3(sharedData.spheres[camIdx].x, sharedData.spheres[camIdx].y, sharedData.spheres[camIdx].z);
+        cameraTarget = glm::vec3(sharedData.renderMisc.camDirection[0], sharedData.renderMisc.camDirection[1], sharedData.renderMisc.camDirection[2]);
         glUniform3f(cameraPosLoc, cameraPos.x, cameraPos.y, cameraPos.z);
         glm::mat4 view = glm::lookAt(cameraPos, cameraTarget, cameraUp);
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
