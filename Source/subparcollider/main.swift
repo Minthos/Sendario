@@ -67,7 +67,8 @@ func main() {
         camera.orientation = (earth.position - camera.position).normalized()
         //camera.orientation = (moon.position - camera.position).normalized()
         renderMisc.camDirection = (Float(camera.orientation.x), Float(camera.orientation.y), Float(camera.orientation.z))
-        renderMisc.camPosition = (Float(camera.position.x), Float(camera.position.y), Float(camera.position.z))
+        //renderMisc.camPosition = (Float(camera.position.x), Float(camera.position.y), Float(camera.position.z))
+        renderMisc.camPosition = (0, 0, 0)
 
         // we have to sort the things before we send them to the renderer, otherwise transparency breaks.
         // this conveniently puts the camera at the end and earth at the beginning of the array.
@@ -75,9 +76,9 @@ func main() {
 
         let sphereArray = UnsafeMutablePointer<sphere>.allocate(capacity: allTheThings.count)
         for (index, object) in allTheThings.enumerated() {
-            sphereArray[index] = sphere(x: Float(object.position.x),
-                                        y: Float(object.position.y),
-                                        z: Float(object.position.z),
+            sphereArray[index] = sphere(x: Float(object.position.x - camera.position.x),
+                                        y: Float(object.position.y - camera.position.y),
+                                        z: Float(object.position.z - camera.position.z),
                                         radius: Float(object.radius),
                                         material: nil)
         }
