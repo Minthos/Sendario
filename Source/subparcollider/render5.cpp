@@ -65,6 +65,8 @@ void main()
     // If the ray does not intersect the sphere, set the color of the fragment to transparent
     if (d < 0.0)
     {
+        //fragColor = vec4(0.0, 0.0, 0.0, 0.0);
+        // eerie green glow for the debug
         fragColor = vec4(0.0, 1.0, 0.0, 0.1);
     }
     else
@@ -82,7 +84,8 @@ void main()
         // Set the color of the fragment based on the lighting
         fragColor = vec4(vec3(diffuse), 1.0);
     }
-    fragColor = vec4(1.0);
+    // to debug even harder, uncomment this
+    //fragColor = vec4(1.0);
 }
 )glsl";
 

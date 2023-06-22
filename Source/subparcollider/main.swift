@@ -46,8 +46,8 @@ var celestials = [sun, mercury, venus, earth, moon]
 var allTheThings = [sun, mercury, venus, earth, moon]
 let actions: [Action] = []
 
-let totalTime = 10.0
-var dt = 0.001
+let totalTime = 200000.0
+var dt = 10.0
 //let totalTime = 0.0001
 //var dt = 0.00001
 var t = 0.0
@@ -61,8 +61,9 @@ func main() {
 
         var renderMisc = render_misc()
 
-        camera.position.z = earth.position.z - earth.radius * (8 - t)
-        camera.orientation = earth.position - camera.position
+        camera.position = earth.position - (earth.position - moon.position) * (1 + 0.0000001 * t)
+        camera.orientation = (earth.position - camera.position).normalized()
+        camera.orientation = (moon.position - camera.position).normalized()
         renderMisc.camDirection = (Float(camera.orientation.x), Float(camera.orientation.y), Float(camera.orientation.z))
         renderMisc.camPosition = (Float(camera.position.x), Float(camera.position.y), Float(camera.position.z))
 
