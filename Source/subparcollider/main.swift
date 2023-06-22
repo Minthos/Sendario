@@ -36,32 +36,35 @@ var moon = SphericalCow(position: Vector(x: 0, y: 0, z: earth.position.z - 384.4
                          orientation: Vector(x: 0, y: 0, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
                          mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.8)
-var camera = SphericalCow(position: Vector(x: earth.position.x, y: earth.position.y + earth.radius * 2.0, z: earth.position.z + earth.radius * 8.0),
+var camera = SphericalCow(position: Vector(x: earth.position.x, y: earth.position.y - earth.radius * 2.0, z: earth.position.z - earth.radius * 8.0),
                           velocity: earth.velocity,
                           orientation: Vector(x: 0, y: 0, z: 0),
                           spin: Vector(x: 0, y: 0, z: 0),
                           mass: 0, radius: 0, frictionCoefficient: 0.0)
 
 var celestials = [sun, mercury, venus, earth, moon]
-var allTheThings = [camera, sun, mercury, venus, earth, moon]
+var allTheThings = [sun, mercury, venus, earth, moon]
 let actions: [Action] = []
 
-let totalTime = 6.0
-var dt = 0.001
+//let totalTime = 10.0
+//var dt = 0.001
+let totalTime = 0.0001
+var dt = 0.00001
 var t = 0.0
 
 func main() {
     startRenderer()
     while t < totalTime {
-//        tick(actions: actions, movingObjects: &allTheThings, t: t, dt: dt)
+        tick(actions: actions, movingObjects: &allTheThings, t: t, dt: dt)
         t += dt
         usleep(1000)
 
         var renderMisc = render_misc()
 
-        camera.position.z = earth.position.z + earth.radius * (8 - t)
+        camera.position.z = earth.position.z - earth.radius * (8 - t)
         camera.orientation = earth.position - camera.position
         renderMisc.camDirection = (Float(camera.orientation.x), Float(camera.orientation.y), Float(camera.orientation.z))
+        renderMisc.camPosition = (Float(camera.position.x), Float(camera.position.y), Float(camera.position.z))
 
         // we have to sort the things before we send them to the renderer, otherwise transparency breaks.
         // this conveniently puts the camera at the end and earth at the beginning of the array.

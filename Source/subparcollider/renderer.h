@@ -8,6 +8,7 @@ typedef struct {
 
 typedef struct {
     float camDirection[3];
+    float camPosition[3];
     float fov;
 } render_misc;
 
