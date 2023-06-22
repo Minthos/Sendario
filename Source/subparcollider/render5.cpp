@@ -31,6 +31,9 @@ void main()
 {
     fragPos = vec3(model * vec4(position, 1.0)); // transform vertex from object space to world space
     gl_Position = projection * view * vec4(fragPos, 1.0); // transform vertex from world space to camera space
+    // logarithmic depth buffer with far plane at 3e15 m, roughly the outer edge of the Oort cloud
+    gl_Position.z = 2.0*log(gl_Position.w + 1)/log(3e15) - 1;
+    gl_Position.z *= gl_Position.w;
 }
 )glsl";
 
