@@ -122,7 +122,7 @@ void main()
 
 
 void checkShader(GLenum status_enum, GLuint shader) {
-    GLint success = 0;
+    GLint success = 1;
     GLchar infoLog[512] = {0};
     glGetShaderiv(shader, status_enum, &success);
     if (!success) {

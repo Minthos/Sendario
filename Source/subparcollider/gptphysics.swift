@@ -342,14 +342,14 @@ func tick(actions: [Action], movingObjects: inout [SphericalCow], t: Double, dt:
                 dragForceMagnitude = 0
             }
             let dragForce = -object.velocity.normalized() * dragForceMagnitude
-            object.applyForce(force: dragForce, dt: dt)
+            //object.applyForce(force: dragForce, dt: dt)
 
             let angularDragTorqueMagnitude = 8 * Double.pi * viscosity * pow(object.radius, 3) * object.spin.length / 3
             let angularDragTorque = -object.spin.normalized() * angularDragTorqueMagnitude
-            object.applyTorque(torque: angularDragTorque, dt: dt)
+            //object.applyTorque(torque: angularDragTorque, dt: dt)
 
             let magnusForce = magnusForce(velocity: object.velocity, spin: object.spin, density: density, viscosity: viscosity, radius: object.radius)
-            object.applyForce(force: magnusForce, dt: dt)
+            //object.applyForce(force: magnusForce, dt: dt)
             print("drag: \(dragForceMagnitude), magnus: \(magnusForce.length), gravity: \(gravityForce.length), total: \((dragForce + magnusForce + gravityForce).length)")
 //            object.applyHeat(heat: 
         }
@@ -470,6 +470,8 @@ let magnusForceDirection = velocity.cross(spin).normalized()
     }
     return magnusForce
 }
+
+
 /*
 // straight from gpt-3.5
 func dragHeatEnergy(sphereRadius: Double, velocity: Double, altitude: Double) -> (Double, Double) {
