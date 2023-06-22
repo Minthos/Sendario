@@ -5,11 +5,12 @@ struct Vector {
     var x: Double
     var y: Double
     var z: Double
-    
+   
     init(x: Double, y: Double, z: Double) {
         self.x = x
         self.y = y
         self.z = z
+        sanityCheck()
     }
 
     var spherical: Spherical {
@@ -20,23 +21,37 @@ struct Vector {
         return Spherical(rho, theta, phi)
     }
 
+#if DEBUG
+    func sanityCheck() {
+        assert( !x.isNaN, "x is NaN")
+        assert( !y.isNaN, "y is NaN")
+        assert( !z.isNaN, "z is NaN")
+    }
+#else
+    func sanityCheck() {}
+#endif
+
     func format(_ decimalPlaces: Int) -> String {
         return "(\(String(format: "%.\(decimalPlaces)f", x)), \(String(format: "%.\(decimalPlaces)f", y)), \(String(format: "%.\(decimalPlaces)f", z)))"
     }
 
     var lengthSquared: Double {
+        sanityCheck()
         return x * x + y * y + z * z
     }
 
-     var length: Double {
+    var length: Double {
+        sanityCheck()
         return sqrt(x * x + y * y + z * z)
     }
     
     func dot(_ other: Vector) -> Double {
+        sanityCheck()
         return x * other.x + y * other.y + z * other.z
     }
 
     func normalized() -> Vector {
+        sanityCheck()
         let length = self.length
         if length == 0 {
             return self
@@ -45,34 +60,49 @@ struct Vector {
     }
 
     static func +(lhs: Vector, rhs: Vector) -> Vector {
+        lhs.sanityCheck()
+        rhs.sanityCheck()
         return Vector(x: lhs.x + rhs.x, y: lhs.y + rhs.y, z: lhs.z + rhs.z)
     }
     
     static func -(lhs: Vector, rhs: Vector) -> Vector {
+        lhs.sanityCheck()
+        rhs.sanityCheck()
         return Vector(x: lhs.x - rhs.x, y: lhs.y - rhs.y, z: lhs.z - rhs.z)
     }
     
     static func *(lhs: Vector, rhs: Double) -> Vector {
+        assert(!rhs.isNaN)
+        lhs.sanityCheck()
         return Vector(x: lhs.x * rhs, y: lhs.y * rhs, z: lhs.z * rhs)
     }
     
     static func /(lhs: Vector, rhs: Double) -> Vector {
+        lhs.sanityCheck()
+        assert(rhs != 0)
+        assert(!rhs.isNaN)
         return Vector(x: lhs.x / rhs, y: lhs.y / rhs, z: lhs.z / rhs)
     }
     
     static func +=(lhs: inout Vector, rhs: Vector) {
+        lhs.sanityCheck()
+        rhs.sanityCheck()
         lhs.x += rhs.x
         lhs.y += rhs.y
         lhs.z += rhs.z
     }
     
     static func -=(lhs: inout Vector, rhs: Vector) {
+        lhs.sanityCheck()
+        rhs.sanityCheck()
         lhs.x -= rhs.x
         lhs.y -= rhs.y
         lhs.z -= rhs.z
     }
     
     static func *=(lhs: inout Vector, rhs: Double) {
+        lhs.sanityCheck()
+        assert(!rhs.isNaN)
         lhs.x *= rhs
         lhs.y *= rhs
         lhs.z *= rhs
@@ -82,9 +112,14 @@ struct Vector {
         lhs.x /= rhs
         lhs.y /= rhs
         lhs.z /= rhs
+        assert(rhs != 0)
+        assert(!rhs.isNaN)
+        lhs.sanityCheck()
     }
 
     func cross(_ other: Vector) -> Vector {
+        sanityCheck()
+        other.sanityCheck()
         return Vector(
             x: y * other.z - z * other.y,
             y: z * other.x - x * other.z,
@@ -93,6 +128,7 @@ struct Vector {
     }
 
     static prefix func - (vector: Vector) -> Vector {
+        vector.sanityCheck()
         return Vector(x: -vector.x, y: -vector.y, z: -vector.z)
     }
 }
@@ -301,7 +337,10 @@ func tick(actions: [Action], movingObjects: inout [SphericalCow], t: Double, dt:
             let (density, _, viscosity) = atmosphericProperties(altitude: altitude)
             let dragCoefficient = 0.47 // Assuming a sphere
             let area = Double.pi * pow(object.radius, 2)
-            let dragForceMagnitude = 0.5 * density * pow(object.velocity.length, 2) * dragCoefficient * area
+            var dragForceMagnitude = 0.5 * density * pow(object.velocity.length, 2) * dragCoefficient * area
+            if(dragForceMagnitude.isNaN) {
+                dragForceMagnitude = 0
+            }
             let dragForce = -object.velocity.normalized() * dragForceMagnitude
             object.applyForce(force: dragForce, dt: dt)
 
@@ -420,8 +459,11 @@ func magnusForce(velocity: Vector, spin: Vector, density: Double, viscosity: Dou
     let magnusCoefficient = magnusCoefficient(velocity: velocity, spin: spin, density: density, viscosity: viscosity, radius: radius)
     let area = Double.pi * pow(radius, 2)
     let relativeVelocity = velocity.length
-    let magnusForceMagnitude = 0.5 * density * pow(relativeVelocity, 2) * magnusCoefficient * area
-    let magnusForceDirection = velocity.cross(spin).normalized()
+    var magnusForceMagnitude = 0.5 * density * pow(relativeVelocity, 2) * magnusCoefficient * area
+    if(magnusForceMagnitude.isNaN) {
+        magnusForceMagnitude = 0
+    }
+let magnusForceDirection = velocity.cross(spin).normalized()
     let magnusForce = magnusForceDirection * magnusForceMagnitude
     if(magnusForceMagnitude > 0) {
 //        print("magnus force: \(magnusForce.format(2))")
