@@ -1,0 +1,1304 @@
+
+<!-- saved from url=(0190)https://webcache.googleusercontent.com/search?q=cache:6XB6RH7eMCgJ:https://www.gamedev.net/blog/73/entry-2006307-tip-of-the-day-logarithmic-zbuffer-artifacts-fix/&hl=en&gl=no&strip=1&vwsrc=0 -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><!--<base href="https://www.gamedev.net/blog/73/entry-2006307-tip-of-the-day-logarithmic-zbuffer-artifacts-fix/">--><base href="."><style>body{margin-left:0;margin-right:0;margin-top:0}#bN015htcoyT__google-cache-hdr{background:#f8f9fa;font:13px arial,sans-serif;text-align:left;color:#202124;border:0;margin:0;border-bottom:1px solid #dadce0;line-height:16px;padding:16px 28px 24px 28px}#bN015htcoyT__google-cache-hdr *{display:inline;font:inherit;text-align:inherit;color:inherit;line-height:inherit;background:none;border:0;margin:0;padding:0;letter-spacing:0}#bN015htcoyT__google-cache-hdr a{text-decoration:none;color:#1a0dab;}#bN015htcoyT__google-cache-hdr a:hover{text-decoration:underline}#bN015htcoyT__google-cache-hdr a:visited{color:#681da8}#bN015htcoyT__google-cache-hdr div{display:block;margin-top:4px}#bN015htcoyT__google-cache-hdr b{font-weight:bold;display:inline-block;direction:ltr}</style></head><body><div id="bN015htcoyT__google-cache-hdr"><div><span>This is Google's cache of <a href="https://www.gamedev.net/blog/73/entry-2006307-tip-of-the-day-logarithmic-zbuffer-artifacts-fix/">https://www.gamedev.net/blog/73/entry-2006307-tip-of-the-day-logarithmic-zbuffer-artifacts-fix/</a>.</span>&nbsp;<span>It is a snapshot of the page as it appeared on 24 Apr 2023 18:36:41 GMT.</span>&nbsp;<span>The <a href="https://www.gamedev.net/blog/73/entry-2006307-tip-of-the-day-logarithmic-zbuffer-artifacts-fix/">current page</a> could have changed in the meantime.</span>&nbsp;<a href="http://support.google.com/websearch/bin/answer.py?hl=en&amp;p=cached&amp;answer=1687222"><span>Learn more</span>.</a></div><div><span style="display:inline-block;margin-top:8px;margin-right:104px;white-space:nowrap"><span style="margin-right:28px"><a href="http://webcache.googleusercontent.com/search?q=cache:6XB6RH7eMCgJ:https://www.gamedev.net/blog/73/entry-2006307-tip-of-the-day-logarithmic-zbuffer-artifacts-fix/&amp;hl=en&amp;gl=no&amp;strip=0&amp;vwsrc=0"><span>Full version</span></a></span><span style="margin-right:28px"><span style="font-weight:bold">Text-only version</span></span><span style="margin-right:28px"><a href="http://webcache.googleusercontent.com/search?q=cache:6XB6RH7eMCgJ:https://www.gamedev.net/blog/73/entry-2006307-tip-of-the-day-logarithmic-zbuffer-artifacts-fix/&amp;hl=en&amp;gl=no&amp;strip=0&amp;vwsrc=1"><span>View source</span></a></span></span></div><span style="display:inline-block;margin-top:8px;color:#70757a"><span>Tip: To quickly find your search term on this page, press <b>Ctrl+F</b> or <b>⌘-F</b> (Mac) and use the find bar.</span></span></div><div style="position:relative; margin:8px;">
+
+
+
+
+
+    
+        <!-- Path to manifest.json -->
+
+
+<!-- Add to homescreen for Chrome on Android -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="application-name" content="GameDev.net">
+
+
+<!-- Chrome for Android theme color -->
+<meta name="theme-color" content="#3F8EE8">
+
+<!-- Add to homescreen for Safari on iOS -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="GameDev.net">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- Tile for Win8 -->
+<meta name="msapplication-TileColor" content="#FFFFFF">
+
+<meta name="msapplication-TileImage" content="/static/media/logo/icons/icon-512x512.png">
+
+
+
+
+
+
+
+        
+        <title>Tip of the day: logarithmic zbuffer artifacts fix - Journal of Ysaneya - GameDev.net</title>
+
+        
+            
+            <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+            <meta content="text/html; charset=UTF-8" name="Content-Type">
+            
+            
+            <meta name="google-site-verification" content="Glk4rvz9MHFoEDTGDS2tEynI9tFHG5oivwyUDtxF-j8">
+            <meta property="fb:pages" content="20678292442">
+            <meta property="fb:app_id" content="111606688673">
+            <meta name="description" content="GameDev.net is your resource for game development with forums, tutorials, blogs, projects, portfolios, news, and more.">
+            <meta name="keywords" content="game development,make a game,game developer,game programming,game making,indie,beginner,tutorials,technology,jobs,news,unity,unreal,godot,game engine,gamedev,community,graphics,game design,game art,game business,game producer,game marketing,indie game developer,indie games,virtual reality,mobile development,augmented reality,game math,game music,webgl,html5 game development,2d,3d,animation,modeling,pixel art,opengl,vulkan,directx,assets,textures,3D,shaders">
+            
+<meta name="description" content="Logarithmic zbuffer artifacts fixIn cameni&#39;s Journal of Lethargic Programmers, I&#39;ve been very interested by his idea about using a logarithm"><meta property="og:title" content="Tip of the day: logarithmic zbuffer artifacts fix"><meta property="og:url" content="https://gamedev.net/blogs/entry/2006307-tip-of-the-day-logarithmic-zbuffer-artifacts-fix"><meta property="og:description" content="Logarithmic zbuffer artifacts fixIn cameni&#39;s Journal of Lethargic Programmers, I&#39;ve been very interested by his idea about using a logarithm"><meta property="og:image:secure_url" content="https://gamedev.net/static/media/user/generic-user.png"><meta property="og:type" content="Article"><meta property="og:site_name" content="GameDev.net"><meta name="twitter:domain" content="gamedev.net"><meta name="twitter:card" content="summary"><meta name="twitter:title" content="Tip of the day: logarithmic zbuffer artifacts fix"><meta name="twitter:url" content="https://gamedev.net/blogs/entry/2006307-tip-of-the-day-logarithmic-zbuffer-artifacts-fix"><meta name="twitter:description" content="Logarithmic zbuffer artifacts fixIn cameni&#39;s Journal of Lethargic Programmers, I&#39;ve been very interested by his idea about using a logarithm"><meta name="twitter:image" content="https://gamedev.net/static/media/user/generic-user.png">
+
+            <!-- Global site tag (gtag.js) - Google Analytics -->
+
+
+
+<!-- Google Tag Manager -->
+
+<!-- End Google Tag Manager -->
+
+
+            
+
+
+
+
+        
+
+
+
+            
+            
+            
+            
+            
+            
+            
+        
+
+        
+
+        
+            
+
+
+        
+
+        
+            
+                
+                
+            
+            
+            
+            
+            
+        
+        
+
+        
+            
+                
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+            
+            
+            
+            
+            
+        
+    
+
+    
+        
+        <div class="container" id="maincontainer">
+            
+                <div class="d-flex justify-content-start align-items-center">
+                    
+                        
+                    
+                    <div class="ml-2"><a href="https://www.gamedev.net/">GameDev.netgamedev.net</a></div>
+                </div>
+                <div class="collapse navbar-collapse shadow-lg" id="navbarTogglerGameDev">
+                    <ul class="navbar-nav mr-2 mt-2 mt-lg-0">
+                        <li class="nav-item">
+                        
+                            <div class="input-group" style="height:44px;">
+                                
+                                <div class="input-group-append">
+                                    
+                                        <i class="fas fa-search"></i>
+                                    
+                                </div>
+                            </div>
+                        
+                        </li>
+                        
+                        <a href="https://www.gamedev.net/">
+                        <li class="nav-item py-1">
+                            <h3>Home</h3>
+                        </li>
+                        </a>
+                        <a href="https://www.gamedev.net/news/">
+                        <li class="nav-item py-1">
+                            <h3>News</h3>
+                        </li>
+                        </a>
+                        <a href="https://www.gamedev.net/blogs/">
+                        <li class="nav-item py-1">
+                            <h3>Blogs</h3>
+                        </li>
+                        </a>
+                        <a href="https://www.gamedev.net/careers/">
+                            <li class="nav-item py-1">
+                                <h3>Careers</h3>
+                            </li>
+                        </a>
+                        <!--
+                        <a href="/challenges/">
+                            <li class="nav-item py-1">
+                                <h3>Challenges</h3>
+                            </li>
+                        </a>-->
+                        <a href="https://www.gamedev.net/forums/">
+                        <li class="nav-item py-1">
+                            <h3>Forums</h3>
+                        </li>
+                        </a>
+                        <!--
+                        <a href="/groups/">
+                            <li class="nav-item py-1">
+                                <h3>Groups</h3>
+                            </li>
+                        </a>-->
+                        <a href="https://www.gamedev.net/portfolios/">
+                        <li class="nav-item py-1">
+                            <h3>Portfolios</h3>
+                        </li>
+                        </a>
+                        <a href="https://www.gamedev.net/projects/">
+                            <li class="nav-item py-1">
+                            <h3>Projects</h3>
+                        </li>
+                        </a>
+                        <a href="https://www.gamedev.net/tutorials/">
+                        <li class="nav-item py-1">
+                            <h3>Tutorials</h3>
+                        </li>
+                        </a>
+                    </ul>
+                </div>
+                <ul class="navbar-nav flex-row flex-nowrap justify-content-end align-items-center pt-2 ml-2">
+                    
+                        <li class="nav-item mx-1">
+                            Log In
+                        </li>
+                        <li class="nav-item mx-1">
+                            <a href="https://www.gamedev.net/signup/" class="btn btn-primary">Sign Up</a>
+                        </li>
+                    
+                </ul>
+            
+            
+            
+                <div class="modal fade loginDlg" tabindex="-1" role="dialog" aria-labelledby="loginDlgLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-md modal-dialog-centered">
+                        <div class="modal-content">
+                             ﻿
+
+
+
+ <div class="d-flex align-self-center mx-auto p-4">
+    <div class="d-flex flex-column justify-content-center">
+        <div class="mt-6">
+            <div class="text-center"><h3>Login</h3></div>
+            
+            
+            
+
+            
+            <!--<div class="text-center">
+                <img class="mb-4" width=184 height=37 src="/static/media/logo/logo-default.png">
+            </div>-->
+            <div class="form-group">
+                
+                <div class="form-group">
+                    Username / Email
+                    
+                </div>
+                <div class="form-group">
+                    Password
+                    
+                </div>
+                <div class="form-group d-flex justify-content-between">
+                    <div class="custom-control custom-checkbox">
+                        
+                        Remember me
+                    </div>
+                    <div>
+                        <a data-dismiss="modal" data-toggle="modal" href="https://www.gamedev.net/blog/73/entry-2006307-tip-of-the-day-logarithmic-zbuffer-artifacts-fix/#forgotPasswordModal">
+                            Forgot password?</a>
+                        <!--<small><a href="/account/password/reset/">Forgot password?</a></small>-->
+                    </div>
+                </div>
+                
+            </div>
+
+            
+
+            <div class="d-flex justify-content-between">
+                <i class="fas fa-sign-in-alt"></i> Login
+            </div>
+            
+        </div>
+        <div class="d-flex justify-content-around align-items-center my-2">
+            <div><hr style="background-color: #BFDCFD;border:0;margin-top:0;margin-bottom:0;height:2px;width:100px;border-width: 1px; margin-left: 0;margin-right: 0;"></div>
+            <div class="form-label">or</div>
+            <div><hr style="background-color: #BFDCFD;border:0;margin-top:0;margin-bottom:0;height:2px;width:100px;border-width: 1px;margin-left: 0;margin-right: 0;"></div>
+        </div>
+        <div class="d-flex justify-content-around my-3 px-3">
+            <!--<a href="#">
+                <div class="mr-3 social-button d-flex justify-content-center align-items-center">
+                    <i style="color:#1da1f2;" class="fab fa-twitter"></i>
+                </div>
+            </a>
+            <a href="#">
+                <div class="mr-3 social-button d-flex justify-content-center align-items-center">
+                    <i style="color:#3b5998;" class="fab fa-facebook-f"></i>
+                </div>
+            </a>-->
+            <a href="https://www.gamedev.net/account/google/login/">
+                <div class="mr-3 social-button d-flex justify-content-center align-items-center">
+                    <i style="color:#ea4335;" class="fab fa-google"></i>
+                </div>
+            </a>
+            <!--<a href="#">
+                <div class="mr-3 social-button d-flex justify-content-center align-items-center">
+                    <i style="color:#00a1f1;" class="fab fa-windows"></i>
+                </div>
+            </a>
+            <a href="#">
+                <div class="mr-3 social-button d-flex justify-content-center align-items-center">
+                    <i style="color:#6e5494;" class="fab fa-github"></i>
+                </div>
+            </a>
+            <a href="#">
+                <div class="mr-3 social-button d-flex justify-content-center align-items-center">
+                    <i style="color:#000;" class="fab fa-steam"></i>
+                </div>
+            </a>-->
+        </div>
+        <div class="d-flex justify-content-center">
+            Don't have a GameDev.net account? <a href="https://www.gamedev.net/signup">Sign up</a>
+        </div>
+    </div>
+</div>
+
+                        </div>
+                    </div>
+                </div>
+                <div class="modal fade forgotPasswordModal" id="forgotPasswordModal" tabindex="-1" role="dialog" aria-labelledby="forgotPasswordModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-md modal-dialog-centered">
+                        <div class="modal-content">
+                            ﻿
+
+
+
+ <div class="d-flex align-self-center mx-auto p-4">
+    <div class="d-flex flex-column justify-content-center">
+        <div class="mt-6">
+        
+            <div class="text-center"><h3>Forgot your password?</h3></div>
+            
+
+            
+                
+                <div class="form-group">
+                    Email Address
+                    
+                </div>
+                <i class="fas fa-key"></i> Reset Password
+            
+
+            <p>Please contact us if you have any trouble resetting your password.</p>
+        </div>
+    </div>
+</div>
+
+                        </div>
+                    </div>
+                </div>
+            
+
+            
+
+            <div id="wrapper" class="d-flex container-fluid">
+
+                
+                
+
+                
+                
+
+                <div id="content-wrapper">
+                    <div class="pt-3">
+                        
+<div class="mb-3"><a href="https://www.gamedev.net/blogs/blog/73-journal-of-ysaneya"><i class="fas fa-chevron-circle-left mr-2"></i>Back to Journal of Ysaneya</a></div>
+<div class="card">
+    
+    <div class="d-flex mt-2 mb-3">
+        <div class="px-3 mw-100 text-wrap">
+            <div class="d-flex flex-column" id="entry_2006307">
+                
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="mb-3">
+                        <div class="">
+                            From <a href="https://www.gamedev.net/blogs/blog/73-journal-of-ysaneya">Journal of Ysaneya</a>
+                        </div>
+                        <h1 class="mb-0">
+                            Tip of the day: logarithmic zbuffer artifacts fix
+                             
+                        </h1>
+                        
+                        <div class="">
+                            Published August 20, 2009
+                        </div>
+                        <div>
+                            
+
+
+    
+
+                        </div>
+                    </div>
+                </div>
+                
+
+<!-- Asteri tags -->
+<div class="d-flex flex-column justify-content-start align-items-center mb-3" style="min-height:113px;border-radius:4px;overflow:hidden">
+    <div id="div-gpt-ad-1604100333835-0" style="max-width:970px;max-height:250px;min-height: 90px; border-radius:4px;overflow:hidden">
+        
+    </div>
+    <div class="text-uppercase" style="font-size:10px;letter-spacing:1px">Advertisement</div>
+</div>
+
+                <div id="entry_content_2006307" class="post_content mb-3">
+                    <b>Logarithmic zbuffer artifacts fix</b><br><br>In cameni's <a href="https://www.gamedev.net/community/forums/mod/journal/journal.asp?jn=503094">Journal of Lethargic Programmers</a>, I've been very interested by his idea about using a logarithmic zbuffer.<br><br>Unfortunately, his idea comes with a couple of very annoying artifacts, due to the linear interpolation of the logarithm (non-linear) based formula. It particularly shows on thin or huge triangles where one or more vertices fall off the edges of the screen. As cameni explains himself in his journal, basically for negative Z values, the triangles tend to pop in/out randomly.<br><br>It was suggested to keep a high tesselation of the scene to avoid the problem, or to use geometry shaders to automatically tesselate the geometry.<br><br>I'm proposing a solution that is much more simple and that works on pixel shaders 2.0+: simply generate the correct Z value at the pixel shader level.<br><br>In the vertex shader, just use an interpolator to pass the vertex position in clip space (GLSL) (here I'm using tex coord interpolator #6):<br><br><pre>void main(){  vec4 vertexPosClip = gl_ModelViewProjectionMatrix * gl_Vertex;  gl_Position = vertexPosClip;  gl_TexCoord[6] = vertexPosClip;}</pre><br>Then you override the depth value in the pixel shader:<br><br><pre>void main(){  gl_FragColor = ...  const float C = 1.0;  const float far = 1000000000.0;  const float offset = 1.0;  gl_FragDepth = (log(C * gl_TexCoord[6].z + offset) / log(C * far + offset));}</pre><br>Note that as cameni indicated before, the 1/log(C*far+1.0) can be optimized as a constant. You're only really paying the price for a mad and a log.<br><br>Quality-wise, I've found that solution to work perfectly: no artifacts at all. In fact, I went so far as testing a city with centimeter to meter details seen from thousands of kilometers away using a very very small field-of-view to simulate zooming. I'm amazed by the quality I got. It's almost magical. ZBuffer precision problems will become a thing of the past, even when using large scales such as needed for a planetary engine.<br><br>There's a performance hit due to the fact that fast-Z is disabled, but to be honnest in my tests I haven't seen a difference in the framerate. Plus, tesselating the scene more or using geometry shaders would very likely cost even more performance than that.<br><br>I've also found that to control the znear clipping and reduce/remove it, you simply have to adjust the "offset" constant in the code above. Cameni used a value of 1.0, but with a value of 2.0 in my setup scene, it moved the znear clipping to a few centimeters.<br><br><b>Results</b><br><br>Settings of the test:<br>- znear = 1.0 inch<br>- zfar = 39370.0 * 100000.0 inches = 100K kilometers<br>- camera is at 205 kilometers from the scene and uses a field-of-view of 0.01?<br>- zbuffer = 24 bits<br><br>Normal zbuffer:<br><a href="http://www.infinity-universe.com/Infinity/Media/Misc/zbufflogoff.jpg"><br>http://www.infinity-universe.com/Infinity/Media/Misc/zbufflogoff.jpg</a><br><br>Logarithmic zbuffer:<br><a href="http://www.infinity-universe.com/Infinity/Media/Misc/zbufflogon.jpg">http://www.infinity-universe.com/Infinity/Media/Misc/zbufflogon.jpg</a><br><br><b>Future works</b><br><br>Could that trick be used to increase precision of shadow maps ?<div>
+</div>
+                </div>
+                <div id="entry_save_2006307" class="d-none justify-content-end align-items-center mb-3">
+                    Cancel
+                    Save
+                </div>
+                <div class="gamedev-border-top gamedev-border-bottom py-3 mb-4">
+                    <div class="d-flex justify-content-between align-items-center" style="font-size:0.75rem;">
+                        <div class="d-flex flex-column">
+                            <div class="mr-3"><i style="color:#D7002B;" class="fas fa-heart"></i> 0 Likes</div>
+                            
+                            
+                            <div><i style="color:#287BDA;" class="fas fa-comment-alt"></i> 13 Comments</div>
+                            
+                        </div>
+                        <div class="d-flex align-items-center">
+                            Share:
+                            <a href="https://www.gamedev.net/blog/73/entry-2006307-tip-of-the-day-logarithmic-zbuffer-artifacts-fix/#">
+                                <div class="mr-3 social-button d-flex justify-content-center align-items-center">
+                                    <i style="color:#1da1f2;font-size:1.2rem;" class="fab fa-twitter"></i>
+                                </div>
+                            </a>
+                            <a href="https://www.gamedev.net/blog/73/entry-2006307-tip-of-the-day-logarithmic-zbuffer-artifacts-fix/#">
+                                <div class="mr-3 social-button d-flex justify-content-center align-items-center">
+                                    <i style="color:#3b5998;font-size:1.2rem;" class="fab fa-facebook-f"></i>
+                                </div>
+                            </a>
+                            <a href="https://www.gamedev.net/blog/73/entry-2006307-tip-of-the-day-logarithmic-zbuffer-artifacts-fix/#">
+                                <div class="mr-3 social-button d-flex justify-content-center align-items-center">
+                                    <i style="color:#ea4335;font-size:1.2rem;" class="fab fa-google"></i>
+                                </div>
+                            </a>
+                            <a href="https://www.gamedev.net/blog/73/entry-2006307-tip-of-the-day-logarithmic-zbuffer-artifacts-fix/#">
+                                <div class="social-button d-flex justify-content-center align-items-center">
+                                    <i style="color:#ea4335;font-size:1.2rem;" class="fab fa-reddit"></i>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="">
+                    <a name="comments"></a>
+                    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="mb-3">
+    <h4 class="text-uppercase">Latest Comments</h4>
+</div>
+
+<div class="list-unstyled" id="comment_container">
+    
+        
+        
+
+
+<div data-commentid="2006428" class="mb-3">
+    <div class="media">
+        cameni
+        <div class="media-body d-flex flex-column justify-content-between">
+            <div class="mb-3">
+                <div class="card gamedev-comment py-3 px-3 mb-2">
+                    <div class="d-flex justify-content-between mb-2">
+                        <div><a href="https://www.gamedev.net/cameni">cameni</a></div>
+                        <!--<div><span class="media-subheading">August 20, 2009 01:43 PM</span></div>-->
+                        <div class="dropdown">
+                            
+                        
+
+
+
+                        </div>
+                    </div>
+                    <div id="comment_content_2006428" class="comment_content" data-author="cameni" style="min-height:auto" itemprop="text">
+                        --
+                    </div>
+                    <div id="comment_save_2006428" class="d-none justify-content-end align-items-center my-3">
+                        Cancel
+                        Save
+                    </div>
+
+                        
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>August 20, 2009 01:43 PM</div>
+                    <div class="">
+                        
+                    </div>
+                </div>
+            </div>
+            <div id="comment_container_2006428">
+                
+            </div>
+            <div id="comment_reply_container_2006428">
+            </div>
+        </div>
+    </div>
+</div>
+
+        
+    
+        
+        
+
+
+<div data-commentid="2006430" class="mb-3">
+    <div class="media">
+        cameni
+        <div class="media-body d-flex flex-column justify-content-between">
+            <div class="mb-3">
+                <div class="card gamedev-comment py-3 px-3 mb-2">
+                    <div class="d-flex justify-content-between mb-2">
+                        <div><a href="https://www.gamedev.net/cameni">cameni</a></div>
+                        <!--<div><span class="media-subheading">August 20, 2009 01:47 PM</span></div>-->
+                        <div class="dropdown">
+                            
+                        
+
+
+
+                        </div>
+                    </div>
+                    <div id="comment_content_2006430" class="comment_content" data-author="cameni" style="min-height:auto" itemprop="text">
+                        --
+                    </div>
+                    <div id="comment_save_2006430" class="d-none justify-content-end align-items-center my-3">
+                        Cancel
+                        Save
+                    </div>
+
+                        
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>August 20, 2009 01:47 PM</div>
+                    <div class="">
+                        
+                    </div>
+                </div>
+            </div>
+            <div id="comment_container_2006430">
+                
+            </div>
+            <div id="comment_reply_container_2006430">
+            </div>
+        </div>
+    </div>
+</div>
+
+        
+    
+        
+        
+
+
+<div data-commentid="2006432" class="mb-3">
+    <div class="media">
+        cameni
+        <div class="media-body d-flex flex-column justify-content-between">
+            <div class="mb-3">
+                <div class="card gamedev-comment py-3 px-3 mb-2">
+                    <div class="d-flex justify-content-between mb-2">
+                        <div><a href="https://www.gamedev.net/cameni">cameni</a></div>
+                        <!--<div><span class="media-subheading">August 20, 2009 01:48 PM</span></div>-->
+                        <div class="dropdown">
+                            
+                        
+
+
+
+                        </div>
+                    </div>
+                    <div id="comment_content_2006432" class="comment_content" data-author="cameni" style="min-height:auto" itemprop="text">
+                        Cool, I see I was unnecessarily afraid of the performance hit from disabled fast-z [rolleyes]
+<br>
+<br>Btw. the log-z equation actually utilizes only half the z-buffer range because z/w will lie in [0,1] range and not [-1,1] as OpenGL would like. But like you've said - it's almost magical anyway [smile]
+<br>We are also thinking about using it for logarithmic shadow maps, see <a href="http://gamma.cs.unc.edu/logpsm/">Logarithmic Perspective Shadow Maps</a>
+<br>
+<br>Thanks!
+                    </div>
+                    <div id="comment_save_2006432" class="d-none justify-content-end align-items-center my-3">
+                        Cancel
+                        Save
+                    </div>
+
+                        
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>August 20, 2009 01:48 PM</div>
+                    <div class="">
+                        
+                    </div>
+                </div>
+            </div>
+            <div id="comment_container_2006432">
+                
+            </div>
+            <div id="comment_reply_container_2006432">
+            </div>
+        </div>
+    </div>
+</div>
+
+        
+    
+        
+        
+
+
+<div data-commentid="2006526" class="mb-3">
+    <div class="media">
+        Ysaneya
+        <div class="media-body d-flex flex-column justify-content-between">
+            <div class="mb-3">
+                <div class="card gamedev-comment py-3 px-3 mb-2">
+                    <div class="d-flex justify-content-between mb-2">
+                        <div><a href="https://www.gamedev.net/ysaneya">Ysaneya</a></div>
+                        <!--<div><span class="media-subheading">August 20, 2009 03:35 PM</span></div>-->
+                        <div class="dropdown">
+                            
+                        
+
+
+
+                        </div>
+                    </div>
+                    <div id="comment_content_2006526" class="comment_content" data-author="Ysaneya" style="min-height:auto" itemprop="text">
+                        Quote:<i>Original post by cameni</i>
+<br>Cool, I see I was unnecessarily afraid of the performance hit from disabled fast-z [rolleyes]
+<br>
+<br>Yeah. But of course it depends on the application (if the bottleneck is somewhere else, for example bandwidth, it won't show up) and the hardware, so I hesitate to say that it's no problem in general.
+<br>
+<br>I need to do some more serious testing in a "real" scene. Unfortunately my engine isn't in a stage to do this test right now (need to re-enable a lot of the pipeline), but I'm confident the benefits will outweight the costs (if any).
+<br>
+<br>Quote:<i>Original post by cameni</i>
+<br>Btw. the log-z equation actually utilizes only half the z-buffer range because z/w will lie in [0,1] range and not [-1,1] as OpenGL would like. But like you've said - it's almost magical anyway [smile]
+<br>
+<br>True, I forgot that. Couldn't it be solved by doing z = z * 2 - 1 at the end ? The w shouldn't come into play as we're already in the pixel shader.
+<br>
+<br>Quote:<i>Original post by cameni</i>
+<br>We are also thinking about using it for logarithmic shadow maps, see <a href="http://gamma.cs.unc.edu/logpsm/">Logarithmic Perspective Shadow Maps</a>
+<br>
+<br>
+<br>Cool, I'll have a look, thanks.
+<br>
+                    </div>
+                    <div id="comment_save_2006526" class="d-none justify-content-end align-items-center my-3">
+                        Cancel
+                        Save
+                    </div>
+
+                        
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>August 20, 2009 03:35 PM</div>
+                    <div class="">
+                        
+                    </div>
+                </div>
+            </div>
+            <div id="comment_container_2006526">
+                
+            </div>
+            <div id="comment_reply_container_2006526">
+            </div>
+        </div>
+    </div>
+</div>
+
+        
+    
+        
+        
+
+
+<div data-commentid="2006785" class="mb-3">
+    <div class="media">
+        cameni
+        <div class="media-body d-flex flex-column justify-content-between">
+            <div class="mb-3">
+                <div class="card gamedev-comment py-3 px-3 mb-2">
+                    <div class="d-flex justify-content-between mb-2">
+                        <div><a href="https://www.gamedev.net/cameni">cameni</a></div>
+                        <!--<div><span class="media-subheading">August 21, 2009 05:11 AM</span></div>-->
+                        <div class="dropdown">
+                            
+                        
+
+
+
+                        </div>
+                    </div>
+                    <div id="comment_content_2006785" class="comment_content" data-author="cameni" style="min-height:auto" itemprop="text">
+                        Quote:<i>Original post by Ysaneya</i>Quote:<i>Original post by cameni</i>
+<br>Btw. the log-z equation actually utilizes only half the z-buffer range because z/w will lie in [0,1] range and not [-1,1] as OpenGL would like.True, I forgot that. Couldn't it be solved by doing z = z * 2 - 1 at the end ? The w shouldn't come into play as we're already in the pixel shader.Actually you've got it right - the [-1,1] range has to be output from vertex shaders, but gl_FragDepth has range [0,1].
+                    </div>
+                    <div id="comment_save_2006785" class="d-none justify-content-end align-items-center my-3">
+                        Cancel
+                        Save
+                    </div>
+
+                        
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>August 21, 2009 05:11 AM</div>
+                    <div class="">
+                        
+                    </div>
+                </div>
+            </div>
+            <div id="comment_container_2006785">
+                
+            </div>
+            <div id="comment_reply_container_2006785">
+            </div>
+        </div>
+    </div>
+</div>
+
+        
+    
+        
+        
+
+
+<div data-commentid="2006921" class="mb-3">
+    <div class="media">
+        Ysaneya
+        <div class="media-body d-flex flex-column justify-content-between">
+            <div class="mb-3">
+                <div class="card gamedev-comment py-3 px-3 mb-2">
+                    <div class="d-flex justify-content-between mb-2">
+                        <div><a href="https://www.gamedev.net/ysaneya">Ysaneya</a></div>
+                        <!--<div><span class="media-subheading">August 21, 2009 10:52 AM</span></div>-->
+                        <div class="dropdown">
+                            
+                        
+
+
+
+                        </div>
+                    </div>
+                    <div id="comment_content_2006921" class="comment_content" data-author="Ysaneya" style="min-height:auto" itemprop="text">
+                        Yeah, I realized that too (and I tested to make sure, the [0-1] range in the pixel shader is indeed correct :)).
+                    </div>
+                    <div id="comment_save_2006921" class="d-none justify-content-end align-items-center my-3">
+                        Cancel
+                        Save
+                    </div>
+
+                        
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>August 21, 2009 10:52 AM</div>
+                    <div class="">
+                        
+                    </div>
+                </div>
+            </div>
+            <div id="comment_container_2006921">
+                
+            </div>
+            <div id="comment_reply_container_2006921">
+            </div>
+        </div>
+    </div>
+</div>
+
+        
+    
+        
+        
+
+
+<div data-commentid="2007189" class="mb-3">
+    <div class="media">
+        Matias Goldberg
+        <div class="media-body d-flex flex-column justify-content-between">
+            <div class="mb-3">
+                <div class="card gamedev-comment py-3 px-3 mb-2">
+                    <div class="d-flex justify-content-between mb-2">
+                        <div><a href="https://www.gamedev.net/matias-goldberg">Matias Goldberg</a></div>
+                        <!--<div><span class="media-subheading">August 21, 2009 09:40 PM</span></div>-->
+                        <div class="dropdown">
+                            
+                        
+
+
+
+                        </div>
+                    </div>
+                    <div id="comment_content_2007189" class="comment_content" data-author="Matias Goldberg" style="min-height:auto" itemprop="text">
+                        By writting to the Z buffer in the pixel shader you lose Hierarchical Z which means more bandwidth usage.
+<br>
+<br>This can get a notorious on bigger screen resolutions and the more pixels are covered by non-overlapping triangles.
+<br>
+<br>You also lose Early Z, which is a shame if you do a lot of overdraw and you were decreasing fillrate by rendering front to back. You lose that advantage.
+<br>Early Z is not automatic, so you won't see a difference if you weren't already doing it. Early-Z is great when you're GPU-bound, but makes you more CPU-bound.
+<br>
+<br>So, if you don't have big screen resolutions, bandwidth-limited, don't consume lot of fillrate, and/or do a lot of overdraw, writting to the Z buffer won't hit performance.
+<br>
+<br>Cheers
+<br>Dark Sylinc
+<br>
+<br><a href="http://developer.amd.com/media/gpu_assets/Depth_in-depth.pdf">More info here</a>
+                    </div>
+                    <div id="comment_save_2007189" class="d-none justify-content-end align-items-center my-3">
+                        Cancel
+                        Save
+                    </div>
+
+                        
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>August 21, 2009 09:40 PM</div>
+                    <div class="">
+                        
+                    </div>
+                </div>
+            </div>
+            <div id="comment_container_2007189">
+                
+            </div>
+            <div id="comment_reply_container_2007189">
+            </div>
+        </div>
+    </div>
+</div>
+
+        
+    
+        
+        
+
+
+<div data-commentid="2007307" class="mb-3">
+    <div class="media">
+        Ysaneya
+        <div class="media-body d-flex flex-column justify-content-between">
+            <div class="mb-3">
+                <div class="card gamedev-comment py-3 px-3 mb-2">
+                    <div class="d-flex justify-content-between mb-2">
+                        <div><a href="https://www.gamedev.net/ysaneya">Ysaneya</a></div>
+                        <!--<div><span class="media-subheading">August 22, 2009 06:31 AM</span></div>-->
+                        <div class="dropdown">
+                            
+                        
+
+
+
+                        </div>
+                    </div>
+                    <div id="comment_content_2007307" class="comment_content" data-author="Ysaneya" style="min-height:auto" itemprop="text">
+                        Yep, I mentionned that in the journal. It's not necessarily a problem though, as it's quite application dependent, for example if your bottleneck isn't in bandwidth. In my tests I haven't been able to notice a drop in framerate using the trick, and that was on a scene with decent overdraw, half a million polys and a pretty intensive pixel shader. But that was on a Radeon HD 4890, so I haven't tested that behavior on other cards/scenes.
+<br>
+                    </div>
+                    <div id="comment_save_2007307" class="d-none justify-content-end align-items-center my-3">
+                        Cancel
+                        Save
+                    </div>
+
+                        
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>August 22, 2009 06:31 AM</div>
+                    <div class="">
+                        
+                    </div>
+                </div>
+            </div>
+            <div id="comment_container_2007307">
+                
+            </div>
+            <div id="comment_reply_container_2007307">
+            </div>
+        </div>
+    </div>
+</div>
+
+        
+    
+        
+        
+
+
+<div data-commentid="2008076" class="mb-3">
+    <div class="media">
+        Martin
+        <div class="media-body d-flex flex-column justify-content-between">
+            <div class="mb-3">
+                <div class="card gamedev-comment py-3 px-3 mb-2">
+                    <div class="d-flex justify-content-between mb-2">
+                        <div><a href="https://www.gamedev.net/martin">Martin</a></div>
+                        <!--<div><span class="media-subheading">August 24, 2009 05:09 AM</span></div>-->
+                        <div class="dropdown">
+                            
+                        
+
+
+
+                        </div>
+                    </div>
+                    <div id="comment_content_2008076" class="comment_content" data-author="Martin" style="min-height:auto" itemprop="text">
+                        For applications with significant overdraw losing the hierarchical z can be very painful. (I'd have to say also typically I'd prefer to call log per vertex rather than per pixel)
+<br> <br>Perhaps something like this could be done in the vertex shader?
+<br> <br><pre>signZ = sign(z);
+z = signZ * (log(C * signZ * z + offset) / log(C * far + offset));
+</pre> <br> <br>Essentially for negative z values inverting the graph given by positive Z values.
+<br>Cheers,
+<br>Martin
+                    </div>
+                    <div id="comment_save_2008076" class="d-none justify-content-end align-items-center my-3">
+                        Cancel
+                        Save
+                    </div>
+
+                        
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>August 24, 2009 05:09 AM</div>
+                    <div class="">
+                        
+                    </div>
+                </div>
+            </div>
+            <div id="comment_container_2008076">
+                
+            </div>
+            <div id="comment_reply_container_2008076">
+            </div>
+        </div>
+    </div>
+</div>
+
+        
+    
+        
+        
+
+
+<div data-commentid="2008142" class="mb-3">
+    <div class="media">
+        Ysaneya
+        <div class="media-body d-flex flex-column justify-content-between">
+            <div class="mb-3">
+                <div class="card gamedev-comment py-3 px-3 mb-2">
+                    <div class="d-flex justify-content-between mb-2">
+                        <div><a href="https://www.gamedev.net/ysaneya">Ysaneya</a></div>
+                        <!--<div><span class="media-subheading">August 24, 2009 08:03 AM</span></div>-->
+                        <div class="dropdown">
+                            
+                        
+
+
+
+                        </div>
+                    </div>
+                    <div id="comment_content_2008142" class="comment_content" data-author="Ysaneya" style="min-height:auto" itemprop="text">
+                        Quote:<i>Original post by Martin</i>
+<br>Essentially for negative z values inverting the graph given by positive Z values.
+<br>Cheers, Martin
+<br>
+<br>Nope, I already tried that, to symmetrize the function ( with success ) or to use alternative functions, but the problem still remains, you get various popping of triangles as soon as some vertices as behind the camera.
+                    </div>
+                    <div id="comment_save_2008142" class="d-none justify-content-end align-items-center my-3">
+                        Cancel
+                        Save
+                    </div>
+
+                        
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>August 24, 2009 08:03 AM</div>
+                    <div class="">
+                        
+                    </div>
+                </div>
+            </div>
+            <div id="comment_container_2008142">
+                
+            </div>
+            <div id="comment_reply_container_2008142">
+            </div>
+        </div>
+    </div>
+</div>
+
+        
+    
+        
+        
+
+
+<div data-commentid="2008176" class="mb-3">
+    <div class="media">
+        cameni
+        <div class="media-body d-flex flex-column justify-content-between">
+            <div class="mb-3">
+                <div class="card gamedev-comment py-3 px-3 mb-2">
+                    <div class="d-flex justify-content-between mb-2">
+                        <div><a href="https://www.gamedev.net/cameni">cameni</a></div>
+                        <!--<div><span class="media-subheading">August 24, 2009 08:59 AM</span></div>-->
+                        <div class="dropdown">
+                            
+                        
+
+
+
+                        </div>
+                    </div>
+                    <div id="comment_content_2008176" class="comment_content" data-author="cameni" style="min-height:auto" itemprop="text">
+                        Quote:<i>Original post by Martin</i> <br>Perhaps something like this could be done in the vertex shader?<pre>signZ = sign(z);
+z = signZ * (log(C * signZ * z + offset) / log(C * far + offset));
+</pre>Essentially for negative z values inverting the graph given by positive Z values <br>The problem is not so much in the values of Z being negative - lower C linearizes the function well enough so that this would not be problem. Problem is that rasterizer interpolates Z/W and 1/W linearly and computes per-pixel z by dividing the two values. It does this to obtain perspective correct values. The value written to Z-buffer could be a different thing from this all, but actually it's taken from this.
+<br> Anyway, the problem is that we are pre-multiplying Z with values of W at the vertices, to get rid of inherent 1/W. Basically then, even when the logarithmic function is linear enough in +-200m range, we are also linearly interpolating between values of W. But since the rasterizer interpolates 1/W, the corresponding values of W are quite different there.
+<br> <br>I'm currently using the pixel shader fix only for objects that are close enough to pass through the near plane
+                    </div>
+                    <div id="comment_save_2008176" class="d-none justify-content-end align-items-center my-3">
+                        Cancel
+                        Save
+                    </div>
+
+                        
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>August 24, 2009 08:59 AM</div>
+                    <div class="">
+                        
+                    </div>
+                </div>
+            </div>
+            <div id="comment_container_2008176">
+                
+            </div>
+            <div id="comment_reply_container_2008176">
+            </div>
+        </div>
+    </div>
+</div>
+
+        
+    
+        
+        
+
+
+<div data-commentid="2012968" class="mb-3">
+    <div class="media">
+        johny5
+        <div class="media-body d-flex flex-column justify-content-between">
+            <div class="mb-3">
+                <div class="card gamedev-comment py-3 px-3 mb-2">
+                    <div class="d-flex justify-content-between mb-2">
+                        <div><a href="https://www.gamedev.net/johny5">johny5</a></div>
+                        <!--<div><span class="media-subheading">September 01, 2009 11:03 PM</span></div>-->
+                        <div class="dropdown">
+                            
+                        
+
+
+
+                        </div>
+                    </div>
+                    <div id="comment_content_2012968" class="comment_content" data-author="johny5" style="min-height:auto" itemprop="text">
+                        Hello..
+<br>
+<br> * I don't really understand this log trick with Z: vertex shader has 32bit float precision calculation, z-buffer also has 32-bit precision. If, after matrix multiplication z value already lost necessary precision, doing log here just increases rounding error &amp; nothing more. At the same time, if resulting z value still has enough precision then z-buffer perfectly will store the resulting value. So where is the win here?
+<br>
+<br> * Lack of fast-z optimization appears because you're doing logarithm in pixel shader, right? It causes a confusion for me, because I didn't even imagine that logarithm is being done in pixel shader. What was a reason of using log in PS?
+<br>
+<br> * About multiplying on 'w' - if you don't need w value (you're trying to compensate for the division) then just make it equal to '1', don't need to multiply on 'w' then (&amp; you may also avoid w = 0 suspicious situations).
+<br>
+<br>
+                    </div>
+                    <div id="comment_save_2012968" class="d-none justify-content-end align-items-center my-3">
+                        Cancel
+                        Save
+                    </div>
+
+                        
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>September 01, 2009 11:03 PM</div>
+                    <div class="">
+                        
+                    </div>
+                </div>
+            </div>
+            <div id="comment_container_2012968">
+                
+            </div>
+            <div id="comment_reply_container_2012968">
+            </div>
+        </div>
+    </div>
+</div>
+
+        
+    
+        
+        
+
+
+<div data-commentid="2013018" class="mb-3">
+    <div class="media">
+        cameni
+        <div class="media-body d-flex flex-column justify-content-between">
+            <div class="mb-3">
+                <div class="card gamedev-comment py-3 px-3 mb-2">
+                    <div class="d-flex justify-content-between mb-2">
+                        <div><a href="https://www.gamedev.net/cameni">cameni</a></div>
+                        <!--<div><span class="media-subheading">September 02, 2009 03:18 AM</span></div>-->
+                        <div class="dropdown">
+                            
+                        
+
+
+
+                        </div>
+                    </div>
+                    <div id="comment_content_2013018" class="comment_content" data-author="cameni" style="min-height:auto" itemprop="text">
+                        * We are talking about Z-buffer storing integers, not floats. For floating-point Z-buffer there would be no problem, since floats are basically integers with logarithmic part (exponent) [smile]
+<br>
+<br>* Yes, fast-Z problem arises when you use the logarithm in pixel shader, what is done to suppress the artifacts appearing when polygons cross the near plane. You may use the logarithm in pixel shader only for objects crossing the plane, though.
+<br>
+<br>* If you mess with W you will affect perspective correct texturing ...
+                    </div>
+                    <div id="comment_save_2013018" class="d-none justify-content-end align-items-center my-3">
+                        Cancel
+                        Save
+                    </div>
+
+                        
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>September 02, 2009 03:18 AM</div>
+                    <div class="">
+                        
+                    </div>
+                </div>
+            </div>
+            <div id="comment_container_2013018">
+                
+            </div>
+            <div id="comment_reply_container_2013018">
+            </div>
+        </div>
+    </div>
+</div>
+
+        
+    
+</div>
+
+
+
+<div class="d-flex flex-column align-items-center justify-content-center mb-3">
+    <div>You must <a href="https://www.gamedev.net/login">log in</a> to join the discussion.</div>
+    <div>Don't have an account? <a href="https://www.gamedev.net/signup">Sign up</a>!</div>
+</div>
+
+                </div>
+                
+            </div>
+        </div>
+    </div>
+
+</div>
+
+
+<!-- Asteri tags -->
+<div class="d-flex flex-column justify-content-start align-items-center mb-3">
+    <div id="div-gpt-ad-1604100291813-0" style="max-width:970px;max-height:250px;min-height: 90px; border-radius:4px;overflow:hidden">
+        
+    </div>
+    <div class="text-uppercase" style="font-size:10px;letter-spacing:1px">Advertisement</div>
+</div>
+
+
+
+                    </div>
+                </div>
+
+                
+                
+                
+                <div class="modal fade search-modal" data-backdrop="static" data-keyboard="false" tabindex="-1">
+                    <div class="modal-dialog modal-xl d-flex justify-content-center align-items-center vh-100 w-100">
+                        <h1 class="mr-3" style="color:#fff">Reticulating splines</h1>
+                        
+                    </div>
+                </div>
+                <div id="toastcontainer" style="z-index:999999"></div>
+            </div>
+    </div>
+    
+    
+
+
+    
+    
+        
+        
+        
+    
+          
+
+        
+
+        
+        
+        
+
+        
+
+        
+
+
+
+<!--<script type="text/javascript"> var infolinks_pid = 3249787; var infolinks_wsid = 0; </script> 
+<script type="text/javascript" src="//resources.infolinks.com/js/infolinks_main.js"></script>-->
+
+<!--<script type="text/javascript" src="//s.skimresources.com/js/13722X707581.skimlinks.js"></script>-->
+
+        
+
+        
+        
+        
+
+
+
+
+
+
+
+
+
+
+
+    
+  
+</div></body></html>

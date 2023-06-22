@@ -38,6 +38,95 @@ void main()
 )glsl";
 
 
+const char *vertexShader2Source = R"glsl(
+#version 330 core
+
+layout (location = 0) in vec3 position;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+out vec3 fragPos;
+out vec4 vertexPosClip;
+
+void main()
+{
+    fragPos = vec3(model * vec4(position, 1.0)); // transform vertex from object space to world space
+    vec4 posClip = projection * view * vec4(fragPos, 1.0); // transform vertex from world space to camera space
+    vertexPosClip = posClip;  // Pass the clip space position to the fragment shader
+    gl_Position = posClip;
+}
+)glsl";
+
+// Setting both gl_Position and vertexPosClip to the same value might seem redundant.
+// However, the GLSL specification stipulates that we cannot directly use gl_Position in the fragment
+// shader, so we need a separate out variable to pass this data. In other words, gl_Position is not
+// interpolated and accessible in the fragment shader, so we can't use it for calculations there.
+
+const char *fragmentShader2Source = R"glsl(
+#version 330 core
+
+in vec3 fragPos;
+in vec4 vertexPosClip;
+
+uniform mat4 view;
+uniform vec3 sphereCenter;
+uniform vec3 cameraPos;
+uniform float sphereRadius;
+uniform vec3 lightDirection;
+
+out vec4 fragColor;
+
+void main()
+{
+    // Transform the sphere center from world space to camera space
+    vec4 sphereCenterCamera = view * vec4(sphereCenter, 1.0);
+
+    // Calculate the ray from the camera to the fragment in camera space
+    vec3 ray = normalize(fragPos - cameraPos);
+
+    // Calculate the intersection of the ray with the sphere
+    vec3 sphereToCamera = cameraPos - sphereCenter;
+    float b = dot(ray, sphereToCamera);
+    float c = dot(sphereToCamera, sphereToCamera) - sphereRadius * sphereRadius;
+    float d = b * b - c;
+
+    // If the ray does not intersect the sphere, set the color of the fragment to transparent
+    if (d < 0.0)
+    {
+        //fragColor = vec4(0.0, 0.0, 0.0, 0.0);
+        // eerie green glow for the debug
+        fragColor = vec4(0.0, 1.0, 0.0, 0.1);
+    }
+    else
+    {
+        // Calculate the intersection point
+        float t = -b - sqrt(d);
+        vec3 intersection = cameraPos + ray * t;
+
+        // Calculate the surface normal at the intersection point
+        vec3 surfaceNormal = normalize(intersection - sphereCenter);
+
+        // Calculate the diffuse lighting
+        float diffuse = max(dot(surfaceNormal, -lightDirection), 0.03);
+
+        // Set the color of the fragment based on the lighting
+        fragColor = vec4(vec3(diffuse), 1.0);
+    }
+    // to debug even harder, uncomment this
+    //fragColor = vec4(1.0);
+
+    // Override the depth value in the pixel shader
+    const float C = 1.0;
+    const float far = 3e18;  // 3e15 m is roughly the extent of the Oort cloud from the Sun.
+                             // Let's multply it by 1000 just because we can.
+    const float offset = 1.0;
+    gl_FragDepth = (log(C * vertexPosClip.z + offset) / log(C * far + offset));
+}
+)glsl";
+
+
 const char *fragmentShaderSource = R"glsl(
 #version 330 core
 
@@ -91,6 +180,7 @@ void main()
     //fragColor = vec4(1.0);
 }
 )glsl";
+
 
 const char *sparklyShaderSource = R"glsl(
 #version 330 core
@@ -214,8 +304,10 @@ void *rendererThread(void *arg) {
     }
 
     // compile the vertex and fragment shaders
-    GLuint vertexShader = compileShader(GL_VERTEX_SHADER, vertexShaderSource);
-    GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragmentShaderSource);
+    //GLuint vertexShader = compileShader(GL_VERTEX_SHADER, vertexShaderSource);
+    //GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragmentShaderSource);
+    GLuint vertexShader = compileShader(GL_VERTEX_SHADER, vertexShader2Source);
+    GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragmentShader2Source);
 
     // linkw them into one program
     GLuint shaderProgram = glCreateProgram();

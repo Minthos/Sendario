@@ -46,7 +46,7 @@ var celestials = [sun, mercury, venus, earth, moon]
 var allTheThings = [sun, mercury, venus, earth, moon]
 let actions: [Action] = []
 
-let totalTime = 100000.0
+let totalTime = 2e5
 var dt = 10.0
 //let totalTime = 0.0001
 //var dt = 0.00001
@@ -63,19 +63,18 @@ func main() {
 
         camera.position = moon.position
         camera.position.y += moon.radius * 1.25
-        camera.position.z -= moon.radius * 1.25
+        camera.position.z -= moon.radius * 1.5
         camera.orientation = (earth.position - camera.position).normalized()
-        //camera.orientation = (moon.position - camera.position).normalized()
         renderMisc.camDirection = (Float(camera.orientation.x), Float(camera.orientation.y), Float(camera.orientation.z))
-        //renderMisc.camPosition = (Float(camera.position.x), Float(camera.position.y), Float(camera.position.z))
+        // camera is at 0,0,0 to make it easy for the renderer
         renderMisc.camPosition = (0, 0, 0)
 
         // we have to sort the things before we send them to the renderer, otherwise transparency breaks.
-        // this conveniently puts the camera at the end and earth at the beginning of the array.
         allTheThings.sort(by: { ($0.position - camera.position).length > ($1.position - camera.position).length })
 
         let sphereArray = UnsafeMutablePointer<sphere>.allocate(capacity: allTheThings.count)
         for (index, object) in allTheThings.enumerated() {
+            // center everything on the camera before converting to float to avoid float precision issues when rendering
             sphereArray[index] = sphere(x: Float(object.position.x - camera.position.x),
                                         y: Float(object.position.y - camera.position.y),
                                         z: Float(object.position.z - camera.position.z),
