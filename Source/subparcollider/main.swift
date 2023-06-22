@@ -16,13 +16,13 @@ var sun = SphericalCow(position: Vector(x: 0, y: 0, z: 0),
                          orientation: Vector(x: 0, y: 0, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
                          mass: 1.989e30, radius: 696.34e6, frictionCoefficient: 0.8)
-var mercury = SphericalCow(position: Vector(x: 0, y: 0, z: -57.91e9),
-                         velocity: Vector(x: 47.87e3, y: 0, z: 0),
+var mercury = SphericalCow(position: Vector(x: 0, y: -57.91e9, z: 0),
+                         velocity: Vector(x: 0, y: 0, z: 47.87e3),
                          orientation: Vector(x: 0, y: 0, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
                          mass: 3.285e23, radius: 2.44e6, frictionCoefficient: 0.8)
-var venus = SphericalCow(position: Vector(x: 0, y: 0, z: -108.2e9),
-                         velocity: Vector(x: 35.02e3, y: 0, z: 0),
+var venus = SphericalCow(position: Vector(x: 0, y: 108.2e9, z: 0),
+                         velocity: Vector(x: 00, y: 0, z: 35.02e3),
                          orientation: Vector(x: 0, y: 0, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
                          mass: 4.867e24, radius: 6.0518e6, frictionCoefficient: 0.8)
@@ -46,7 +46,7 @@ var celestials = [sun, mercury, venus, earth, moon]
 var allTheThings = [sun, mercury, venus, earth, moon]
 let actions: [Action] = []
 
-let totalTime = 200000.0
+let totalTime = 100000.0
 var dt = 10.0
 //let totalTime = 0.0001
 //var dt = 0.00001
@@ -61,9 +61,11 @@ func main() {
 
         var renderMisc = render_misc()
 
-        camera.position = earth.position - (earth.position - moon.position) * (1 + 0.0000001 * t)
+        camera.position = moon.position
+        camera.position.y += moon.radius * 1.25
+        camera.position.z -= moon.radius * 1.25
         camera.orientation = (earth.position - camera.position).normalized()
-        camera.orientation = (moon.position - camera.position).normalized()
+        //camera.orientation = (moon.position - camera.position).normalized()
         renderMisc.camDirection = (Float(camera.orientation.x), Float(camera.orientation.y), Float(camera.orientation.z))
         renderMisc.camPosition = (Float(camera.position.x), Float(camera.position.y), Float(camera.position.z))
 
