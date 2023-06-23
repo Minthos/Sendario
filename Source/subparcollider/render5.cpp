@@ -26,28 +26,6 @@ uniform mat4 view;
 uniform mat4 projection;
 
 out vec3 fragPos;
-
-void main()
-{
-    fragPos = vec3(model * vec4(position, 1.0)); // transform vertex from object space to world space
-    gl_Position = projection * view * vec4(fragPos, 1.0); // transform vertex from world space to camera space
-    // logarithmic depth buffer with far plane at 3e15 m, roughly the outer edge of the Oort cloud
-    gl_Position.z = 2.0*log(gl_Position.w + 1)/log(3e15) - 1;
-    gl_Position.z *= gl_Position.w;
-}
-)glsl";
-
-
-const char *vertexShader2Source = R"glsl(
-#version 330 core
-
-layout (location = 0) in vec3 position;
-
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
-
-out vec3 fragPos;
 out vec4 vertexPosClip;
 
 void main()
@@ -64,7 +42,7 @@ void main()
 // shader, so we need a separate out variable to pass this data. In other words, gl_Position is not
 // interpolated and accessible in the fragment shader, so we can't use it for calculations there.
 
-const char *fragmentShader2Source = R"glsl(
+const char *fragmentShaderSource = R"glsl(
 #version 330 core
 
 in vec3 fragPos;
@@ -75,112 +53,91 @@ uniform vec3 sphereCenter;
 uniform vec3 cameraPos;
 uniform float sphereRadius;
 uniform vec3 lightDirection;
+uniform vec3 lightColor; // W/m^2
+uniform vec3 materialDiffuse;
+uniform vec3 materialEmissive; // W/sr/m^2
+uniform float gamma;
 
 out vec4 fragColor;
 
 void main()
 {
-    // Transform the sphere center from world space to camera space
-    vec4 sphereCenterCamera = view * vec4(sphereCenter, 1.0);
-
-    // Calculate the ray from the camera to the fragment in camera space
-    vec3 ray = normalize(fragPos - cameraPos);
-
-    // Calculate the intersection of the ray with the sphere
     vec3 sphereToCamera = cameraPos - sphereCenter;
-    float b = dot(ray, sphereToCamera);
-    float c = dot(sphereToCamera, sphereToCamera) - sphereRadius * sphereRadius;
-    float d = b * b - c;
+    float raySphereDot = dot(rayDirection, sphereToCamera);
+    float sphereToCameraDot = dot(sphereToCamera, sphereToCamera) - sphereRadius * sphereRadius;
+    float discriminant = raySphereDot * raySphereDot - sphereToCameraDot;
 
-    // If the ray does not intersect the sphere, set the color of the fragment to transparent
-    if (d < 0.0)
+    vec3 radiance;
+    if (discriminant < 0.0)
     {
-        //fragColor = vec4(0.0, 0.0, 0.0, 0.0);
-        // eerie green glow for the debug
-        fragColor = vec4(0.0, 1.0, 0.0, 0.1);
+        radiance = vec3(0.0, 0.0, 0.0);
     }
     else
     {
-        // Calculate the intersection point
-        float t = -b - sqrt(d);
-        vec3 intersection = cameraPos + ray * t;
+        float rayIntersectParam = -raySphereDot - sqrt(discriminant);
+        vec3 intersectionPos = cameraPosition + rayDirection * rayIntersectParam;
+        vec3 surfaceNormal = normalize(intersectionPos - sphereCenterPos);
+        float lambertian = max(dot(surfaceNormal, -lightDirection), 0.03);
+        radiance = materialEmissive / (4.0 * 3.14159);
+        radiance = materialDiffuse * lightColor * lambertian + radiance;
 
-        // Calculate the surface normal at the intersection point
-        vec3 surfaceNormal = normalize(intersection - sphereCenter);
-
-        // Calculate the diffuse lighting
-        float diffuse = max(dot(surfaceNormal, -lightDirection), 0.03);
-
-        // Set the color of the fragment based on the lighting
-        fragColor = vec4(vec3(diffuse), 1.0);
+        // Gamma correction should be applied after all lighting calculations
+        radiance = pow(radiance, vec3(1.0 / gamma));
     }
-    // to debug even harder, uncomment this
-    //fragColor = vec4(1.0);
 
-    // Override the depth value in the pixel shader
-    const float C = 1.0;
-    const float far = 3e18;  // 3e15 m is roughly the extent of the Oort cloud from the Sun.
-                             // Let's multply it by 1000 just because we can.
-    const float offset = 1.0;
-    gl_FragDepth = (log(C * vertexPosClip.z + offset) / log(C * far + offset));
+    // Reinhard Tone Mapping
+    radiance = radiance / (radiance + vec3(1.0));
+
+    fragmentColor = vec4(radiance, 1.0);
+
+    const float constantForDepth = 1.0;
+    const float farDistance = 3e18;
+    const float offsetForDepth = 1.0;
+    gl_FragDepth = (log(constantForDepth * vertexPositionClipSpace.z + offsetForDepth) / log(constantForDepth * farDistance + offsetForDepth));
 }
+
 )glsl";
 
 
-const char *fragmentShaderSource = R"glsl(
-#version 330 core
+/*
 
-in vec3 fragPos;
+The easiest way to implement ACES tone mapping in your shader might be to use the ACES filmic tone mapping curve, which is a piecewise function designed to produce visually pleasing results across a wide range of inputs.
 
-uniform mat4 view;
-uniform vec3 sphereCenter;
-uniform vec3 cameraPos;
-uniform float sphereRadius;
-uniform vec3 lightDirection;
+Below is a GLSL implementation of the ACES filmic tone mapping curve:
 
-out vec4 fragColor;
+```glsl
+vec3 RRTAndODTFit(vec3 v)
+{
+    vec3 a = v * (v + 0.0245786) - 0.000090537;
+    vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081;
+    return a / b;
+}
 
 void main()
-{   
-    // Transform the sphere center from world space to camera space
-    vec4 sphereCenterCamera = view * vec4(sphereCenter, 1.0);
-    
-    // Calculate the ray from the camera to the fragment in camera space
-    vec3 ray = normalize(fragPos - cameraPos);
-    
-    // Calculate the intersection of the ray with the sphere
-    vec3 sphereToCamera = cameraPos - sphereCenter;
-    float b = dot(ray, sphereToCamera);
-    float c = dot(sphereToCamera, sphereToCamera) - sphereRadius * sphereRadius;
-    float d = b * b - c;
-    
-    // If the ray does not intersect the sphere, set the color of the fragment to transparent
-    if (d < 0.0)
-    {
-        //fragColor = vec4(0.0, 0.0, 0.0, 0.0);
-        // eerie green glow for the debug
-        fragColor = vec4(0.0, 1.0, 0.0, 0.1);
-    }
-    else
-    {
-        // Calculate the intersection point
-        float t = -b - sqrt(d);
-        vec3 intersection = cameraPos + ray * t;
+{
+    // Perform lighting calculations as before
 
-        // Calculate the surface normal at the intersection point
-        vec3 surfaceNormal = normalize(intersection - sphereCenter);
-        
-        // Calculate the diffuse lighting
-        float diffuse = max(dot(surfaceNormal, -lightDirection), 0.03);
+    // Apply ACES Filmic Tone Mapping
+    vec3 color = RRTAndODTFit(radiance * 0.6);
+    color *= 1.0 / RRTAndODTFit(vec3(0.18));
+    
+    // Apply gamma correction
+    color = pow(color, vec3(1.0 / gamma));
 
-        // Set the color of the fragment based on the lighting
-        fragColor = vec4(vec3(diffuse), 1.0);
-    }
-    // to debug even harder, uncomment this
-    //fragColor = vec4(1.0);
+    // Set the final color
+    fragmentColor = vec4(color, 1.0);
+
+    // ... Rest of the shader
 }
-)glsl";
+```
 
+In this code, `RRTAndODTFit` is the ACES RRT (Reference Rendering Transform) and ODT (Output Device Transform) combined. The number `0.6` is an exposure bias which you might want to expose as a tweakable parameter in your game. The number `0.18` comes from middle grey and is used to maintain consistent brightness. The result of the tone mapping step is then gamma corrected and written to the output color.
+
+Keep in mind that ACES is a large standard and the full ACES pipeline involves much more than just tone mapping, including color spaces, white balance, color grading, etc. However, just using the ACES tone curve can be a good first step to achieving more physically accurate rendering.
+
+As always, the best tone mapping method to use depends on the specifics of your game and the aesthetic you're aiming for, so it's worth trying out a few different methods to see what works best in your case.
+
+ */
 
 const char *sparklyShaderSource = R"glsl(
 #version 330 core

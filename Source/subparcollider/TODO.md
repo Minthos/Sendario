@@ -1,13 +1,4 @@
 
-Recently done:
-
-* logarithmic depth in fragment shader
-* transform objects to be centered on the camera before rendering
-* "eliminated" physics bugs (partly by commenting out the drag and magnus force)
-* installed valgrind from source because fuck ubuntu (it was easy and it works, 10/10 with rice)
-
-
-
 Near term TODO:
 
 * set the sun's position as origin of light for each object to render
@@ -15,6 +6,15 @@ Near term TODO:
 * give planets and moons different colors
 * do something about atmospheric drag
 * improve logic for celestial bodies' orbits
+
+
+Recently done:
+
+* logarithmic depth in fragment shader
+* transform objects to be centered on the camera before rendering
+* "eliminated" physics bugs (partly by commenting out the drag and magnus force)
+* installed valgrind from source because fuck ubuntu (it was easy and it works, 10/10 with rice)
+
 
 
 
