@@ -55,7 +55,8 @@ struct light {
 
 const int MAX_LIGHTS = 1;
 
-uniform light lights[MAX_LIGHTS];
+uniform vec3 lightPositions[MAX_LIGHTS];
+uniform vec3 lightColors[MAX_LIGHTS];
 uniform mat4 view;
 uniform vec3 sphereCenter;
 uniform vec3 cameraPos;
@@ -79,6 +80,8 @@ void main()
     if (discriminant < 0.0)
     {
         radiance = vec3(0.0, 0.0, 0.0);
+	// eerie green glow for the debug
+        fragColor = vec4(0.0, 1.0, 0.0, 0.1); 
     }
     else
     {
@@ -87,22 +90,29 @@ void main()
         vec3 surfaceNormal = normalize(intersectionPos - sphereCenter);
 
 	vec3 accumulatedLight = vec3(0.0, 0.0, 0.0);
+
 	for (int i = 0; i < MAX_LIGHTS; ++i) {
-	    vec3 lightVector = lights[i].position - fragPos;
+	    vec3 lightVector = lightPositions[i] - fragPos;
 	    float squaredDistance = dot(lightVector, lightVector);
 	    vec3 lightDirection = lightVector / sqrt(squaredDistance);
+    	    //fragColor = vec4(lightDirection, 1.0);
 	    float attenuation = 1.0 / squaredDistance;
 	    float lambertian = max(dot(surfaceNormal, -lightDirection), 0.03);
-	    accumulatedLight += attenuation * materialDiffuse * lights[i].color * lambertian;
+	    accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
 	}
+	
+        //fragColor = vec4(lightPositions[0], 1.0);
 
 	radiance = materialEmissive / (4.0 * 3.14159) + accumulatedLight;
+    	// Reinhard Tone Mapping
+    	radiance = radiance / (radiance + vec3(1.0));
+	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
+	//fragColor = vec4(radiance, 1.0);
+    	//fragColor = vec4(1.0);
+    	
+	//fragColor = vec4(surfaceNormal * 0.5 + 0.5, 1.0);
     }
 
-    // Reinhard Tone Mapping
-    radiance = radiance / (radiance + vec3(1.0));
-//    fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
-    fragColor = vec4(1.0);
 
     const float constantForDepth = 1.0;
     const float farDistance = 3e18;
@@ -306,9 +316,12 @@ void *rendererThread(void *arg) {
     GLuint projLoc = glGetUniformLocation(shaderProgram, "projection");
     GLuint sphereCenterLoc = glGetUniformLocation(shaderProgram, "sphereCenter");
     GLuint sphereRadiusLoc = glGetUniformLocation(shaderProgram, "sphereRadius");
-    GLuint lightDirectionLoc = glGetUniformLocation(shaderProgram, "lightDirection");
     GLuint cameraPosLoc = glGetUniformLocation(shaderProgram, "cameraPos");
-    GLuint lightsLocation = glGetUniformLocation(shaderProgram, "lights");
+    GLuint lightPositionsLoc = glGetUniformLocation(shaderProgram, "lightPositions");
+    GLuint lightColorsLoc = glGetUniformLocation(shaderProgram, "lightColors");
+    GLuint gammaLoc = glGetUniformLocation(shaderProgram, "gamma");
+    GLuint diffuseLoc = glGetUniformLocation(shaderProgram, "materialDiffuse");
+    GLuint emissiveLoc = glGetUniformLocation(shaderProgram, "materialEmissive");
 
     // viewport
     int screenWidth, screenHeight;
@@ -354,7 +367,14 @@ void *rendererThread(void *arg) {
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
 	// Lights
-	glUniform1fv(lightsLocation, MAX_LIGHTS * 6, (GLfloat*)&sharedData.renderMisc.lights[0]);
+	for (int i = 0; i < MAX_LIGHTS; ++i) {
+    	    glUniform3fv(lightPositionsLoc + i, 1, &sharedData.renderMisc.lights[i].position[0]);
+            glUniform3fv(lightColorsLoc + i, 1, &sharedData.renderMisc.lights[i].color[0]);
+        }
+	
+	//light_source l = sharedData.renderMisc.lights[0];
+	//printf("light source pos: %f %f %f color: %f %f %f\n", l.position[0], l.position[1], l.position[2], l.color[0], l.color[1], l.color[2]);
+	glUniform1f(gammaLoc, 2.2f);
 
         // Geometry
         glBindVertexArray(VAO);
@@ -371,8 +391,11 @@ void *rendererThread(void *arg) {
                 // send the position of the sphere directly to the fragment shader, bypassing the vertex shader
                 glUniform3f(sphereCenterLoc, currentSphere.x, currentSphere.y, currentSphere.z);
                 glUniform1f(sphereRadiusLoc, currentSphere.radius);
-                glm::vec3 lightDirection = glm::normalize(glm::vec3(1.0f, -1.0f, -1.0f));
-                glUniform3fv(lightDirectionLoc, 1, glm::value_ptr(lightDirection));
+                
+		glm::vec3 diffuseComponent = glm::vec3(0.2, 0.2, 1.0); // 0 to 1
+		glm::vec3 emissiveComponent = glm::vec3(0.0, 0.0, 0.0); // W/m^2
+		glUniform3fv(diffuseLoc, 1, glm::value_ptr(diffuseComponent));
+		glUniform3fv(emissiveLoc, 1, glm::value_ptr(emissiveComponent));
 
                 // Draw the sphere
                 glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
