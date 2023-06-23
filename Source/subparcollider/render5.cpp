@@ -11,10 +11,10 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+
 extern "C" {
     #include "renderer.h"
 }
-
 
 const char *vertexShaderSource = R"glsl(
 #version 330 core
@@ -48,12 +48,18 @@ const char *fragmentShaderSource = R"glsl(
 in vec3 fragPos;
 in vec4 vertexPosClip;
 
+struct light {
+    vec3 position;
+    vec3 color; // W/sr per component
+};
+
+const int MAX_LIGHTS = 1;
+
+uniform light lights[MAX_LIGHTS];
 uniform mat4 view;
 uniform vec3 sphereCenter;
 uniform vec3 cameraPos;
 uniform float sphereRadius;
-uniform vec3 lightDirection;
-uniform vec3 lightColor; // W/m^2
 uniform vec3 materialDiffuse;
 uniform vec3 materialEmissive; // W/sr/m^2
 uniform float gamma;
@@ -62,10 +68,12 @@ out vec4 fragColor;
 
 void main()
 {
+    vec4 sphereCenterCamera = view * vec4(sphereCenter, 1.0);
+    vec3 ray = normalize(fragPos - cameraPos);
     vec3 sphereToCamera = cameraPos - sphereCenter;
-    float raySphereDot = dot(rayDirection, sphereToCamera);
-    float sphereToCameraDot = dot(sphereToCamera, sphereToCamera) - sphereRadius * sphereRadius;
-    float discriminant = raySphereDot * raySphereDot - sphereToCameraDot;
+    float b = dot(ray, sphereToCamera);
+    float c = dot(sphereToCamera, sphereToCamera) - sphereRadius * sphereRadius;
+    float discriminant = b * b - c;
 
     vec3 radiance;
     if (discriminant < 0.0)
@@ -74,26 +82,31 @@ void main()
     }
     else
     {
-        float rayIntersectParam = -raySphereDot - sqrt(discriminant);
-        vec3 intersectionPos = cameraPosition + rayDirection * rayIntersectParam;
-        vec3 surfaceNormal = normalize(intersectionPos - sphereCenterPos);
-        float lambertian = max(dot(surfaceNormal, -lightDirection), 0.03);
-        radiance = materialEmissive / (4.0 * 3.14159);
-        radiance = materialDiffuse * lightColor * lambertian + radiance;
+        float t = -b - sqrt(discriminant);
+        vec3 intersectionPos = cameraPos + ray * t;
+        vec3 surfaceNormal = normalize(intersectionPos - sphereCenter);
 
-        // Gamma correction should be applied after all lighting calculations
-        radiance = pow(radiance, vec3(1.0 / gamma));
+	vec3 accumulatedLight = vec3(0.0, 0.0, 0.0);
+	for (int i = 0; i < MAX_LIGHTS; ++i) {
+	    vec3 lightVector = lights[i].position - fragPos;
+	    float squaredDistance = dot(lightVector, lightVector);
+	    vec3 lightDirection = lightVector / sqrt(squaredDistance);
+	    float attenuation = 1.0 / squaredDistance;
+	    float lambertian = max(dot(surfaceNormal, -lightDirection), 0.03);
+	    accumulatedLight += attenuation * materialDiffuse * lights[i].color * lambertian;
+	}
+
+	radiance = materialEmissive / (4.0 * 3.14159) + accumulatedLight;
     }
 
     // Reinhard Tone Mapping
     radiance = radiance / (radiance + vec3(1.0));
-
-    fragmentColor = vec4(radiance, 1.0);
+    fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
 
     const float constantForDepth = 1.0;
     const float farDistance = 3e18;
     const float offsetForDepth = 1.0;
-    gl_FragDepth = (log(constantForDepth * vertexPositionClipSpace.z + offsetForDepth) / log(constantForDepth * farDistance + offsetForDepth));
+    gl_FragDepth = (log(constantForDepth * vertexPosClip.z + offsetForDepth) / log(constantForDepth * farDistance + offsetForDepth));
 }
 
 )glsl";
@@ -248,8 +261,6 @@ void *rendererThread(void *arg) {
         glfwTerminate();
         return 0;
     }
-
-    // Make the window's context current
     glfwMakeContextCurrent(sharedData.window);
 
     // Initialize GLEW
@@ -261,24 +272,23 @@ void *rendererThread(void *arg) {
     }
 
     // compile the vertex and fragment shaders
-    //GLuint vertexShader = compileShader(GL_VERTEX_SHADER, vertexShaderSource);
-    //GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragmentShaderSource);
-    GLuint vertexShader = compileShader(GL_VERTEX_SHADER, vertexShader2Source);
-    GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragmentShader2Source);
+    GLuint vertexShader = compileShader(GL_VERTEX_SHADER, vertexShaderSource);
+    GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragmentShaderSource);
+    //GLuint vertexShader = compileShader(GL_VERTEX_SHADER, vertexShader2Source);
+    //GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragmentShader2Source);
 
-    // linkw them into one program
+    // link them into one program
     GLuint shaderProgram = glCreateProgram();
     glAttachShader(shaderProgram, vertexShader);
     glAttachShader(shaderProgram, fragmentShader);
     glLinkProgram(shaderProgram);
     checkShader(GL_LINK_STATUS, shaderProgram);
 
-    // prepare buffers
+    // buffers
     GLuint VAO, VBO, EBO;
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
     glGenBuffers(1, &EBO);
-
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
@@ -289,6 +299,7 @@ void *rendererThread(void *arg) {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
+    // uniforms
     GLuint modelLoc = glGetUniformLocation(shaderProgram, "model");
     GLuint viewLoc = glGetUniformLocation(shaderProgram, "view");
     GLuint projLoc = glGetUniformLocation(shaderProgram, "projection");
@@ -296,7 +307,9 @@ void *rendererThread(void *arg) {
     GLuint sphereRadiusLoc = glGetUniformLocation(shaderProgram, "sphereRadius");
     GLuint lightDirectionLoc = glGetUniformLocation(shaderProgram, "lightDirection");
     GLuint cameraPosLoc = glGetUniformLocation(shaderProgram, "cameraPos");
+    GLuint lightsLocation = glGetUniformLocation(shaderProgram, "lights");
 
+    // viewport
     int screenWidth, screenHeight;
     glfwGetFramebufferSize(sharedData.window, &screenWidth, &screenHeight);
     glViewport(0, 0, screenWidth, screenHeight);
@@ -304,10 +317,8 @@ void *rendererThread(void *arg) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_CULL_FACE);
-
-    // Camera setup
     glm::mat4 projection = glm::perspective(glm::radians(90.0f), (float)screenWidth / (float)screenHeight, 1.0f, 1e12f);
-    glm::vec3 cameraPos = glm::vec3(0.0f, 1e10f, 0.0f);
+    glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 0.0f);
     glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
     glm::vec3 cameraUp = glm::vec3(0.0f, 0.0f, 1.0f);
 
@@ -319,7 +330,9 @@ void *rendererThread(void *arg) {
         glUseProgram(shaderProgram);
         glm::mat4 model = glm::mat4(1.0f);
 
-        // Read data
+        // Swap pointers with the thread that copies the data
+	// This lets the rendering thread and physics simulation both run at full speed
+	// without having to wait for each other
         pthread_mutex_lock(&sharedData.mutex);
         if(sharedData.nextBatch != NULL) {
             if(sharedData.spheres != NULL) {
@@ -331,14 +344,18 @@ void *rendererThread(void *arg) {
         }
         pthread_mutex_unlock(&sharedData.mutex);
 
+	// Camera
         cameraPos = glm::vec3(sharedData.renderMisc.camPosition[0], sharedData.renderMisc.camPosition[1], sharedData.renderMisc.camPosition[2]);
         cameraTarget = glm::vec3(sharedData.renderMisc.camDirection[0], sharedData.renderMisc.camDirection[1], sharedData.renderMisc.camDirection[2]);
         glUniform3f(cameraPosLoc, cameraPos.x, cameraPos.y, cameraPos.z);
         glm::mat4 view = glm::lookAt(cameraPos, cameraTarget, cameraUp);
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
- 
-        // Render spheres
+
+	// Lights
+	glUniform1fv(lightsLocation, MAX_LIGHTS * 6, (GLfloat*)&sharedData.renderMisc.lights[0]);
+
+        // Geometry
         glBindVertexArray(VAO);
         if (sharedData.spheres != NULL) {
             for (int i = 0; i < sharedData.numSpheres; ++i) {
@@ -356,7 +373,7 @@ void *rendererThread(void *arg) {
                 glm::vec3 lightDirection = glm::normalize(glm::vec3(1.0f, -1.0f, -1.0f));
                 glUniform3fv(lightDirectionLoc, 1, glm::value_ptr(lightDirection));
 
-                // Draw the cube
+                // Draw the sphere
                 glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
             }
         }
@@ -373,7 +390,7 @@ void *rendererThread(void *arg) {
     return 0;
 }
 
-
+// thread safe entry point copies all the data to keep things dumb.
 extern "C" void render(sphere* spheres, size_t sphereCount, render_misc renderMisc) {
     pthread_mutex_lock(&sharedData.mutex);
     if(sharedData.nextBatch != NULL) {

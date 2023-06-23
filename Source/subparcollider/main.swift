@@ -42,12 +42,12 @@ var camera = SphericalCow(position: Vector(x: earth.position.x, y: earth.positio
                           spin: Vector(x: 0, y: 0, z: 0),
                           mass: 0, radius: 0, frictionCoefficient: 0.0)
 
-var celestials = [sun, mercury, venus, earth, moon]
+var lights = [sun]
 var allTheThings = [sun, mercury, venus, earth, moon]
 let actions: [Action] = []
 
-let totalTime = 2e5
-var dt = 10.0
+let totalTime = 1e5
+var dt = 100.0
 //let totalTime = 0.0001
 //var dt = 0.00001
 var t = 0.0
@@ -57,7 +57,7 @@ func main() {
     while t < totalTime {
         tick(actions: actions, movingObjects: &allTheThings, t: t, dt: dt)
         t += dt
-        usleep(1000)
+        usleep(10000)
 
         var renderMisc = render_misc()
 
@@ -69,9 +69,23 @@ func main() {
         // camera is at 0,0,0 to make it easy for the renderer
         renderMisc.camPosition = (0, 0, 0)
 
+        for (index, object) in lights.enumerated() {
+            if(index >= MAX_LIGHTS){
+                print("warning: MAX_LIGHTS exceeded")
+                break
+            }
+            withUnsafeMutablePointer(to:&renderMisc.lights) { lights_ptr in
+                lights_ptr[index].position =
+                    (Float(object.position.x - camera.position.x),
+                     Float(object.position.y - camera.position.y),
+                     Float(object.position.z - camera.position.z))
+                // hardcoded values for the sun, improve later
+                lights_ptr[index].color = (4.38e24, 4.38e24, 4.18e24)
+            }
+        }
+
         // we have to sort the things before we send them to the renderer, otherwise transparency breaks.
         allTheThings.sort(by: { ($0.position - camera.position).length > ($1.position - camera.position).length })
-
         let sphereArray = UnsafeMutablePointer<sphere>.allocate(capacity: allTheThings.count)
         for (index, object) in allTheThings.enumerated() {
             // center everything on the camera before converting to float to avoid float precision issues when rendering
@@ -81,12 +95,43 @@ func main() {
                                         radius: Float(object.radius),
                                         material: nil)
         }
+
         render(sphereArray, allTheThings.count, renderMisc)
         sphereArray.deallocate()
     }
 
     stopRenderer()
 }
+
+/*
+
+The value of 3.828 x 10^26 W is the total power emitted by the sun in all directions - this is its luminosity. To convert this to a power per unit solid angle (W/sr), we need to divide by the total solid angle of a sphere, which is 4π steradians.
+
+For the visible part, that's approximately 43.4% of the total power, or 1.66 x 10^26 W. Dividing by 4π gives us about 1.32 x 10^25 W/sr.
+
+If we split this equally among the R, G, and B components (assuming for simplicity that they're all of equal intensity, which isn't quite true but is close enough for a first approximation), each one gets about 4.4 x 10^24 W/sr.
+
+In reality, the sun emits slightly more green light than red or blue, so if we account for that by assigning the given RGB values of 255, 255, 244 to R, G, and B respectively, we get:
+
+R: 4.38 x 10^24 W/sr
+G: 4.38 x 10^24 W/sr
+B: 4.18 x 10^24 W/sr
+
+Radio: The sun's flux density at a frequency of 1 GHz is about 10^-22 W m^-2 Hz^-1. Considering the entire radio spectrum, the total power is very small compared to other forms of radiation.
+
+Microwave: The sun's contribution to the Cosmic Microwave Background (CMB) radiation is minuscule. The CMB has a nearly uniform temperature of about 2.725 K, and the sun's motion adds a dipole anisotropy of only about 3 mK.
+
+Infrared: About 49.4% of the sun's total power output, or approximately 1.89 x 10^26 W, is emitted as infrared radiation.
+
+Visible: About 43.4% of the sun's total power output, or approximately 1.66 x 10^26 W, is emitted as visible light.
+
+Ultraviolet: About 7.1% of the sun's total power output, or approximately 2.72 x 10^25 W, is emitted as ultraviolet radiation.
+
+X-rays: The sun's X-ray flux is highly variable and depends on solar activity, but it's estimated to be around 10^-6 W/m^2 during a solar flare. Over the entire surface of the sun, this would be about 10^20 W, which is still many orders of magnitude less than the total power output.
+
+Gamma rays: The sun produces essentially no gamma rays, because the temperatures in the sun's core are not high enough to support the nuclear reactions that produce gamma rays.
+
+*/
 
 main()
 

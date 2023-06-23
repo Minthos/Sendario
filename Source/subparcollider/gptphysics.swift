@@ -333,24 +333,24 @@ func tick(actions: [Action], movingObjects: inout [SphericalCow], t: Double, dt:
             let gravityForce = deltaPosition.normalized() * forceMagnitude
             object.applyForce(force: gravityForce, dt: dt)
 
-            let altitude = object.position.z - earth.radius
-            let (density, _, viscosity) = atmosphericProperties(altitude: altitude)
-            let dragCoefficient = 0.47 // Assuming a sphere
-            let area = Double.pi * pow(object.radius, 2)
-            var dragForceMagnitude = 0.5 * density * pow(object.velocity.length, 2) * dragCoefficient * area
-            if(dragForceMagnitude.isNaN) {
-                dragForceMagnitude = 0
-            }
-            let dragForce = -object.velocity.normalized() * dragForceMagnitude
+            //let altitude = object.position.z - earth.radius
+            //let (density, _, viscosity) = atmosphericProperties(altitude: altitude)
+            //let dragCoefficient = 0.47 // Assuming a sphere
+            //let area = Double.pi * pow(object.radius, 2)
+            //var dragForceMagnitude = 0.5 * density * pow(object.velocity.length, 2) * dragCoefficient * area
+            //if(dragForceMagnitude.isNaN) {
+            //    dragForceMagnitude = 0
+            //}
+            //let dragForce = -object.velocity.normalized() * dragForceMagnitude
             //object.applyForce(force: dragForce, dt: dt)
 
-            let angularDragTorqueMagnitude = 8 * Double.pi * viscosity * pow(object.radius, 3) * object.spin.length / 3
-            let angularDragTorque = -object.spin.normalized() * angularDragTorqueMagnitude
+            //let angularDragTorqueMagnitude = 8 * Double.pi * viscosity * pow(object.radius, 3) * object.spin.length / 3
+            //let angularDragTorque = -object.spin.normalized() * angularDragTorqueMagnitude
             //object.applyTorque(torque: angularDragTorque, dt: dt)
 
-            let magnusForce = magnusForce(velocity: object.velocity, spin: object.spin, density: density, viscosity: viscosity, radius: object.radius)
+            //let magnusForce = magnusForce(velocity: object.velocity, spin: object.spin, density: density, viscosity: viscosity, radius: object.radius)
             //object.applyForce(force: magnusForce, dt: dt)
-            print("drag: \(dragForceMagnitude), magnus: \(magnusForce.length), gravity: \(gravityForce.length), total: \((dragForce + magnusForce + gravityForce).length)")
+            //print("drag: \(dragForceMagnitude), magnus: \(magnusForce.length), gravity: \(gravityForce.length), total: \((dragForce + magnusForce + gravityForce).length)")
 //            object.applyHeat(heat: 
         }
         object.position += object.velocity * dt
