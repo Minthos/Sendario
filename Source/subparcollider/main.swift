@@ -61,9 +61,9 @@ func main() {
 
         var renderMisc = render_misc()
 
-        camera.position = moon.position
-        camera.position.y += moon.radius * 1.25
-        camera.position.z -= moon.radius * 1.5
+        camera.position = earth.position
+        camera.position.y += earth.radius * 1.25
+        camera.position.z -= earth.radius * 1.5
         camera.orientation = (earth.position - camera.position).normalized()
         renderMisc.camDirection = (Float(camera.orientation.x), Float(camera.orientation.y), Float(camera.orientation.z))
         // camera is at 0,0,0 to make it easy for the renderer

@@ -101,7 +101,8 @@ void main()
 
     // Reinhard Tone Mapping
     radiance = radiance / (radiance + vec3(1.0));
-    fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
+//    fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
+    fragColor = vec4(1.0);
 
     const float constantForDepth = 1.0;
     const float farDistance = 3e18;
