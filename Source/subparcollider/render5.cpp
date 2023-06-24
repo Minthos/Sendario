@@ -391,10 +391,11 @@ void *rendererThread(void *arg) {
                 glUniform3f(sphereCenterLoc, currentSphere.x, currentSphere.y, currentSphere.z);
                 glUniform1f(sphereRadiusLoc, currentSphere.radius);
                 
-		float vibrance = 3.0;
 		glm::vec3 diffuseComponent = glm::vec3(0.5, 0.7, 1.0); // 0 to 1
-		
-		diffuseComponent = glm::vec3(std::pow(diffuseComponent.r, vibrance), std::pow(diffuseComponent.g, vibrance), std::pow(diffuseComponent.b, vibrance));
+	
+		// colors looked washed out so I did a thing. not quite vibrance so I'll call it vibe.
+		float vibe = 3.0;
+		diffuseComponent = glm::vec3(std::pow(diffuseComponent.r, vibe), std::pow(diffuseComponent.g, vibe), std::pow(diffuseComponent.b, vibe));
 		glm::vec3 emissiveComponent = glm::vec3(2.0, 0.0, 2.0); // W/m^2
 		glUniform3fv(diffuseLoc, 1, glm::value_ptr(diffuseComponent));
 		glUniform3fv(emissiveLoc, 1, glm::value_ptr(emissiveComponent));
