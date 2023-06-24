@@ -391,7 +391,7 @@ void *rendererThread(void *arg) {
                 glUniform3f(sphereCenterLoc, currentSphere.x, currentSphere.y, currentSphere.z);
                 glUniform1f(sphereRadiusLoc, currentSphere.radius);
                 
-		glm::vec3 diffuseComponent = glm::vec3(0.4, 0.4, 0.8); // 0 to 1
+		glm::vec3 diffuseComponent = glm::vec3(0.2, 0.2, 1.0); // 0 to 1
 		glm::vec3 emissiveComponent = glm::vec3(10.0, 0.0, 0.0); // W/m^2
 		glUniform3fv(diffuseLoc, 1, glm::value_ptr(diffuseComponent));
 		glUniform3fv(emissiveLoc, 1, glm::value_ptr(emissiveComponent));
