@@ -64,6 +64,7 @@ uniform float sphereRadius;
 uniform vec3 materialDiffuse;
 uniform vec3 materialEmissive; // W/sr/m^2
 uniform float gamma;
+uniform float exposure;
 
 out vec4 fragColor;
 
@@ -95,13 +96,18 @@ void main()
 	    float squaredDistance = dot(lightVector, lightVector);
 	    vec3 lightDirection = lightVector / sqrt(squaredDistance);
 	    float attenuation = 1.0 / squaredDistance;
-	    float lambertian = max(dot(surfaceNormal, -lightDirection), 0.03);
+	    float lambertian = max(dot(surfaceNormal, lightDirection), 0.0);
 	    accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
 	}
+
+	// divide materialEmissive by 4 pi
+	radiance = materialEmissive * 0.079577 + accumulatedLight;	
 	
-	radiance = materialEmissive / (4.0 * 3.14159) + accumulatedLight;
-    	// Reinhard Tone Mapping
-    	radiance = radiance / (radiance + vec3(1.0));
+	// tone mapping radiance to the 0,1 range by dividing by total brightness. darkness is the inverse of brightness.
+	float darkness = 3.0 / (3.0 + exposure + radiance.r + radiance.g + radiance.b);
+	radiance = radiance * darkness;
+	
+	// gamma correction
 	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
     }
 
@@ -311,9 +317,10 @@ void *rendererThread(void *arg) {
     GLuint cameraPosLoc = glGetUniformLocation(shaderProgram, "cameraPos");
     GLuint lightPositionsLoc = glGetUniformLocation(shaderProgram, "lightPositions");
     GLuint lightColorsLoc = glGetUniformLocation(shaderProgram, "lightColors");
-    GLuint gammaLoc = glGetUniformLocation(shaderProgram, "gamma");
     GLuint diffuseLoc = glGetUniformLocation(shaderProgram, "materialDiffuse");
     GLuint emissiveLoc = glGetUniformLocation(shaderProgram, "materialEmissive");
+    GLuint gammaLoc = glGetUniformLocation(shaderProgram, "gamma");
+    GLuint exposureLoc = glGetUniformLocation(shaderProgram, "exposure");
 
     // viewport
     int screenWidth, screenHeight;
@@ -357,16 +364,16 @@ void *rendererThread(void *arg) {
         glm::mat4 view = glm::lookAt(cameraPos, cameraTarget, cameraUp);
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+	
+	// Brightness controls
+	glUniform1f(gammaLoc, 2.2f);
+	glUniform1f(exposureLoc, 200.0f);
 
 	// Lights
 	for (int i = 0; i < MAX_LIGHTS; ++i) {
     	    glUniform3fv(lightPositionsLoc + i, 1, &sharedData.renderMisc.lights[i].position[0]);
             glUniform3fv(lightColorsLoc + i, 1, &sharedData.renderMisc.lights[i].color[0]);
         }
-	
-	//light_source l = sharedData.renderMisc.lights[0];
-	//printf("light source pos: %f %f %f color: %f %f %f\n", l.position[0], l.position[1], l.position[2], l.color[0], l.color[1], l.color[2]);
-	glUniform1f(gammaLoc, 2.2f);
 
         // Geometry
         glBindVertexArray(VAO);
@@ -384,8 +391,8 @@ void *rendererThread(void *arg) {
                 glUniform3f(sphereCenterLoc, currentSphere.x, currentSphere.y, currentSphere.z);
                 glUniform1f(sphereRadiusLoc, currentSphere.radius);
                 
-		glm::vec3 diffuseComponent = glm::vec3(0.002, 0.002, 0.01); // 0 to 1
-		glm::vec3 emissiveComponent = glm::vec3(0.0, 0.0, 0.0); // W/m^2
+		glm::vec3 diffuseComponent = glm::vec3(0.4, 0.4, 0.8); // 0 to 1
+		glm::vec3 emissiveComponent = glm::vec3(10.0, 0.0, 0.0); // W/m^2
 		glUniform3fv(diffuseLoc, 1, glm::value_ptr(diffuseComponent));
 		glUniform3fv(emissiveLoc, 1, glm::value_ptr(emissiveComponent));
 

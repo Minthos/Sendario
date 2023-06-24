@@ -46,7 +46,7 @@ var lights = [sun]
 var allTheThings = [sun, mercury, venus, earth, moon]
 let actions: [Action] = []
 
-let totalTime = 1e5
+let totalTime = 1e6
 var dt = 100.0
 //let totalTime = 0.0001
 //var dt = 0.00001
@@ -61,10 +61,10 @@ func main() {
 
         var renderMisc = render_misc()
 
-        if(false){
+        if(true){
             camera.position = earth.position
-            camera.position.y += earth.radius * 1.25
-            camera.position.z -= earth.radius * 1.5
+            camera.position.y += earth.radius * 2.25
+            camera.position.z += earth.radius * 0.5
             camera.orientation = (earth.position - camera.position).normalized()
         } else {
             camera.position = moon.position
