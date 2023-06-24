@@ -76,10 +76,9 @@ void main()
     float c = dot(sphereToCamera, sphereToCamera) - sphereRadius * sphereRadius;
     float discriminant = b * b - c;
 
-    vec3 radiance;
+    vec3 radiance = vec3(0.0, 0.0, 0.0);
     if (discriminant < 0.0)
     {
-        radiance = vec3(0.0, 0.0, 0.0);
 	// eerie green glow for the debug
         fragColor = vec4(0.0, 1.0, 0.0, 0.1); 
     }
@@ -95,22 +94,15 @@ void main()
 	    vec3 lightVector = lightPositions[i] - fragPos;
 	    float squaredDistance = dot(lightVector, lightVector);
 	    vec3 lightDirection = lightVector / sqrt(squaredDistance);
-    	    //fragColor = vec4(lightDirection, 1.0);
 	    float attenuation = 1.0 / squaredDistance;
 	    float lambertian = max(dot(surfaceNormal, -lightDirection), 0.03);
 	    accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
 	}
 	
-        //fragColor = vec4(lightPositions[0], 1.0);
-
 	radiance = materialEmissive / (4.0 * 3.14159) + accumulatedLight;
     	// Reinhard Tone Mapping
     	radiance = radiance / (radiance + vec3(1.0));
 	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
-	//fragColor = vec4(radiance, 1.0);
-    	//fragColor = vec4(1.0);
-    	
-	//fragColor = vec4(surfaceNormal * 0.5 + 0.5, 1.0);
     }
 
 
@@ -392,7 +384,7 @@ void *rendererThread(void *arg) {
                 glUniform3f(sphereCenterLoc, currentSphere.x, currentSphere.y, currentSphere.z);
                 glUniform1f(sphereRadiusLoc, currentSphere.radius);
                 
-		glm::vec3 diffuseComponent = glm::vec3(0.2, 0.2, 1.0); // 0 to 1
+		glm::vec3 diffuseComponent = glm::vec3(0.002, 0.002, 0.01); // 0 to 1
 		glm::vec3 emissiveComponent = glm::vec3(0.0, 0.0, 0.0); // W/m^2
 		glUniform3fv(diffuseLoc, 1, glm::value_ptr(diffuseComponent));
 		glUniform3fv(emissiveLoc, 1, glm::value_ptr(emissiveComponent));

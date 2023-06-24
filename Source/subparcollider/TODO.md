@@ -1,8 +1,7 @@
 
 Near term TODO:
 
-* set the sun's position as origin of light for each object to render
-* make the sun really bright
+* fix remaining bug(s) the light calculation
 * give planets and moons different colors
 * do something about atmospheric drag
 * improve logic for celestial bodies' orbits
@@ -10,6 +9,8 @@ Near term TODO:
 
 Recently done:
 
+* set the sun's position as origin of light for each object to render
+* make the sun really bright
 * logarithmic depth in fragment shader
 * transform objects to be centered on the camera before rendering
 * "eliminated" physics bugs (partly by commenting out the drag and magnus force)
