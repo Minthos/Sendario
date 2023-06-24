@@ -31,8 +31,8 @@ var earth = SphericalCow(position: Vector(x: 0, y: 0, z: -149.6e9),
                          orientation: Vector(x: 0, y: 0, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
                          mass: 5.972e24, radius: 6.371e6, frictionCoefficient: 0.8)
-var moon = SphericalCow(position: Vector(x: 0, y: 0, z: earth.position.z - 384.4e6),
-                         velocity: Vector(x: earth.velocity.x + 1.02e3, y: 0, z: earth.velocity.z),
+var moon = SphericalCow(position: Vector(x: earth.position.x, y: earth.position.y - 384e5, z: earth.position.z),
+                         velocity: Vector(x: earth.velocity.x, y: earth.velocity.y, z: earth.velocity.z + 3.5e3),
                          orientation: Vector(x: 0, y: 0, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
                          mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.8)
@@ -46,7 +46,7 @@ var lights = [sun]
 var allTheThings = [sun, mercury, venus, earth, moon]
 let actions: [Action] = []
 
-let totalTime = 1e6
+let totalTime = 1e8
 var dt = 100.0
 //let totalTime = 0.0001
 //var dt = 0.00001
@@ -63,14 +63,15 @@ func main() {
 
         if(true){
             camera.position = earth.position
-            camera.position.y += earth.radius * 2.25
+            camera.position.x += earth.radius * 16.25
             camera.position.z += earth.radius * 0.5
             camera.orientation = (earth.position - camera.position).normalized()
         } else {
-            camera.position = moon.position
-            camera.position.y += moon.radius * 1.25
-            camera.position.z -= moon.radius * 1.5
-            camera.orientation = (earth.position - camera.position).normalized()
+            camera.position = moon.position + (moon.position - earth.position).normalized() * 10.0 * moon.radius
+            camera.position.x += moon.radius * 2.0
+            camera.position.y += moon.radius * 2.0
+            camera.position.z += moon.radius * 2.0
+            camera.orientation = (moon.position - camera.position).normalized()
         }
         renderMisc.camDirection = (Float(camera.orientation.x), Float(camera.orientation.y), Float(camera.orientation.z))
         // camera is at 0,0,0 to make it easy for the renderer

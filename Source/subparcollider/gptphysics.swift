@@ -326,7 +326,14 @@ func tick(actions: [Action], movingObjects: inout [SphericalCow], t: Double, dt:
     // calculate gravity between celestial bodies with brute force
     // if an object is near a celestial body, use that body to calculate drag and magnus force
     for object in movingObjects {
-        if(object !== sun && object !== camera){
+        if(object === moon) {
+            let deltaPosition = earth.position - object.position
+            let distance = deltaPosition.length
+            let forceMagnitude = (6.67430e-11 * object.mass * earth.mass) / pow(distance, 2)
+            let gravityForce = deltaPosition.normalized() * forceMagnitude
+            object.applyForce(force: gravityForce, dt: dt)
+        }
+        else if(object !== sun && object !== camera){
             let deltaPosition = sun.position - object.position
             let distance = deltaPosition.length
             let forceMagnitude = (6.67430e-11 * object.mass * sun.mass) / pow(distance, 2)

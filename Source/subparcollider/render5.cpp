@@ -333,7 +333,7 @@ void *rendererThread(void *arg) {
     glm::mat4 projection = glm::perspective(glm::radians(90.0f), (float)screenWidth / (float)screenHeight, 1.0f, 1e12f);
     glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 0.0f);
     glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
-    glm::vec3 cameraUp = glm::vec3(0.0f, 0.0f, 1.0f);
+    glm::vec3 cameraUp = glm::vec3(1.0f, 0.0f, 0.0f);
 
     // Rendering loop
     while (!glfwWindowShouldClose(sharedData.window) && !sharedData.shouldExit) {
@@ -393,7 +393,7 @@ void *rendererThread(void *arg) {
                 
 		glm::vec3 diffuseComponent = glm::vec3(0.5, 0.7, 1.0); // 0 to 1
 	
-		// colors looked washed out so I did a thing. not quite vibrance so I'll call it vibe.
+		// colors looked washed out so I did a thing. not quite vibrance so I'll call it vibe. texture saturation? but we don't have textures.
 		float vibe = 3.0;
 		diffuseComponent = glm::vec3(std::pow(diffuseComponent.r, vibe), std::pow(diffuseComponent.g, vibe), std::pow(diffuseComponent.b, vibe));
 		glm::vec3 emissiveComponent = glm::vec3(2.0, 0.0, 2.0); // W/m^2

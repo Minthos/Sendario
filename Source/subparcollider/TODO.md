@@ -1,22 +1,21 @@
 
 Near term TODO:
 
-* fix remaining bug(s) the light calculation
+* gravity, wtf??
+* improve logic for celestial bodies' orbits
 * give planets and moons different colors
 * do something about atmospheric drag
-* improve logic for celestial bodies' orbits
 
 
 Recently done:
 
+* fix remaining bug(s) the light calculation
 * set the sun's position as origin of light for each object to render
 * make the sun really bright
 * logarithmic depth in fragment shader
 * transform objects to be centered on the camera before rendering
 * "eliminated" physics bugs (partly by commenting out the drag and magnus force)
 * installed valgrind from source because fuck ubuntu (it was easy and it works, 10/10 with rice)
-
-
 
 
 Long-range plans:
