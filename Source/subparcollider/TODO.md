@@ -9,6 +9,7 @@ Near term TODO:
 
 Recently done:
 
+* implemented Verlet integration. It doesn't solve orbital stability completely but it improves it.
 * fix remaining bug(s) the light calculation
 * set the sun's position as origin of light for each object to render
 * make the sun really bright

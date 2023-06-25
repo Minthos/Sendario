@@ -294,44 +294,41 @@ class SphericalCow {
         self.accumulatedTorque += torque
     }
 
-
+    // Homegrown algorithm inspired by Euler and Verlet
+    // idk, maybe I'm regarded
     func integrateForces(dt: Double) {
-        // OK this version is actually awesome. I don't know why.
-        let dv = accumulatedForce * (dt / mass)
-        position = position + velocity * dt + dv * 0.5 * dt
+        
+        // This is Verlet, copied from Wikipedia. It works well.
 
-        let futureForce = accumulatedForce * 1.5 - prevForce * 0.5
-        let futureDv = futureForce * dt / mass
-        velocity = velocity + futureDv
+        // act as if accumulatedForces don't exist yet
+        let new_pos = position + velocity * dt + (prevForce / mass) * (dt * dt * 0.5)
+        // apply forces
+        let sum_accel = (prevForce + accumulatedForce) / mass
+        let new_vel = velocity + (sum_accel)*(dt*0.5)
+        position = new_pos
+        velocity = new_vel
         prevForce = accumulatedForce
         accumulatedForce = Vector(x: 0, y: 0, z: 0)
 /*
-
-        // 18 seconds with dt=5.0
+        // this is my own attempt, not as good as Verlet.
         let dv = accumulatedForce * (dt / mass)
-        let newVelocity = velocity + dv
-        position = position + (newVelocity + velocity) * 0.5 * dt
-
-        let futureForce = accumulatedForce * 2.0 - prevForce
-        let futureDv = (futureForce + accumulatedForce) * 0.5 * dt / mass
+        position = position + velocity * dt + dv * (0.5 * dt)
+        // extrapolating acceleration slightly seems to help keep orbits stable for longer
+        // we're really just front-loading some of the acceleration.. since we remove it next tick..
+        // but the effect is that the next position update gets a slight nudge
+        // am I taking crazy pills?
+        let futureForce = accumulatedForce * 1.5 - prevForce * 0.5
+        let futureDv = futureForce * (dt / mass)
         velocity = velocity + futureDv
         prevForce = accumulatedForce
         accumulatedForce = Vector(x: 0, y: 0, z: 0)
-
-        // 23 seconds with dt=5.0, but it has a bug
-        let averageForce = (prevForce + accumulatedForce) * 0.5
-        let dv = averageForce * (dt / mass)
-        let newVelocity = velocity + dv
-        position = position + (newVelocity + velocity) * 0.5
-        velocity = newVelocity
-        prevForce = accumulatedForce
-        accumulatedForce = Vector(x: 0, y: 0, z: 0)
 */
-        let averageTorque = (prevTorque + accumulatedTorque) * 0.5
-        let ds = averageTorque * (dt / mass)
-        let newSpin = spin + ds
-        orientation = orientation + (newSpin + spin) * 0.5
-        spin = newSpin
+        // same algorithm for torque
+        let ds = accumulatedTorque * (dt / momentOfInertia)
+        orientation = orientation + spin * dt + ds * (0.5 * dt)
+        let futureTorque = accumulatedTorque * 1.5 - prevTorque * 0.5
+        let futureDs = futureTorque * (dt / momentOfInertia)
+        spin = spin + futureDs
         prevTorque = accumulatedTorque
         accumulatedTorque = Vector(x: 0, y: 0, z: 0)
     }
