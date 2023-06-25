@@ -296,12 +296,12 @@ class SphericalCow {
 
 
     func integrateForces(dt: Double) {
-        // 18 seconds with dt=5.0
+        // OK this version is actually awesome. I don't know why.
         let dv = accumulatedForce * (dt / mass)
         position = position + velocity * dt + dv * 0.5 * dt
 
-        let futureForce = accumulatedForce * 2.0 - prevForce
-        let futureDv = (futureForce + accumulatedForce) * 0.5 * dt / mass
+        let futureForce = accumulatedForce * 1.5 - prevForce * 0.5
+        let futureDv = futureForce * dt / mass
         velocity = velocity + futureDv
         prevForce = accumulatedForce
         accumulatedForce = Vector(x: 0, y: 0, z: 0)
