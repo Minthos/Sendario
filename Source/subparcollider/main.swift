@@ -30,12 +30,12 @@ var earth = SphericalCow(position: Vector(x: 0, y: 0, z: -149.6e9),
                          velocity: Vector(x: 29.78e3, y: 0, z: 0),
                          orientation: Vector(x: 0, y: 0, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
-                         mass: 5.972e24, radius: 6.371e6, frictionCoefficient: 0.8)
+                         mass: 5.972e24, radius: 6.371e6, frictionCoefficient: 0.0)
 var moon = SphericalCow(position: Vector(x: earth.position.x, y: earth.position.y - 384e5, z: earth.position.z),
-                         velocity: Vector(x: earth.velocity.x, y: earth.velocity.y, z: earth.velocity.z + 3.5e3),
+                         velocity: Vector(x: earth.velocity.x, y: earth.velocity.y, z: earth.velocity.z + 3.66e3),
                          orientation: Vector(x: 0, y: 0, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
-                         mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.8)
+                         mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.0)
 var camera = SphericalCow(position: Vector(x: earth.position.x, y: earth.position.y - earth.radius * 2.0, z: earth.position.z - earth.radius * 8.0),
                           velocity: earth.velocity,
                           orientation: Vector(x: 0, y: 0, z: 0),
@@ -46,8 +46,8 @@ var lights = [sun]
 var allTheThings = [sun, mercury, venus, earth, moon]
 let actions: [Action] = []
 
-let totalTime = 1e8
-var dt = 100.0
+let totalTime = 1e9
+var dt = 5.0
 //let totalTime = 0.0001
 //var dt = 0.00001
 var t = 0.0
@@ -57,7 +57,7 @@ func main() {
     while t < totalTime {
         tick(actions: actions, movingObjects: &allTheThings, t: t, dt: dt)
         t += dt
-        usleep(10000)
+        //usleep(10000)
 
         var renderMisc = render_misc()
 

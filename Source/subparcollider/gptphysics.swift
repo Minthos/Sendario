@@ -259,6 +259,10 @@ class SphericalCow {
     var velocity: Vector
     var orientation: Vector
     var spin: Vector
+    var accumulatedForce: Vector
+    var accumulatedTorque: Vector
+    var prevForce: Vector
+    var prevTorque: Vector
     let mass: Double
     let radius: Double
     let momentOfInertia: Double
@@ -272,6 +276,10 @@ class SphericalCow {
         self.velocity = velocity
         self.orientation = orientation
         self.spin = spin
+        self.accumulatedForce = Vector(x: 0, y: 0, z: 0)
+        self.accumulatedTorque = Vector(x: 0, y: 0, z: 0)
+        self.prevForce = Vector(x: 0, y: 0, z: 0)
+        self.prevTorque = Vector(x: 0, y: 0, z: 0)
         self.mass = mass
         self.radius = radius
         self.momentOfInertia = 2 * mass * radius * radius / 5
@@ -279,11 +287,53 @@ class SphericalCow {
     }
 
     func applyForce(force: Vector, dt: Double) {
-        self.velocity += (force / mass) * dt
+        self.accumulatedForce += force
     }
 
     func applyTorque(torque: Vector, dt: Double) {
-        self.spin += (torque / momentOfInertia) * dt
+        self.accumulatedTorque += torque
+    }
+
+
+    func integrateForces(dt: Double) {
+        // 18 seconds with dt=5.0
+        let dv = accumulatedForce * (dt / mass)
+        position = position + velocity * dt + dv * 0.5 * dt
+
+        let futureForce = accumulatedForce * 2.0 - prevForce
+        let futureDv = (futureForce + accumulatedForce) * 0.5 * dt / mass
+        velocity = velocity + futureDv
+        prevForce = accumulatedForce
+        accumulatedForce = Vector(x: 0, y: 0, z: 0)
+/*
+
+        // 18 seconds with dt=5.0
+        let dv = accumulatedForce * (dt / mass)
+        let newVelocity = velocity + dv
+        position = position + (newVelocity + velocity) * 0.5 * dt
+
+        let futureForce = accumulatedForce * 2.0 - prevForce
+        let futureDv = (futureForce + accumulatedForce) * 0.5 * dt / mass
+        velocity = velocity + futureDv
+        prevForce = accumulatedForce
+        accumulatedForce = Vector(x: 0, y: 0, z: 0)
+
+        // 23 seconds with dt=5.0, but it has a bug
+        let averageForce = (prevForce + accumulatedForce) * 0.5
+        let dv = averageForce * (dt / mass)
+        let newVelocity = velocity + dv
+        position = position + (newVelocity + velocity) * 0.5
+        velocity = newVelocity
+        prevForce = accumulatedForce
+        accumulatedForce = Vector(x: 0, y: 0, z: 0)
+*/
+        let averageTorque = (prevTorque + accumulatedTorque) * 0.5
+        let ds = averageTorque * (dt / mass)
+        let newSpin = spin + ds
+        orientation = orientation + (newSpin + spin) * 0.5
+        spin = newSpin
+        prevTorque = accumulatedTorque
+        accumulatedTorque = Vector(x: 0, y: 0, z: 0)
     }
 }
 
@@ -360,7 +410,7 @@ func tick(actions: [Action], movingObjects: inout [SphericalCow], t: Double, dt:
             //print("drag: \(dragForceMagnitude), magnus: \(magnusForce.length), gravity: \(gravityForce.length), total: \((dragForce + magnusForce + gravityForce).length)")
 //            object.applyHeat(heat: 
         }
-        object.position += object.velocity * dt
+        object.integrateForces(dt: dt)
     }
 
 

@@ -1,7 +1,7 @@
 
 Near term TODO:
 
-* gravity, wtf??
+* gravity, wtf?? - may need to simulate tidal interactions (simplified obviously) for orbits to circularize instead of getting more eccentric over time
 * improve logic for celestial bodies' orbits
 * give planets and moons different colors
 * do something about atmospheric drag
