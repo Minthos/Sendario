@@ -30,12 +30,12 @@ var earth = SphericalCow(position: Vector(x: 0, y: 0, z: -149.6e9),
                          velocity: Vector(x: 29.78e3, y: 0, z: 0),
                          orientation: Vector(x: 0, y: 0, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
-                         mass: 5.972e24, radius: 6.371e6, frictionCoefficient: 0.0)
+                         mass: 5.972e24, radius: 6.371e6, frictionCoefficient: 0.0001)
 var moon = SphericalCow(position: Vector(x: earth.position.x, y: earth.position.y - 384e5, z: earth.position.z),
                          velocity: Vector(x: earth.velocity.x, y: earth.velocity.y, z: earth.velocity.z + 3.66e3),
                          orientation: Vector(x: 0, y: 0, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
-                         mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.0)
+                         mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.01)
 var camera = SphericalCow(position: Vector(x: earth.position.x, y: earth.position.y - earth.radius * 2.0, z: earth.position.z - earth.radius * 8.0),
                           velocity: earth.velocity,
                           orientation: Vector(x: 0, y: 0, z: 0),

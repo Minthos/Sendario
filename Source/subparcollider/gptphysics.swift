@@ -300,7 +300,7 @@ class SphericalCow {
         
         // This is Verlet, copied from Wikipedia. It works well.
 
-        // act as if accumulatedForces don't exist yet
+        // act as if accumulatedForce don't exist yet
         let new_pos = position + velocity * dt + (prevForce / mass) * (dt * dt * 0.5)
         // apply forces
         let sum_accel = (prevForce + accumulatedForce) / mass
@@ -309,6 +309,17 @@ class SphericalCow {
         velocity = new_vel
         prevForce = accumulatedForce
         accumulatedForce = Vector(x: 0, y: 0, z: 0)
+
+
+        // act as if accumulatedTorque don't exist yet
+        let new_orientation = orientation + spin * dt + (prevTorque / momentOfInertia) * (dt * dt * 0.5)
+        // apply torques
+        let sum_rotAccel = (prevTorque + accumulatedTorque) / momentOfInertia
+        let new_spin = spin + (sum_rotAccel)*(dt*0.5)
+        orientation = new_orientation
+        spin = new_spin
+        prevTorque = accumulatedTorque
+        accumulatedTorque = Vector(x: 0, y: 0, z: 0)
 /*
         // this is my own attempt, not as good as Verlet.
         let dv = accumulatedForce * (dt / mass)
@@ -322,7 +333,7 @@ class SphericalCow {
         velocity = velocity + futureDv
         prevForce = accumulatedForce
         accumulatedForce = Vector(x: 0, y: 0, z: 0)
-*/
+
         // same algorithm for torque
         let ds = accumulatedTorque * (dt / momentOfInertia)
         orientation = orientation + spin * dt + ds * (0.5 * dt)
@@ -331,6 +342,7 @@ class SphericalCow {
         spin = spin + futureDs
         prevTorque = accumulatedTorque
         accumulatedTorque = Vector(x: 0, y: 0, z: 0)
+*/
     }
 }
 
