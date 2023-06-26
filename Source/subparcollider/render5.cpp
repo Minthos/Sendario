@@ -162,11 +162,32 @@ As always, the best tone mapping method to use depends on the specifics of your 
 
  */
 
-const char *sparklyShaderSource = R"glsl(
+const char *skyboxVertSource = R"glsl(
+#version 330 core
+layout (location = 0) in vec3 position;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+out vec3 fragPos;
+out vec4 vertexPosClip;
+
+void main()
+{
+    TexCoords = aPos;
+    vec4 pos = projection * view * vec4(aPos, 1.0);
+    gl_Position = pos.xyww; // Remove translations from the view matrix
+}
+)glsl";
+
+const char *skyboxFragSource = R"glsl(
 #version 330 core
 
 uniform float time;
 uniform vec2 resolution;
+
+in vec3 fragPos;
 out vec4 FragColor;
 
 float random(vec2 uv) {
@@ -191,6 +212,7 @@ vec3 hsv2rgb(vec3 c) {
 
 void main() {
     vec2 uv = gl_FragCoord.xy / resolution;
+
     uv *= 8.0;
     vec2 uv2 = vec2(uv.y, uv.x);
     float baseNoise = noise(uv * 250 + 50 + time * -0.1);
@@ -304,11 +326,13 @@ void *rendererThread(void *arg) {
     checkShader(GL_LINK_STATUS, shaderProgram);
 
     // shader for the star background
-    GLuint sparklyShader = compileShader(GL_FRAGMENT_SHADER, sparklyShaderSource);
-    GLuint sparklyProgram = glCreateProgram();
-    glAttachShader(sparklyProgram, sparklyShader);
-    glLinkProgram(sparklyProgram);
-    checkShader(GL_LINK_STATUS, sparklyProgram);
+    GLuint skyboxVert = compileShader(GL_VERTEX_SHADER, skyboxVertSource);
+    GLuint skyboxFrag = compileShader(GL_FRAGMENT_SHADER, skyboxFragSource);
+    GLuint skyboxProgram = glCreateProgram();
+    glAttachShader(skyboxProgram, skyboxFrag);
+    glAttachShader(skyboxProgram, skyboxVert);
+    glLinkProgram(skyboxProgram);
+    checkShader(GL_LINK_STATUS, skyboxProgram);
  
     // buffers
     GLuint VAO, VBO, EBO;
@@ -343,7 +367,9 @@ void *rendererThread(void *arg) {
     //glUseProgram(sparklyProgram);
     GLint resolutionLocation = glGetUniformLocation(sparklyProgram, "resolution");
     GLint timeLocation = glGetUniformLocation(sparklyProgram, "time");
-    
+    GLint skyboxCameraLoc = glGetUniformLocation(sparklyProgram, "camera");
+    GLint skyboxViewMatrixLoc = glGetUniformLocation(sparklyProgram, "viewMatrix");
+
     // viewport
     int screenWidth, screenHeight;
     glfwGetFramebufferSize(sharedData.window, &screenWidth, &screenHeight);
@@ -361,25 +387,8 @@ void *rendererThread(void *arg) {
     while (!glfwWindowShouldClose(sharedData.window) && !sharedData.shouldExit) {
         usleep(8000);
 
-	// draw the skybox
-        glUseProgram(sparklyProgram);
-        float time = static_cast<float>(glfwGetTime());
-        glUniform2f(resolutionLocation, 3840, 2160);
-        glUniform1f(timeLocation, time);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glBegin(GL_TRIANGLES);
-          glVertex2f(-1.0f, -1.0f);
-          glVertex2f(3.0f, -1.0f);
-          glVertex2f(-1.0f, 3.0f);
-        glEnd();
-
-
-        glClear(GL_DEPTH_BUFFER_BIT);
-        glUseProgram(shaderProgram);
-        glm::mat4 model = glm::mat4(1.0f);
-
         // Swap pointers with the thread that copies the data
-	// This lets the rendering thread and physics simulation both run at full speed
+	// This lets the rendering thread and physics simulation both run at full tilt
 	// without having to wait for each other
         pthread_mutex_lock(&sharedData.mutex);
         if(sharedData.nextBatch != NULL) {
@@ -393,12 +402,32 @@ void *rendererThread(void *arg) {
         pthread_mutex_unlock(&sharedData.mutex);
 
 	// Camera
+        glUseProgram(shaderProgram);
         cameraPos = glm::vec3(sharedData.renderMisc.camPosition[0], sharedData.renderMisc.camPosition[1], sharedData.renderMisc.camPosition[2]);
         cameraTarget = glm::vec3(sharedData.renderMisc.camDirection[0], sharedData.renderMisc.camDirection[1], sharedData.renderMisc.camDirection[2]);
         glUniform3f(cameraPosLoc, cameraPos.x, cameraPos.y, cameraPos.z);
         glm::mat4 view = glm::lookAt(cameraPos, cameraTarget, cameraUp);
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+
+	// draw the skybox
+        glUseProgram(sparklyProgram);
+        float time = static_cast<float>(glfwGetTime());
+        glUniform2f(resolutionLocation, 3840, 2160);
+        glUniform1f(timeLocation, time);
+        glUniform3f(skyboxCameraLoc, cameraTarget.x, cameraTarget.y, cameraTarget.z);
+        glUniformMatrix4fv(skyboxViewMatrixLoc, 1, GL_FALSE, glm::value_ptr(view));
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glBegin(GL_TRIANGLES);
+          glVertex2f(-1.0f, -1.0f);
+          glVertex2f(3.0f, -1.0f);
+          glVertex2f(-1.0f, 3.0f);
+        glEnd();
+
+
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glUseProgram(shaderProgram);
+
 	
 	// Brightness controls
 	glUniform1f(gammaLoc, 2.2f);
@@ -411,6 +440,7 @@ void *rendererThread(void *arg) {
         }
 
         // Geometry
+        glm::mat4 model = glm::mat4(1.0f);
         glBindVertexArray(VAO);
         if (sharedData.spheres != NULL) {
             for (int i = 0; i < sharedData.numSpheres; ++i) {
@@ -431,8 +461,6 @@ void *rendererThread(void *arg) {
 
 		glm::vec3 diffuseComponent = glm::vec3(mat->diffuse[0], mat->diffuse[1], mat->diffuse[2]); // 0 to 1
 		glm::vec3 emissiveComponent = glm::vec3(mat->emissive[0], mat->emissive[1], mat->emissive[2]); // W/m^2
-		//glm::vec3 diffuseComponent = glm::vec3(0.5, 0.7, 1.0); // 0 to 1
-		//glm::vec3 emissiveComponent = glm::vec3(2.0, 0.0, 2.0); // W/m^2
 	
 		// colors looked washed out so I did a thing. not quite vibrance so I'll call it vibe. texture saturation? but we don't have textures.
 		float vibe = 3.0;

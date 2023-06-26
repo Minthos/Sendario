@@ -1,6 +1,13 @@
 
 ./build5.sh && valgrind --track-origins=yes ./main
 
+DOING:
+
+update the uniforms for the new skybox shader
+use an actual box for the skybox
+use texture coordinates as uv coords for the starfield shader
+(optional) apply gnomonic projection?
+
 Near term TODO:
 
 * create a skybox with the starfield.py shader
@@ -43,5 +50,16 @@ Even further out:
 * mining, refining and logistics
  - mining can be in several types: rich deposits in hard rock, sparse deposits in loose regolith, asteroids
  - logistics shouldn't be too tedious but scaling up should be time-consuming. we don't want players to get too big too fast.
+
+
+ideas:
+
+sparse octree/hctree with mass distribution of celestials for "global gravity" approximation in asteroid belts and such - linear time to construct the tree, then to evaluate the gravity in a specific location query the tree at resolution inversely proportional to distance
+
+populate every visited galaxy with enough stars to render a skybox for the visited star systems and the universe with enough galaxies and nebulae to render a skybox for every visited galaxy. combinie the two skyboxes to show a realistic view of the universe from anywhere players travel.
+
+should be feasible to have a hctree of each star system, another of each galaxy, and another of the enture universe. mass (gravity) and EM spectrum emissivity for each node in the tree. one tree should fit on an SSD.
+
+of course all of this will be procedurally generated but we still have to cache it so we don't generate the same data over and over again
 
 

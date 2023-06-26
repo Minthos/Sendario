@@ -53,7 +53,7 @@ var allTheThings = [sun, mercury, venus, earth, moon]
 let actions: [Action] = []
 
 let totalTime = 1e9
-var dt = 1.0
+var dt = 5.0
 //let totalTime = 0.0001
 //var dt = 0.00001
 var t = 0.0
@@ -92,7 +92,7 @@ func main() {
     while t < totalTime {
         tick(actions: actions, movingObjects: &allTheThings, t: t, dt: dt)
         t += dt
-        //usleep(1000)
+        usleep(1000)
 
         var renderMisc = render_misc()
         renderMisc.materials = materialsArray
