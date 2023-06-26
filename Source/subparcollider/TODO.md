@@ -7,6 +7,7 @@ Near term TODO:
 * gravity, wtf?? - may need to simulate tidal interactions (simplified obviously) for orbits to circularize instead of getting more eccentric over time
 * improve logic for celestial bodies' orbits
 * do something about atmospheric drag
+* basic camera control with mouse/keyboard/gamepad
 
 Recently done:
 

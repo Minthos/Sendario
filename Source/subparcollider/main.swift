@@ -53,7 +53,7 @@ var allTheThings = [sun, mercury, venus, earth, moon]
 let actions: [Action] = []
 
 let totalTime = 1e9
-var dt = 5.0
+var dt = 1.0
 //let totalTime = 0.0001
 //var dt = 0.00001
 var t = 0.0
@@ -97,7 +97,7 @@ func main() {
         var renderMisc = render_misc()
         renderMisc.materials = materialsArray
 
-        if(true){
+        if(false){
             camera.position = earth.position
             camera.position.x += earth.radius * 16.25
             camera.position.z += earth.radius * 0.5

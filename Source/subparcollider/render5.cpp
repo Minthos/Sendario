@@ -122,6 +122,7 @@ void main()
 
 
 /*
+from GPT:
 
 The easiest way to implement ACES tone mapping in your shader might be to use the ACES filmic tone mapping curve, which is a piecewise function designed to produce visually pleasing results across a wide range of inputs.
 
@@ -164,34 +165,47 @@ As always, the best tone mapping method to use depends on the specifics of your 
 const char *sparklyShaderSource = R"glsl(
 #version 330 core
 
-uniform vec2 u_resolution;
-uniform float u_time;
+uniform float time;
+uniform vec2 resolution;
+out vec4 FragColor;
 
-float random (vec2 st) {
-    return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+float random(vec2 uv) {
+    return fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
-float noise (vec2 st) {
-    vec2 i = floor(st);
-    vec2 f = fract(st);
-    float a = random(i);
-    float b = random(i + vec2(1.0, 0.0));
-    float c = random(i + vec2(0.0, 1.0));
-    float d = random(i + vec2(1.0, 1.0));
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+float noise(vec2 uv) {
+    vec2 i = floor(uv);
+    vec2 f = fract(uv);
+    vec2 w = f * f * (3.0 - 2.0 * f);
+
+    return mix(mix(random(i), random(i + vec2(1.0, 0.0)), w.x),
+               mix(random(i + vec2(0.0, 1.0)), random(i + vec2(1.0, 1.0)), w.x),
+               w.y);
 }
 
-void main()
-{   
-    vec2 st = gl_FragCoord.xy / u_resolution.xy;
+vec3 hsv2rgb(vec3 c) {
+    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
 
-    float flicker = pow(noise(vec2(st.x, u_time * 10.0)), 3.0);
-    float stars = pow(noise(vec2(st.x * 10.0, st.y * 10.0)), 3.0);
-
-    vec3 color = vec3(stars * flicker);
-
-    gl_FragColor = vec4(color, 1.0);
+void main() {
+    vec2 uv = gl_FragCoord.xy / resolution;
+    uv *= 8.0;
+    vec2 uv2 = vec2(uv.y, uv.x);
+    float baseNoise = noise(uv * 250 + 50 + time * -0.1);
+    float basedNoise = noise(uv2 * 250 + 3.14 + time * 0.07);
+    float crossNoise = (basedNoise + baseNoise) * 0.5;
+    float baseNoise2 = noise(uv2 * -100 + 22 + time * -0.25);
+    float basedNoise2 = noise(uv * -100 + 1.444 + time * 0.14);
+    float crossNoise2 = (basedNoise2 + baseNoise2) * 0.5;
+    crossNoise = max(crossNoise, crossNoise2);
+    //crossNoise = crossNoise2;
+    float detailNoise = noise(uv2 * 150.0 + time * 0.15);
+    float combinedNoise = mix(crossNoise, detailNoise, 0.6);
+    float intensity = smoothstep(0.8, 1.0, combinedNoise) * 1.0;
+    vec3 starColor = hsv2rgb(vec3(random(floor(gl_FragCoord.xy / 12) * 12), 0.7-intensity, intensity));
+    FragColor = vec4(starColor, 1.0);
 }
 )glsl";
 
@@ -280,19 +294,22 @@ void *rendererThread(void *arg) {
         return 0;
     }
 
-    // compile the vertex and fragment shaders
+    // shaders for celestial objects
     GLuint vertexShader = compileShader(GL_VERTEX_SHADER, vertexShaderSource);
     GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragmentShaderSource);
-    //GLuint vertexShader = compileShader(GL_VERTEX_SHADER, vertexShader2Source);
-    //GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragmentShader2Source);
-
-    // link them into one program
     GLuint shaderProgram = glCreateProgram();
     glAttachShader(shaderProgram, vertexShader);
     glAttachShader(shaderProgram, fragmentShader);
     glLinkProgram(shaderProgram);
     checkShader(GL_LINK_STATUS, shaderProgram);
 
+    // shader for the star background
+    GLuint sparklyShader = compileShader(GL_FRAGMENT_SHADER, sparklyShaderSource);
+    GLuint sparklyProgram = glCreateProgram();
+    glAttachShader(sparklyProgram, sparklyShader);
+    glLinkProgram(sparklyProgram);
+    checkShader(GL_LINK_STATUS, sparklyProgram);
+ 
     // buffers
     GLuint VAO, VBO, EBO;
     glGenVertexArrays(1, &VAO);
@@ -309,6 +326,7 @@ void *rendererThread(void *arg) {
     glBindVertexArray(0);
 
     // uniforms
+    //glUseProgram(shaderProgram);
     GLuint modelLoc = glGetUniformLocation(shaderProgram, "model");
     GLuint viewLoc = glGetUniformLocation(shaderProgram, "view");
     GLuint projLoc = glGetUniformLocation(shaderProgram, "projection");
@@ -322,6 +340,10 @@ void *rendererThread(void *arg) {
     GLuint gammaLoc = glGetUniformLocation(shaderProgram, "gamma");
     GLuint exposureLoc = glGetUniformLocation(shaderProgram, "exposure");
 
+    //glUseProgram(sparklyProgram);
+    GLint resolutionLocation = glGetUniformLocation(sparklyProgram, "resolution");
+    GLint timeLocation = glGetUniformLocation(sparklyProgram, "time");
+    
     // viewport
     int screenWidth, screenHeight;
     glfwGetFramebufferSize(sharedData.window, &screenWidth, &screenHeight);
@@ -339,7 +361,20 @@ void *rendererThread(void *arg) {
     while (!glfwWindowShouldClose(sharedData.window) && !sharedData.shouldExit) {
         usleep(8000);
 
+	// draw the skybox
+        glUseProgram(sparklyProgram);
+        float time = static_cast<float>(glfwGetTime());
+        glUniform2f(resolutionLocation, 3840, 2160);
+        glUniform1f(timeLocation, time);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glBegin(GL_TRIANGLES);
+          glVertex2f(-1.0f, -1.0f);
+          glVertex2f(3.0f, -1.0f);
+          glVertex2f(-1.0f, 3.0f);
+        glEnd();
+
+
+        glClear(GL_DEPTH_BUFFER_BIT);
         glUseProgram(shaderProgram);
         glm::mat4 model = glm::mat4(1.0f);
 

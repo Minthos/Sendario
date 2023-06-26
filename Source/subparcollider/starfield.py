@@ -2,15 +2,6 @@ import glfw
 from OpenGL.GL import *
 from OpenGL.GL.shaders import compileShader, compileProgram
 
-VERTEX_SHADER = """
-#version 330 core
-
-void main()
-{
-    gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
-}
-"""
-
 FRAGMENT_SHADER = """
 #version 330 core
 
@@ -64,9 +55,7 @@ def main():
     glfw.init()
     window = glfw.create_window(3840, 2160, "Starfield", None, None)
     glfw.make_context_current(window)
-#    vertex_shader = compileShader(VERTEX_SHADER, GL_VERTEX_SHADER)
     fragment_shader = compileShader(FRAGMENT_SHADER, GL_FRAGMENT_SHADER)
-#    program = compileProgram(vertex_shader, fragment_shader)
     program = compileProgram(fragment_shader)
     resolution_location = glGetUniformLocation(program, "resolution")
     time_location = glGetUniformLocation(program, "time")
