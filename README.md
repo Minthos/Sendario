@@ -1,8 +1,11 @@
 # Takeoff Sendario
 
-I didn't add all the project files to github, complain if you want to compile it and it doesn't work. There's not much to compile yet anyway.
+Project status: Very far from ready
 
-Created using: Unreal Engine 5.1.1, Ubuntu Linux 22.04, ChatGPT 3.5
+The interesting stuff is actually in the Source/subparcollider folder.
+The Unreal Engine stuff is not being developed.
+
+Everything is subject to change without notice.
 
 Licence to be determined (open source).
 
