@@ -390,13 +390,18 @@ void *rendererThread(void *arg) {
                 // send the position of the sphere directly to the fragment shader, bypassing the vertex shader
                 glUniform3f(sphereCenterLoc, currentSphere.x, currentSphere.y, currentSphere.z);
                 glUniform1f(sphereRadiusLoc, currentSphere.radius);
-                
-		glm::vec3 diffuseComponent = glm::vec3(0.5, 0.7, 1.0); // 0 to 1
+               
+	       	material* mat = &sharedData.renderMisc.materials[currentSphere.material_idx];
+
+
+		glm::vec3 diffuseComponent = glm::vec3(mat->diffuse[0], mat->diffuse[1], mat->diffuse[2]); // 0 to 1
+		glm::vec3 emissiveComponent = glm::vec3(mat->emissive[0], mat->emissive[1], mat->emissive[2]); // W/m^2
+		//glm::vec3 diffuseComponent = glm::vec3(0.5, 0.7, 1.0); // 0 to 1
+		//glm::vec3 emissiveComponent = glm::vec3(2.0, 0.0, 2.0); // W/m^2
 	
 		// colors looked washed out so I did a thing. not quite vibrance so I'll call it vibe. texture saturation? but we don't have textures.
 		float vibe = 3.0;
 		diffuseComponent = glm::vec3(std::pow(diffuseComponent.r, vibe), std::pow(diffuseComponent.g, vibe), std::pow(diffuseComponent.b, vibe));
-		glm::vec3 emissiveComponent = glm::vec3(2.0, 0.0, 2.0); // W/m^2
 		glUniform3fv(diffuseLoc, 1, glm::value_ptr(diffuseComponent));
 		glUniform3fv(emissiveLoc, 1, glm::value_ptr(emissiveComponent));
 

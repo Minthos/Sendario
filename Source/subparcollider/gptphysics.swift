@@ -254,6 +254,7 @@ class Celestial {
 // shorter timestep as needed during high acceleration such as collisions
 // longer timestep for planet trajectories, they rarely change anyway. Only the position changes every ms.
 class SphericalCow {
+    let id: Int64
     var position: Vector
     var relativeTo: Celestial?
     var velocity: Vector
@@ -271,7 +272,8 @@ class SphericalCow {
     var density: Double { return mass / (4 * Double.pi * pow(radius, 3) / 3) }
     var heat: Double = 0
 
-    init(position: Vector, velocity: Vector, orientation: Vector, spin: Vector, mass: Double, radius: Double, frictionCoefficient: Double = 0.1) {
+    init(id: Int64, position: Vector, velocity: Vector, orientation: Vector, spin: Vector, mass: Double, radius: Double, frictionCoefficient: Double = 0.1) {
+        self.id = id
         self.position = position
         self.velocity = velocity
         self.orientation = orientation
