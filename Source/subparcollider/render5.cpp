@@ -162,11 +162,33 @@ As always, the best tone mapping method to use depends on the specifics of your 
 
  */
 
+
 const char *skyboxVertSource = R"glsl(
 #version 330 core
+
 layout (location = 0) in vec3 position;
 
 uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+out vec3 fragPos;
+out vec3 vertexPosClip;
+
+void main()
+{
+    fragPos = position; // transform vertex from object space to world space
+    vec4 posClip = projection * view * vec4(fragPos, 1.0); // transform vertex from world space to camera space
+    vertexPosClip = position;
+    gl_Position = posClip.xyww;
+}
+)glsl";
+
+const char *skyboxVert2Source = R"glsl(
+#version 330 core
+layout (location = 0) in vec3 position;
+
+//uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
 
@@ -175,9 +197,9 @@ out vec4 vertexPosClip;
 
 void main()
 {
-    TexCoords = aPos;
-    vec4 pos = projection * view * vec4(aPos, 1.0);
-    gl_Position = pos.xyww; // Remove translations from the view matrix
+    fragPos = position;
+    vec4 pos = projection * view * vec4(position, 1.0);
+    gl_Position = pos.xyww;
 }
 )glsl";
 
@@ -188,6 +210,7 @@ uniform float time;
 uniform vec2 resolution;
 
 in vec3 fragPos;
+in vec3 vertexPosClip;
 out vec4 FragColor;
 
 float random(vec2 uv) {
@@ -211,7 +234,9 @@ vec3 hsv2rgb(vec3 c) {
 }
 
 void main() {
-    vec2 uv = gl_FragCoord.xy / resolution;
+    //vec2 uv = gl_FragCoord.xy / resolution;
+    vec2 uv = fragPos.xy;
+    //vec2 uv = vertexPosClip.xy;
 
     uv *= 8.0;
     vec2 uv2 = vec2(uv.y, uv.x);
@@ -228,6 +253,7 @@ void main() {
     float intensity = smoothstep(0.8, 1.0, combinedNoise) * 1.0;
     vec3 starColor = hsv2rgb(vec3(random(floor(gl_FragCoord.xy / 12) * 12), 0.7-intensity, intensity));
     FragColor = vec4(starColor, 1.0);
+//    FragColor = vec4(0.5, 0.0, 0.5, 1.0);
 }
 )glsl";
 
@@ -365,10 +391,11 @@ void *rendererThread(void *arg) {
     GLuint exposureLoc = glGetUniformLocation(shaderProgram, "exposure");
 
     //glUseProgram(sparklyProgram);
-    GLint resolutionLocation = glGetUniformLocation(sparklyProgram, "resolution");
-    GLint timeLocation = glGetUniformLocation(sparklyProgram, "time");
-    GLint skyboxCameraLoc = glGetUniformLocation(sparklyProgram, "camera");
-    GLint skyboxViewMatrixLoc = glGetUniformLocation(sparklyProgram, "viewMatrix");
+    GLuint skyboxModelLoc = glGetUniformLocation(skyboxProgram, "model");
+    GLuint skyboxViewLoc = glGetUniformLocation(skyboxProgram, "view");
+    GLuint skyboxProjLoc = glGetUniformLocation(skyboxProgram, "projection");
+    GLint timeLocation = glGetUniformLocation(skyboxProgram, "time");
+    GLint resolutionLocation = glGetUniformLocation(skyboxProgram, "resolution");
 
     // viewport
     int screenWidth, screenHeight;
@@ -407,27 +434,30 @@ void *rendererThread(void *arg) {
         cameraTarget = glm::vec3(sharedData.renderMisc.camDirection[0], sharedData.renderMisc.camDirection[1], sharedData.renderMisc.camDirection[2]);
         glUniform3f(cameraPosLoc, cameraPos.x, cameraPos.y, cameraPos.z);
         glm::mat4 view = glm::lookAt(cameraPos, cameraTarget, cameraUp);
+        glm::mat4 model = glm::mat4(1.0f);
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
+	// vertex buffer
+        glBindVertexArray(VAO);
+	
 	// draw the skybox
-        glUseProgram(sparklyProgram);
+        glUseProgram(skyboxProgram);
         float time = static_cast<float>(glfwGetTime());
-        glUniform2f(resolutionLocation, 3840, 2160);
-        glUniform1f(timeLocation, time);
-        glUniform3f(skyboxCameraLoc, cameraTarget.x, cameraTarget.y, cameraTarget.z);
-        glUniformMatrix4fv(skyboxViewMatrixLoc, 1, GL_FALSE, glm::value_ptr(view));
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glBegin(GL_TRIANGLES);
-          glVertex2f(-1.0f, -1.0f);
-          glVertex2f(3.0f, -1.0f);
-          glVertex2f(-1.0f, 3.0f);
-        glEnd();
+        glUniformMatrix4fv(skyboxViewLoc, 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(skyboxProjLoc, 1, GL_FALSE, glm::value_ptr(projection));
+	glUniformMatrix4fv(skyboxModelLoc, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1f(timeLocation, time);
+        glUniform2f(resolutionLocation, 3840, 2160);
+        glDisable(GL_DEPTH_TEST);
+	glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+        glEnable(GL_DEPTH_TEST);
 
-
+	// clear the depth buffer so the skybox is behind everything else
         glClear(GL_DEPTH_BUFFER_BIT);
-        glUseProgram(shaderProgram);
 
+        glUseProgram(shaderProgram);
 	
 	// Brightness controls
 	glUniform1f(gammaLoc, 2.2f);
@@ -440,8 +470,6 @@ void *rendererThread(void *arg) {
         }
 
         // Geometry
-        glm::mat4 model = glm::mat4(1.0f);
-        glBindVertexArray(VAO);
         if (sharedData.spheres != NULL) {
             for (int i = 0; i < sharedData.numSpheres; ++i) {
                 sphere currentSphere = sharedData.spheres[i];
