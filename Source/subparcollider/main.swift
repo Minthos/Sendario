@@ -31,7 +31,7 @@ var venus = SphericalCow(id: 2,
                          mass: 4.867e24, radius: 6.0518e6, frictionCoefficient: 0.8)
 var earth = SphericalCow(id: 3,
                          position: Vector(x: 0, y: 0, z: -149.6e9),
-                         velocity: Vector(x: 29.78e3, y: 0, z: 0),
+                         velocity: Vector(x: 0, y: 29.78e3, z: 0),
                          orientation: Vector(x: 0, y: 0, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
                          mass: 5.972e24, radius: 6.371e6, frictionCoefficient: 0.0001)
@@ -53,7 +53,7 @@ var allTheThings = [sun, mercury, venus, earth, moon]
 let actions: [Action] = []
 
 let totalTime = 1e9
-var dt = 0.1
+var dt = 10.0
 //let totalTime = 0.0001
 //var dt = 0.00001
 var t = 0.0

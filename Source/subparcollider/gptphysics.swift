@@ -296,15 +296,8 @@ class SphericalCow {
         self.accumulatedTorque += torque
     }
 
-    // Homegrown algorithm inspired by Euler and Verlet
-    // idk, maybe I'm regarded
     func integrateForces(dt: Double) {
-        
-        // This is Verlet, copied from Wikipedia. It works well.
-
-        // act as if accumulatedForce don't exist yet
         let new_pos = position + velocity * dt + (prevForce / mass) * (dt * dt * 0.5)
-        // apply forces
         let sum_accel = (prevForce + accumulatedForce) / mass
         let new_vel = velocity + (sum_accel)*(dt*0.5)
         position = new_pos
@@ -312,43 +305,30 @@ class SphericalCow {
         prevForce = accumulatedForce
         accumulatedForce = Vector(x: 0, y: 0, z: 0)
 
-
-        // act as if accumulatedTorque don't exist yet
         let new_orientation = orientation + spin * dt + (prevTorque / momentOfInertia) * (dt * dt * 0.5)
-        // apply torques
         let sum_rotAccel = (prevTorque + accumulatedTorque) / momentOfInertia
         let new_spin = spin + (sum_rotAccel)*(dt*0.5)
         orientation = new_orientation
         spin = new_spin
         prevTorque = accumulatedTorque
         accumulatedTorque = Vector(x: 0, y: 0, z: 0)
-/*
-        // this is my own attempt, not as good as Verlet.
-        let dv = accumulatedForce * (dt / mass)
-        position = position + velocity * dt + dv * (0.5 * dt)
-        // extrapolating acceleration slightly seems to help keep orbits stable for longer
-        // we're really just front-loading some of the acceleration.. since we remove it next tick..
-        // but the effect is that the next position update gets a slight nudge
-        // am I taking crazy pills?
-        let futureForce = accumulatedForce * 1.5 - prevForce * 0.5
-        let futureDv = futureForce * (dt / mass)
-        velocity = velocity + futureDv
-        prevForce = accumulatedForce
-        accumulatedForce = Vector(x: 0, y: 0, z: 0)
-
-        // same algorithm for torque
-        let ds = accumulatedTorque * (dt / momentOfInertia)
-        orientation = orientation + spin * dt + ds * (0.5 * dt)
-        let futureTorque = accumulatedTorque * 1.5 - prevTorque * 0.5
-        let futureDs = futureTorque * (dt / momentOfInertia)
-        spin = spin + futureDs
-        prevTorque = accumulatedTorque
-        accumulatedTorque = Vector(x: 0, y: 0, z: 0)
-*/
     }
 }
 
-func gravitationalForceAtPoint(point: Vector, objects: [SphericalCow], G: Double = 6.6743e-11) -> Vector {
+func gravities(subject: SphericalCow, objects: [SphericalCow], G: Double = 6.6743e-11) -> Vector {
+    var gravity = Vector(x: 0, y: 0, z: 0)
+    for object in objects {
+        if(subject !== object) {
+            let deltaPosition = object.position - subject.position
+            let distance = deltaPosition.length
+            let forceMagnitude = (6.67430e-11 * object.mass * subject.mass) / pow(distance, 2)
+            gravity += deltaPosition.normalized() * forceMagnitude
+        }
+    }
+    return gravity
+}
+
+/*func gravitationalForceAtPoint(point: Vector, objects: [SphericalCow], G: Double = 6.6743e-11) -> Vector {
     var gravityVector = Vector(x: 0, y: 0, z: 0)
     for obj in objects {
         let distanceVector = point - obj.position
@@ -373,7 +353,7 @@ func gravitationalForceAtPoint(point: Vector, objects: [SphericalCow], G: Double
         gravityVector += force
     }
     return gravityVector
-}
+}*/
 
 func tick(actions: [Action], movingObjects: inout [SphericalCow], t: Double, dt: Double) {
     for action in actions {
@@ -382,24 +362,17 @@ func tick(actions: [Action], movingObjects: inout [SphericalCow], t: Double, dt:
         // lol, scope crept a little..
     }
 
-    // What I should be doing here:
-    // have celestial bodies separate from moving objects
-    // calculate gravity between celestial bodies with brute force
-    // if an object is near a celestial body, use that body to calculate drag and magnus force
     for object in movingObjects {
-        if(object === moon) {
-            let deltaPosition = earth.position - object.position
-            let distance = deltaPosition.length
-            let forceMagnitude = (6.67430e-11 * object.mass * earth.mass) / pow(distance, 2)
-            let gravityForce = deltaPosition.normalized() * forceMagnitude
-            object.applyForce(force: gravityForce, dt: dt)
-        }
-        else if(object !== sun && object !== camera){
-            let deltaPosition = sun.position - object.position
-            let distance = deltaPosition.length
-            let forceMagnitude = (6.67430e-11 * object.mass * sun.mass) / pow(distance, 2)
-            let gravityForce = deltaPosition.normalized() * forceMagnitude
-            object.applyForce(force: gravityForce, dt: dt)
+    //    if(object === moon) {
+    //        let deltaPosition = earth.position - object.position
+    //        let distance = deltaPosition.length
+    //        let forceMagnitude = (6.67430e-11 * object.mass * earth.mass) / pow(distance, 2)
+    //        let gravityForce = deltaPosition.normalized() * forceMagnitude
+    //        object.applyForce(force: gravityForce, dt: dt)
+    //    }
+    //    else if(object !== sun && object !== camera){
+        if(object !== sun && object !== camera){
+            object.applyForce(force: gravities(subject: object, objects: movingObjects), dt: dt)
 
             //let altitude = object.position.z - earth.radius
             //let (density, _, viscosity) = atmosphericProperties(altitude: altitude)
