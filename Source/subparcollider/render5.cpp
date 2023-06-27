@@ -173,33 +173,12 @@ uniform mat4 view;
 uniform mat4 projection;
 
 out vec3 fragPos;
-out vec3 vertexPosClip;
 
 void main()
 {
     fragPos = position; // transform vertex from object space to world space
     vec4 posClip = projection * view * vec4(fragPos, 1.0); // transform vertex from world space to camera space
-    vertexPosClip = position;
     gl_Position = posClip.xyww;
-}
-)glsl";
-
-const char *skyboxVert2Source = R"glsl(
-#version 330 core
-layout (location = 0) in vec3 position;
-
-//uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
-
-out vec3 fragPos;
-out vec4 vertexPosClip;
-
-void main()
-{
-    fragPos = position;
-    vec4 pos = projection * view * vec4(position, 1.0);
-    gl_Position = pos.xyww;
 }
 )glsl";
 
@@ -236,7 +215,11 @@ vec3 hsv2rgb(vec3 c) {
 void main() {
     //vec2 uv = gl_FragCoord.xy / resolution;
     vec2 uv = fragPos.xy;
-    //vec2 uv = vertexPosClip.xy;
+    if(abs(fragPos.x) > 0.999){
+	uv = fragPos.zy;
+    } else if(abs(fragPos.y) > 0.999){
+	uv = fragPos.xz;
+    }
 
     uv *= 8.0;
     vec2 uv2 = vec2(uv.y, uv.x);
@@ -253,7 +236,6 @@ void main() {
     float intensity = smoothstep(0.8, 1.0, combinedNoise) * 1.0;
     vec3 starColor = hsv2rgb(vec3(random(floor(gl_FragCoord.xy / 12) * 12), 0.7-intensity, intensity));
     FragColor = vec4(starColor, 1.0);
-//    FragColor = vec4(0.5, 0.0, 0.5, 1.0);
 }
 )glsl";
 
