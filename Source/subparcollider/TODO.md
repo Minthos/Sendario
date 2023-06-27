@@ -1,23 +1,18 @@
 
 ./build5.sh && valgrind --track-origins=yes ./main
 
-DOING:
-
-update the uniforms for the new skybox shader
-use an actual box for the skybox
-use texture coordinates as uv coords for the starfield shader
-(optional) apply gnomonic projection?
 
 Near term TODO:
 
-* create a skybox with the starfield.py shader
-* gravity, wtf?? - may need to simulate tidal interactions (simplified obviously) for orbits to circularize instead of getting more eccentric over time
-* improve logic for celestial bodies' orbits
-* do something about atmospheric drag
+* visualize future trajectories with lines in colors of the rainbow, to about 1 orbital period
+* make gravity awesome
+* implement tidal effects on celestial spin and orbit
+* reactivate atmospheric drag but make it follow the celestial and not apply to the celestial
 * basic camera control with mouse/keyboard/gamepad
 
 Recently done:
 
+* create a skybox with the starfield.py shader
 * make the sun really bright
 * give planets and moons different colors
 * implemented Verlet integration. It doesn't solve orbital stability completely but it improves it.
