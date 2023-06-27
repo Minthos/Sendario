@@ -223,15 +223,15 @@ void main() {
 
     uv *= 8.0;
     vec2 uv2 = vec2(uv.y, uv.x);
-    float baseNoise = noise(uv * 250 + 50 + time * -0.1);
-    float basedNoise = noise(uv2 * 250 + 3.14 + time * 0.07);
+    float baseNoise = noise(uv * 250 + 50 + (time + 5.0) * -0.001);
+    float basedNoise = noise(uv2 * 250 + 3.14 + (time + 10.0) * 0.0007);
     float crossNoise = (basedNoise + baseNoise) * 0.5;
-    float baseNoise2 = noise(uv2 * -100 + 22 + time * -0.25);
-    float basedNoise2 = noise(uv * -100 + 1.444 + time * 0.14);
+    float baseNoise2 = noise(uv2 * -100 + 22 + (time + 15.0) * -0.0025);
+    float basedNoise2 = noise(uv * -100 + 1.444 + (time + 23.0) * 0.0014);
     float crossNoise2 = (basedNoise2 + baseNoise2) * 0.5;
     crossNoise = max(crossNoise, crossNoise2);
     //crossNoise = crossNoise2;
-    float detailNoise = noise(uv2 * 150.0 + time * 0.15);
+    float detailNoise = noise(uv2 * 150.0 + time * 0.0015);
     float combinedNoise = mix(crossNoise, detailNoise, 0.6);
     float intensity = smoothstep(0.8, 1.0, combinedNoise) * 1.0;
     vec3 starColor = hsv2rgb(vec3(random(floor(gl_FragCoord.xy / 12) * 12), 0.7-intensity, intensity));
