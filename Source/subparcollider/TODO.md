@@ -4,11 +4,11 @@
 
 Near term TODO:
 
-* visualize future trajectories with lines in colors of the rainbow, to about 1 orbital period
-* make gravity awesome
+* make gravity awesome (take sun and all planets into account for planets and moons, take all moons into account for planets with multiple moons)
 * implement tidal effects on celestial spin and orbit
 * reactivate atmospheric drag but make it follow the celestial and not apply to the celestial
 * basic camera control with mouse/keyboard/gamepad
+* visualize future trajectories with lines in colors of the rainbow, to about 1 orbital period
 
 Recently done:
 

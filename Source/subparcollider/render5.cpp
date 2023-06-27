@@ -11,7 +11,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-
 extern "C" {
     #include "renderer.h"
 }
@@ -213,7 +212,6 @@ vec3 hsv2rgb(vec3 c) {
 }
 
 void main() {
-    //vec2 uv = gl_FragCoord.xy / resolution;
     vec2 uv = fragPos.xy;
     if(abs(fragPos.x) > 0.999){
 	uv = fragPos.zy;
@@ -230,7 +228,6 @@ void main() {
     float basedNoise2 = noise(uv * -100 + 1.444 + (time + 23.0) * 0.0014);
     float crossNoise2 = (basedNoise2 + baseNoise2) * 0.5;
     crossNoise = max(crossNoise, crossNoise2);
-    //crossNoise = crossNoise2;
     float detailNoise = noise(uv2 * 150.0 + time * 0.0015);
     float combinedNoise = mix(crossNoise, detailNoise, 0.6);
     float intensity = smoothstep(0.8, 1.0, combinedNoise) * 1.0;
@@ -358,7 +355,6 @@ void *rendererThread(void *arg) {
     glBindVertexArray(0);
 
     // uniforms
-    //glUseProgram(shaderProgram);
     GLuint modelLoc = glGetUniformLocation(shaderProgram, "model");
     GLuint viewLoc = glGetUniformLocation(shaderProgram, "view");
     GLuint projLoc = glGetUniformLocation(shaderProgram, "projection");
@@ -372,12 +368,11 @@ void *rendererThread(void *arg) {
     GLuint gammaLoc = glGetUniformLocation(shaderProgram, "gamma");
     GLuint exposureLoc = glGetUniformLocation(shaderProgram, "exposure");
 
-    //glUseProgram(sparklyProgram);
     GLuint skyboxModelLoc = glGetUniformLocation(skyboxProgram, "model");
     GLuint skyboxViewLoc = glGetUniformLocation(skyboxProgram, "view");
     GLuint skyboxProjLoc = glGetUniformLocation(skyboxProgram, "projection");
-    GLint timeLocation = glGetUniformLocation(skyboxProgram, "time");
-    GLint resolutionLocation = glGetUniformLocation(skyboxProgram, "resolution");
+    GLuint timeLocation = glGetUniformLocation(skyboxProgram, "time");
+    GLuint resolutionLocation = glGetUniformLocation(skyboxProgram, "resolution");
 
     // viewport
     int screenWidth, screenHeight;
@@ -467,8 +462,6 @@ void *rendererThread(void *arg) {
                 glUniform1f(sphereRadiusLoc, currentSphere.radius);
                
 	       	material* mat = &sharedData.renderMisc.materials[currentSphere.material_idx];
-
-
 		glm::vec3 diffuseComponent = glm::vec3(mat->diffuse[0], mat->diffuse[1], mat->diffuse[2]); // 0 to 1
 		glm::vec3 emissiveComponent = glm::vec3(mat->emissive[0], mat->emissive[1], mat->emissive[2]); // W/m^2
 	

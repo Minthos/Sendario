@@ -36,8 +36,8 @@ var earth = SphericalCow(id: 3,
                          spin: Vector(x: 0, y: 0, z: 0),
                          mass: 5.972e24, radius: 6.371e6, frictionCoefficient: 0.0001)
 var moon = SphericalCow(id: 4,
-                         position: Vector(x: earth.position.x, y: earth.position.y - 384e5, z: earth.position.z),
-                         velocity: Vector(x: earth.velocity.x, y: earth.velocity.y, z: earth.velocity.z + 3.66e3),
+                         position: Vector(x: earth.position.x, y: earth.position.y - 384e6, z: earth.position.z),
+                         velocity: Vector(x: earth.velocity.x, y: earth.velocity.y, z: earth.velocity.z + 1.022e3),
                          orientation: Vector(x: 0, y: 0, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
                          mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.01)
@@ -53,7 +53,7 @@ var allTheThings = [sun, mercury, venus, earth, moon]
 let actions: [Action] = []
 
 let totalTime = 1e9
-var dt = 1.0
+var dt = 0.1
 //let totalTime = 0.0001
 //var dt = 0.00001
 var t = 0.0
@@ -92,7 +92,7 @@ func main() {
     while t < totalTime {
         tick(actions: actions, movingObjects: &allTheThings, t: t, dt: dt)
         t += dt
-        usleep(1000)
+        //usleep(1000)
 
         var renderMisc = render_misc()
         renderMisc.materials = materialsArray
