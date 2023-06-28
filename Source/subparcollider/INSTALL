@@ -41,6 +41,9 @@ cp -r swift-5.8.1-RELEASE-ubuntu22.04/usr/* ~/.local/
 rm -r swift-5.8.1-RELEASE-ubuntu22.04/usr/
 cd -
 
+export PATH=$PATH:~/.local/bin
+echo 'export PATH=$PATH:~/.local/bin' >> ~/.bashrc
+
 pip install PyOpenGL glfw
 
 
