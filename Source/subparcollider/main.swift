@@ -40,7 +40,13 @@ var moon = SphericalCow(id: 4,
                          velocity: Vector(x: earth.velocity.x, y: earth.velocity.y, z: earth.velocity.z + 1.022e3),
                          orientation: Vector(x: 0, y: 0, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
-                         mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.01)
+                         mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.8)
+var player1 = SphericalCow(id: 5,
+                         position: Vector(x: moon.position.x, y: moon.position.y, z: moon.position.z + moon.radius + 50.0),
+                         velocity: Vector(x: moon.velocity.x, y: moon.velocity.y + 100.0, z: moon.velocity.z),
+                         orientation: moon.orientation,
+                         spin: moon.spin,
+                         mass: 10e3, radius:4.0, frictionCoefficient: 0.5)
 var camera = SphericalCow(id: -1,
                           position: Vector(x: earth.position.x, y: earth.position.y - earth.radius * 2.0, z: earth.position.z - earth.radius * 8.0),
                           velocity: earth.velocity,
@@ -49,11 +55,11 @@ var camera = SphericalCow(id: -1,
                           mass: 0, radius: 0, frictionCoefficient: 0.0)
 
 var lights = [sun]
-var allTheThings = [sun, mercury, venus, earth, moon]
+var allTheThings = [sun, mercury, venus, earth, moon, player1]
 let actions: [Action] = []
 
-let totalTime = 1e9
-var dt = 10.0
+let totalTime = 1e12
+var dt = 0.01
 //let totalTime = 0.0001
 //var dt = 0.00001
 var t = 0.0
@@ -84,24 +90,27 @@ func main() {
     //Earth	
     materialsArray[3].diffuse = (0.184314, 0.415686, 0.411765)
     materialsArray[3].emissive = (0, 0, 0)
-    //Moon        
+    //Moon
     materialsArray[4].diffuse = (0.8, 0.8, 0.8)
     materialsArray[4].emissive = (0, 0, 0)
+    //Player1
+    materialsArray[5].diffuse = (1.0, 0.0, 1.0)
+    materialsArray[5].emissive = (500.0, 500.0, 15.0)
 
     startRenderer()
     while t < totalTime {
         tick(actions: actions, movingObjects: &allTheThings, t: t, dt: dt)
         t += dt
-        //usleep(1000)
+        usleep(1000)
 
         var renderMisc = render_misc()
         renderMisc.materials = materialsArray
 
-        if(false){
-            camera.position = earth.position
-            camera.position.x += earth.radius * 16.25
-            camera.position.z += earth.radius * 0.5
-            camera.orientation = (earth.position - camera.position).normalized()
+        let cameraTarget = player1
+        if(true){
+            let relativeVelocity = cameraTarget.velocity - moon.velocity
+            camera.position = cameraTarget.position + relativeVelocity.normalized() * cameraTarget.radius * -2.0
+            camera.orientation = (cameraTarget.position - camera.position).normalized()
         } else {
             camera.position = moon.position + (moon.position - earth.position).normalized() * 10.0 * moon.radius
             camera.position.x += moon.radius * 2.0

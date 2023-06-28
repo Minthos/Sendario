@@ -1,5 +1,6 @@
-
 import Foundation
+
+let G: Double = 6.67430e-11
 
 struct Vector {
     var x: Double
@@ -315,45 +316,25 @@ class SphericalCow {
     }
 }
 
-func gravities(subject: SphericalCow, objects: [SphericalCow], G: Double = 6.6743e-11) -> Vector {
+func calculateGravities(subject: SphericalCow, objects: [SphericalCow]) -> Vector {
     var gravity = Vector(x: 0, y: 0, z: 0)
     for object in objects {
         if(subject !== object) {
             let deltaPosition = object.position - subject.position
             let distance = deltaPosition.length
-            let forceMagnitude = (6.67430e-11 * object.mass * subject.mass) / pow(distance, 2)
+            var mass = object.mass
+            if(distance == 0) {
+                continue
+            } else if(distance < object.radius) {
+                let volumeEnclosed = (4.0 / 3.0) * Double.pi * pow(distance, 3)
+                mass = object.density * volumeEnclosed
+            }
+            let forceMagnitude = (G * mass * subject.mass) / pow(distance, 2)
             gravity += deltaPosition.normalized() * forceMagnitude
         }
     }
     return gravity
 }
-
-/*func gravitationalForceAtPoint(point: Vector, objects: [SphericalCow], G: Double = 6.6743e-11) -> Vector {
-    var gravityVector = Vector(x: 0, y: 0, z: 0)
-    for obj in objects {
-        let distanceVector = point - obj.position
-        let distance = distanceVector.length
-        let radius = obj.radius
-        let density = obj.density
-        
-        // Calculate the mass enclosed within a sphere of radius 'distance'
-        var massEnclosed: Double
-        if distance > radius {
-            massEnclosed = obj.mass
-        } else if distance > 0 { // handle division by zero error
-            let volumeEnclosed = (4.0 / 3.0) * Double.pi * pow(distance, 3)
-            massEnclosed = density * volumeEnclosed
-        } else {
-            continue // distance is zero, skip to next object
-        }
-        
-        // Calculate the gravitational force using the mass enclosed and distance from the object
-        let forceMagnitude = G * massEnclosed / pow(distance, 2)
-        let force = distanceVector.normalized() * forceMagnitude
-        gravityVector += force
-    }
-    return gravityVector
-}*/
 
 func tick(actions: [Action], movingObjects: inout [SphericalCow], t: Double, dt: Double) {
     for action in actions {
@@ -363,16 +344,8 @@ func tick(actions: [Action], movingObjects: inout [SphericalCow], t: Double, dt:
     }
 
     for object in movingObjects {
-    //    if(object === moon) {
-    //        let deltaPosition = earth.position - object.position
-    //        let distance = deltaPosition.length
-    //        let forceMagnitude = (6.67430e-11 * object.mass * earth.mass) / pow(distance, 2)
-    //        let gravityForce = deltaPosition.normalized() * forceMagnitude
-    //        object.applyForce(force: gravityForce, dt: dt)
-    //    }
-    //    else if(object !== sun && object !== camera){
         if(object !== sun && object !== camera){
-            object.applyForce(force: gravities(subject: object, objects: movingObjects), dt: dt)
+            object.applyForce(force: calculateGravities(subject: object, objects: movingObjects), dt: dt)
 
             //let altitude = object.position.z - earth.radius
             //let (density, _, viscosity) = atmosphericProperties(altitude: altitude)
@@ -440,9 +413,9 @@ func tick(actions: [Action], movingObjects: inout [SphericalCow], t: Double, dt:
         }
 
         // Calculate and apply impulse due to friction
-        let averageFrictionCoefficient = (object1.frictionCoefficient + object2.frictionCoefficient) / 2
+        let frictionCoefficient = (object1.frictionCoefficient * object2.frictionCoefficient)
         let tangentVelocity = deltaVelocity - (collisionNormal * deltaVelocity.dot(collisionNormal))
-        let frictionImpulseMagnitude = impulseMagnitude * averageFrictionCoefficient
+        let frictionImpulseMagnitude = impulseMagnitude * frictionCoefficient
         let frictionImpulse = tangentVelocity.normalized() * frictionImpulseMagnitude
 
         object1.velocity -= frictionImpulse / object1.mass
