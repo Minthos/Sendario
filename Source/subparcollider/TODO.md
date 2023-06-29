@@ -1,8 +1,9 @@
 ## Near term TODO:
 
+* basic camera control with gamepad
+* spaceship controls and thrust, attitude control
 * fix the rendering bug when camera is near/inside an object
 * reactivate atmospheric drag but make it follow the celestial and not apply to the celestial
-* basic camera control with mouse/keyboard/gamepad
 * visualize future trajectories with lines in colors of the rainbow, to about 1 orbital period
 
 ## Recently done:
@@ -25,7 +26,6 @@
 * Make a basic space exploration prototype
  - A solar system with the sun, some planets, a circular "spaceship" with a gaslight drive
 * w-space
-* spaceship controls and thrust, attitude control
 
 
 ## Even further out:

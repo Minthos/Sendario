@@ -1,5 +1,10 @@
 #include <pthread.h>
 #include <stdint.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_gamecontroller.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <stdbool.h> 
 
 // warning! this is also defined in the shader source, so changing it here requires changing it there as well.
 // you should also change the size of the lights array in the swift source to match it.
@@ -32,4 +37,7 @@ typedef struct {
 void startRenderer();
 void render(sphere* spheres, size_t sphereCount, render_misc renderMisc);
 void stopRenderer();
+
+bool isGameController(int joystick_index);
+const char* getStringForButton(Uint8 button);
 

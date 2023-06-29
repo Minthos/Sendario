@@ -98,7 +98,42 @@ func main() {
     materialsArray[5].emissive = (500.0, 500.0, 15.0)
 
     startRenderer()
-    while t < totalTime {
+    SDL_Init(SDL_INIT_GAMECONTROLLER)
+    var controller: OpaquePointer? = nil
+    var shouldExit = false
+    while( !shouldExit ) {
+        // poll for inputs, generate actions
+        for i in 0..<SDL_NumJoysticks() {
+            if isGameController(i) {
+                controller = SDL_GameControllerOpen(i)
+                if controller != nil {
+                    var event = SDL_Event()
+                    while SDL_PollEvent(&event) != 0 {
+                        switch event.type {
+                        case SDL_CONTROLLERBUTTONDOWN.rawValue:
+                            print("\(String(cString: getStringForButton(event.cbutton.button)!)) pressed")
+                        case SDL_CONTROLLERBUTTONUP.rawValue:
+                            if event.cbutton.button == SDL_CONTROLLER_BUTTON_START.rawValue {
+                                shouldExit = true
+                            }
+                        case SDL_CONTROLLERAXISMOTION.rawValue:
+                            if event.caxis.axis == SDL_CONTROLLER_AXIS_LEFTX.rawValue || event.caxis.axis == SDL_CONTROLLER_AXIS_LEFTY.rawValue {
+                                continue
+                            }
+                        default:
+                            break
+                        }
+                    }
+                } else {
+                    let errorMessage = String(cString: SDL_GetError())
+                    print("Could not open game controller: \(errorMessage)")
+                }
+            }
+        }
+    
+
+
+
         tick(actions: actions, movingObjects: &allTheThings, t: t, dt: dt)
         t += dt
         usleep(1000)
@@ -153,6 +188,7 @@ func main() {
         sphereArray.deallocate()
     }
 
+    SDL_Quit()
     stopRenderer()
     materialsArray.deallocate()
 }
