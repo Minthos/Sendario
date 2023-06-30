@@ -42,8 +42,8 @@ var moon = SphericalCow(id: 4,
                          spin: Vector(x: 0, y: 0, z: 0),
                          mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.8)
 var player1 = SphericalCow(id: 5,
-                         position: Vector(x: moon.position.x, y: moon.position.y, z: moon.position.z + moon.radius + 5.0),
-                         velocity: Vector(x: moon.velocity.x, y: moon.velocity.y + 1.0, z: moon.velocity.z),
+                         position: Vector(x: moon.position.x, y: moon.position.y, z: moon.position.z + moon.radius + 4.1),
+                         velocity: Vector(x: moon.velocity.x, y: moon.velocity.y + 1.00, z: moon.velocity.z),
                          orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
                          spin: moon.spin,
                          mass: 10e3, radius:4.0, frictionCoefficient: 0.5)
@@ -59,7 +59,7 @@ var allTheThings = [sun, mercury, venus, earth, moon, player1]
 let actions: [Action] = []
 
 let totalTime = 1e12
-var dt = 0.001
+var dt = 0.01
 //let totalTime = 0.0001
 //var dt = 0.00001
 var t = 0.0

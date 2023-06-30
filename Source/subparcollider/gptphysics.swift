@@ -165,6 +165,17 @@ struct Quaternion {
         sanityCheck()
     }
 
+    init(axis: Vector, angle: Double) {
+        let vn = axis.normalized()
+        let halfAngle = angle * 0.5
+	let sinAngle = sin(halfAngle);
+	x = (vn.x * sinAngle);
+	y = (vn.y * sinAngle);
+	z = (vn.z * sinAngle);
+	w = cos(angle);
+        sanityCheck()
+    }
+
 #if DEBUG
     func sanityCheck() {
         assert( !w.isNaN, "w is NaN")
@@ -393,25 +404,15 @@ class SphericalCow {
         velocity = new_vel
         prevForce = accumulatedForce
         accumulatedForce = Vector(x: 0, y: 0, z: 0)
-/*
-        let new_orientation = orientation + spin * dt + (prevTorque / momentOfInertia) * (dt * dt * 0.5)
-        let sum_rotAccel = (prevTorque + accumulatedTorque) / momentOfInertia
-        let new_spin = spin + (sum_rotAccel)*(dt*0.5)
-        orientation = new_orientation
-        spin = new_spin
-        prevTorque = accumulatedTorque
-        accumulatedTorque = Vector(x: 0, y: 0, z: 0)
-    */
     }
 
     func integrateTorque(dt: Double) {
-        // dq/dt = 1/2 omega q, where q is the quaternion representing the current orientation of the body, and omega is the angular velocity vector. Omega has to be converted to a quat by placing 0 in the scalar (real) component, so you can multiply it by q using quaternion multiplication.
-        // https://gamedev.stackexchange.com/questions/18036/problem-representing-torque-as-a-quaternion
-
-        let omega = spin * dt + (prevTorque / momentOfInertia) * (dt * dt * 0.5)
-        let half_omega = Quaternion(w: 0, x: omega.x * 0.5, y: omega.y * 0.5, z: omega.z * 0.5)
+        let omega = (spin * dt) + ((prevTorque / momentOfInertia) * (dt * dt * 0.5))
+        let angle = omega.length
+        let rotation = Quaternion(axis: omega, angle: angle)
         if(omega.x != 0 || omega.y != 0 || omega.z != 0) {
-            orientation = (half_omega * orientation).normalized()
+            orientation = (rotation * orientation).normalized()
+            print("spin: \(spin) omega: \(omega)")
         }
         let sum_rotAccel = (prevTorque + accumulatedTorque) / momentOfInertia
         let new_spin = spin + (sum_rotAccel)*(dt*0.5)
