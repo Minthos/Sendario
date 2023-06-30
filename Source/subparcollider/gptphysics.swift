@@ -154,6 +154,7 @@ struct Quaternion {
         x = v.x
         y = v.y
         z = v.z
+        sanityCheck()
     }
 
     init(w: Double, x: Double, y: Double, z: Double) {
@@ -161,7 +162,19 @@ struct Quaternion {
         self.x = x
         self.y = y
         self.z = z
+        sanityCheck()
     }
+
+#if DEBUG
+    func sanityCheck() {
+        assert( !w.isNaN, "w is NaN")
+        assert( !x.isNaN, "x is NaN")
+        assert( !y.isNaN, "y is NaN")
+        assert( !z.isNaN, "z is NaN")
+    }
+#else
+    func sanityCheck() {}
+#endif
 
     static func fromAxisAngle(axis: (Double, Double, Double), angle: Double) -> Quaternion {
         let halfAngle = angle * 0.5
@@ -397,10 +410,11 @@ class SphericalCow {
 
         let omega = spin * dt + (prevTorque / momentOfInertia) * (dt * dt * 0.5)
         let half_omega = Quaternion(w: 0, x: omega.x * 0.5, y: omega.y * 0.5, z: omega.z * 0.5)
-        let new_orientation = (half_omega * orientation).normalized()
+        if(omega.x != 0 || omega.y != 0 || omega.z != 0) {
+            orientation = (half_omega * orientation).normalized()
+        }
         let sum_rotAccel = (prevTorque + accumulatedTorque) / momentOfInertia
         let new_spin = spin + (sum_rotAccel)*(dt*0.5)
-        orientation = new_orientation
         spin = new_spin
         prevTorque = accumulatedTorque
         accumulatedTorque = Vector(x: 0, y: 0, z: 0)

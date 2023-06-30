@@ -14,43 +14,43 @@ struct Action {
 var sun = SphericalCow(id: 0,
                          position: Vector(x: 0, y: 0, z: 0),
                          velocity: Vector(x: 0, y: 0, z: 0),
-                         orientation: Quaternion(w: 1, x: 0, y: 0, z: 0),
+                         orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
                          mass: 1.989e30, radius: 696.34e6, frictionCoefficient: 0.8)
 var mercury = SphericalCow(id: 1,
                          position: Vector(x: 0, y: -57.91e9, z: 0),
                          velocity: Vector(x: 0, y: 0, z: 47.87e3),
-                         orientation: Quaternion(w: 1, x: 0, y: 0, z: 0),
+                         orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
                          mass: 3.285e23, radius: 2.44e6, frictionCoefficient: 0.8)
 var venus = SphericalCow(id: 2,
                          position: Vector(x: 0, y: 108.2e9, z: 0),
                          velocity: Vector(x: 00, y: 0, z: 35.02e3),
-                         orientation: Quaternion(w: 1, x: 0, y: 0, z: 0),
+                         orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
                          mass: 4.867e24, radius: 6.0518e6, frictionCoefficient: 0.8)
 var earth = SphericalCow(id: 3,
                          position: Vector(x: 0, y: 0, z: -149.6e9),
                          velocity: Vector(x: 0, y: 29.78e3, z: 0),
-                         orientation: Quaternion(w: 1, x: 0, y: 0, z: 0),
+                         orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
                          mass: 5.972e24, radius: 6.371e6, frictionCoefficient: 0.0001)
 var moon = SphericalCow(id: 4,
                          position: Vector(x: earth.position.x, y: earth.position.y - 384e6, z: earth.position.z),
                          velocity: Vector(x: earth.velocity.x, y: earth.velocity.y, z: earth.velocity.z + 1.022e3),
-                         orientation: Quaternion(w: 1, x: 0, y: 0, z: 0),
+                         orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
                          mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.8)
 var player1 = SphericalCow(id: 5,
-                         position: Vector(x: moon.position.x, y: moon.position.y, z: moon.position.z + moon.radius + 50.0),
-                         velocity: Vector(x: moon.velocity.x, y: moon.velocity.y + 100.0, z: moon.velocity.z),
+                         position: Vector(x: moon.position.x, y: moon.position.y, z: moon.position.z + moon.radius + 5.0),
+                         velocity: Vector(x: moon.velocity.x, y: moon.velocity.y + 1.0, z: moon.velocity.z),
                          orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
                          spin: moon.spin,
                          mass: 10e3, radius:4.0, frictionCoefficient: 0.5)
 var camera = SphericalCow(id: -1,
                           position: Vector(x: earth.position.x, y: earth.position.y - earth.radius * 2.0, z: earth.position.z - earth.radius * 8.0),
                           velocity: earth.velocity,
-                          orientation: Quaternion(w: 1, x: 0, y: 0, z: 0),
+                          orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
                           spin: Vector(x: 0, y: 0, z: 0),
                           mass: 0, radius: 0, frictionCoefficient: 0.0)
 
@@ -59,7 +59,7 @@ var allTheThings = [sun, mercury, venus, earth, moon, player1]
 let actions: [Action] = []
 
 let totalTime = 1e12
-var dt = 0.01
+var dt = 0.001
 //let totalTime = 0.0001
 //var dt = 0.00001
 var t = 0.0
@@ -171,7 +171,7 @@ func main() {
 
         tick(actions: actions, movingObjects: &allTheThings, t: t, dt: dt)
         t += dt
-        usleep(1000)
+        usleep(10000)
 
         var renderMisc = render_misc()
         renderMisc.materials = materialsArray
@@ -185,8 +185,9 @@ func main() {
             //let relativeVelocity = cameraTarget.velocity - moon.velocity
             let relativeVelocity = camera.velocity - moon.velocity
             camera.position = cameraTarget.position + relativeVelocity.normalized() * cameraTarget.radius * -2.0
-            //camera.orientation = cameraTarget.orientation
-            camera.orientation = Quaternion(w: 0, v: (relativeVelocity).normalized())
+            camera.orientation = cameraTarget.orientation
+            //camera.orientation = Quaternion(w: 0, v: (relativeVelocity).normalized())
+            print(camera.orientation)
         }
         let halfthetaX = cameraVector.x * 0.5 * Double.pi
         let rotX = Quaternion(w: cos(halfthetaX), x: sin(halfthetaX), y: 0, z: 0)
