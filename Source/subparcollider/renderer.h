@@ -27,7 +27,8 @@ typedef struct {
 } material;
 
 typedef struct {
-    float camDirection[3];
+    float camForward[3];
+    float camUp[3];
     float camPosition[3];
     float fov;
     light_source lights[MAX_LIGHTS];

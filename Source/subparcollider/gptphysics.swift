@@ -149,13 +149,29 @@ struct Quaternion {
     var y: Double
     var z: Double
     
+    init(w: Double, v: Vector) {
+        self.w = w
+        x = v.x
+        y = v.y
+        z = v.z
+    }
+
     init(w: Double, x: Double, y: Double, z: Double) {
         self.w = w
         self.x = x
         self.y = y
         self.z = z
     }
-    
+
+    static func fromAxisAngle(axis: (Double, Double, Double), angle: Double) -> Quaternion {
+        let halfAngle = angle * 0.5
+        let s = sin(halfAngle)
+        return Quaternion(w: cos(halfAngle),
+                          x: axis.0 * s,
+                          y: axis.1 * s,
+                          z: axis.2 * s)
+    }
+
     func length() -> Double {
         return sqrt(w*w + x*x + y*y + z*z)
     }
@@ -163,6 +179,12 @@ struct Quaternion {
     func normalized() -> Quaternion {
         let len_inv = 1.0 / length()
         return Quaternion(w: w * len_inv, x: x * len_inv, y: y * len_inv, z: z * len_inv)
+    }
+
+    // if self is unit length, use conjugate instead
+    func inverse() -> Quaternion {
+        let f = 1.0 / -(w*w + x*x + y*y + z*z)
+        return Quaternion(w: w*(-f), x: x*f, y: y*f, z: z*f)
     }
     
     func conjugate() -> Quaternion {
@@ -184,16 +206,8 @@ struct Quaternion {
         let z = left.w*right.z + left.x*right.y - left.y*right.x + left.z*right.w
         return Quaternion(w: w, x: x, y: y, z: z)
     }
-    
-    static func fromAxisAngle(axis: (Double, Double, Double), angle: Double) -> Quaternion {
-        let halfAngle = angle / 2.0
-        let s = sin(halfAngle)
-        return Quaternion(w: cos(halfAngle),
-                          x: axis.0 * s,
-                          y: axis.1 * s,
-                          z: axis.2 * s)
-    }
 }
+
 
 
 // assuming Earthlike conditions for now
@@ -320,7 +334,7 @@ class SphericalCow {
     var position: Vector
     var relativeTo: Celestial?
     var velocity: Vector
-    var orientation: Vector
+    var orientation: Quaternion
     var spin: Vector
     var accumulatedForce: Vector
     var accumulatedTorque: Vector
@@ -328,13 +342,13 @@ class SphericalCow {
     var prevTorque: Vector
     let mass: Double
     let radius: Double
-    let momentOfInertia: Double
+    let momentOfInertia: Double // should be 3x3 matrix (inertia tensor)
     let frictionCoefficient: Double
     var inertia: Double { return (2 / 5) * mass * pow(radius, 2) }
     var density: Double { return mass / (4 * Double.pi * pow(radius, 3) / 3) }
     var heat: Double = 0
 
-    init(id: Int64, position: Vector, velocity: Vector, orientation: Vector, spin: Vector, mass: Double, radius: Double, frictionCoefficient: Double = 0.1) {
+    init(id: Int64, position: Vector, velocity: Vector, orientation: Quaternion, spin: Vector, mass: Double, radius: Double, frictionCoefficient: Double = 0.1) {
         self.id = id
         self.position = position
         self.velocity = velocity
@@ -358,7 +372,7 @@ class SphericalCow {
         self.accumulatedTorque += torque
     }
 
-    func integrateForces(dt: Double) {
+    func integrateForce(dt: Double) {
         let new_pos = position + velocity * dt + (prevForce / mass) * (dt * dt * 0.5)
         let sum_accel = (prevForce + accumulatedForce) / mass
         let new_vel = velocity + (sum_accel)*(dt*0.5)
@@ -366,7 +380,7 @@ class SphericalCow {
         velocity = new_vel
         prevForce = accumulatedForce
         accumulatedForce = Vector(x: 0, y: 0, z: 0)
-
+/*
         let new_orientation = orientation + spin * dt + (prevTorque / momentOfInertia) * (dt * dt * 0.5)
         let sum_rotAccel = (prevTorque + accumulatedTorque) / momentOfInertia
         let new_spin = spin + (sum_rotAccel)*(dt*0.5)
@@ -374,7 +388,24 @@ class SphericalCow {
         spin = new_spin
         prevTorque = accumulatedTorque
         accumulatedTorque = Vector(x: 0, y: 0, z: 0)
+    */
     }
+
+    func integrateTorque(dt: Double) {
+        // dq/dt = 1/2 omega q, where q is the quaternion representing the current orientation of the body, and omega is the angular velocity vector. Omega has to be converted to a quat by placing 0 in the scalar (real) component, so you can multiply it by q using quaternion multiplication.
+        // https://gamedev.stackexchange.com/questions/18036/problem-representing-torque-as-a-quaternion
+
+        let omega = spin * dt + (prevTorque / momentOfInertia) * (dt * dt * 0.5)
+        let half_omega = Quaternion(w: 0, x: omega.x * 0.5, y: omega.y * 0.5, z: omega.z * 0.5)
+        let new_orientation = (half_omega * orientation).normalized()
+        let sum_rotAccel = (prevTorque + accumulatedTorque) / momentOfInertia
+        let new_spin = spin + (sum_rotAccel)*(dt*0.5)
+        orientation = new_orientation
+        spin = new_spin
+        prevTorque = accumulatedTorque
+        accumulatedTorque = Vector(x: 0, y: 0, z: 0)
+    }
+
 }
 
 func calculateGravities(subject: SphericalCow, objects: [SphericalCow]) -> Vector {
@@ -428,7 +459,8 @@ func tick(actions: [Action], movingObjects: inout [SphericalCow], t: Double, dt:
             //print("drag: \(dragForceMagnitude), magnus: \(magnusForce.length), gravity: \(gravityForce.length), total: \((dragForce + magnusForce + gravityForce).length)")
 //            object.applyHeat(heat: 
         }
-        object.integrateForces(dt: dt)
+        object.integrateForce(dt: dt)
+        object.integrateTorque(dt: dt)
     }
 
 
@@ -439,18 +471,14 @@ func tick(actions: [Action], movingObjects: inout [SphericalCow], t: Double, dt:
             let object1 = movingObjects[i]
             let object2 = movingObjects[j]
             let deltaPosition = object2.position - object1.position
-            let distance = deltaPosition.length
             let sumRadii = object1.radius + object2.radius
+            let distance = deltaPosition.length - sumRadii
+            let deltaVelocity = object2.velocity - object1.velocity
+            let closingSpeed = deltaVelocity.dot(deltaPosition.normalized())
 
-            if distance < sumRadii {
-                let deltaVelocity = object2.velocity - object1.velocity
-                let closingSpeed = deltaVelocity.dot(deltaPosition.normalized())
-
-                if closingSpeed < 0 {
-                    let collisionDistance = distance - sumRadii
-                    let collisionTime = collisionDistance / closingSpeed
-                    collisions.append((collisionTime, object1, object2))
-                }
+            if closingSpeed < 0 && distance < (-1.0 * closingSpeed * dt) {
+                let collisionTime = distance / closingSpeed
+                collisions.append((collisionTime, object1, object2))
             }
         }
     }

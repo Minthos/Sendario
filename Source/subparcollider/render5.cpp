@@ -408,7 +408,8 @@ void *rendererThread(void *arg) {
 	// Camera
         glUseProgram(shaderProgram);
         cameraPos = glm::vec3(sharedData.renderMisc.camPosition[0], sharedData.renderMisc.camPosition[1], sharedData.renderMisc.camPosition[2]);
-        cameraTarget = glm::vec3(sharedData.renderMisc.camDirection[0], sharedData.renderMisc.camDirection[1], sharedData.renderMisc.camDirection[2]);
+        cameraTarget = glm::vec3(sharedData.renderMisc.camForward[0], sharedData.renderMisc.camForward[1], sharedData.renderMisc.camForward[2]);
+        cameraUp = glm::vec3(sharedData.renderMisc.camUp[0], sharedData.renderMisc.camUp[1], sharedData.renderMisc.camUp[2]);
         glUniform3f(cameraPosLoc, cameraPos.x, cameraPos.y, cameraPos.z);
         glm::mat4 view = glm::lookAt(cameraPos, cameraTarget, cameraUp);
         glm::mat4 model = glm::mat4(1.0f);

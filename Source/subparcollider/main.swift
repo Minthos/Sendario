@@ -14,31 +14,31 @@ struct Action {
 var sun = SphericalCow(id: 0,
                          position: Vector(x: 0, y: 0, z: 0),
                          velocity: Vector(x: 0, y: 0, z: 0),
-                         orientation: Vector(x: 0, y: 0, z: 0),
+                         orientation: Quaternion(w: 1, x: 0, y: 0, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
                          mass: 1.989e30, radius: 696.34e6, frictionCoefficient: 0.8)
 var mercury = SphericalCow(id: 1,
                          position: Vector(x: 0, y: -57.91e9, z: 0),
                          velocity: Vector(x: 0, y: 0, z: 47.87e3),
-                         orientation: Vector(x: 0, y: 0, z: 0),
+                         orientation: Quaternion(w: 1, x: 0, y: 0, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
                          mass: 3.285e23, radius: 2.44e6, frictionCoefficient: 0.8)
 var venus = SphericalCow(id: 2,
                          position: Vector(x: 0, y: 108.2e9, z: 0),
                          velocity: Vector(x: 00, y: 0, z: 35.02e3),
-                         orientation: Vector(x: 0, y: 0, z: 0),
+                         orientation: Quaternion(w: 1, x: 0, y: 0, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
                          mass: 4.867e24, radius: 6.0518e6, frictionCoefficient: 0.8)
 var earth = SphericalCow(id: 3,
                          position: Vector(x: 0, y: 0, z: -149.6e9),
                          velocity: Vector(x: 0, y: 29.78e3, z: 0),
-                         orientation: Vector(x: 0, y: 0, z: 0),
+                         orientation: Quaternion(w: 1, x: 0, y: 0, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
                          mass: 5.972e24, radius: 6.371e6, frictionCoefficient: 0.0001)
 var moon = SphericalCow(id: 4,
                          position: Vector(x: earth.position.x, y: earth.position.y - 384e6, z: earth.position.z),
                          velocity: Vector(x: earth.velocity.x, y: earth.velocity.y, z: earth.velocity.z + 1.022e3),
-                         orientation: Vector(x: 0, y: 0, z: 0),
+                         orientation: Quaternion(w: 1, x: 0, y: 0, z: 0),
                          spin: Vector(x: 0, y: 0, z: 0),
                          mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.8)
 var player1 = SphericalCow(id: 5,
@@ -50,7 +50,7 @@ var player1 = SphericalCow(id: 5,
 var camera = SphericalCow(id: -1,
                           position: Vector(x: earth.position.x, y: earth.position.y - earth.radius * 2.0, z: earth.position.z - earth.radius * 8.0),
                           velocity: earth.velocity,
-                          orientation: Vector(x: 0, y: 0, z: 0),
+                          orientation: Quaternion(w: 1, x: 0, y: 0, z: 0),
                           spin: Vector(x: 0, y: 0, z: 0),
                           mass: 0, radius: 0, frictionCoefficient: 0.0)
 
@@ -98,42 +98,6 @@ enum CommandType {
     case backwardThrust // left throttle
     case thrustVector // left stick
     case cameraVector // right stick
-}
-
-func rotateY(vector: Vector, angle: Double) -> Vector {
-    let magnitude = sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z)
-    let normalizedVector = Vector(x: vector.x / magnitude, y: vector.y / magnitude, z: vector.z / magnitude)
-    let orthogonalAxis = Vector(x: -normalizedVector.z, y: 0, z: normalizedVector.x)
-    let cosTheta = cos(angle)
-    let sinTheta = sin(angle)
-    let rotatedX = normalizedVector.x * cosTheta + orthogonalAxis.x * sinTheta
-    let rotatedY = normalizedVector.y
-    let rotatedZ = normalizedVector.z * cosTheta + orthogonalAxis.z * sinTheta
-    return Vector(x: rotatedX, y: rotatedY, z: rotatedZ)
-}
-
-func rotateX(vector: Vector, angle: Double) -> Vector {
-    let magnitude = sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z)
-    let normalizedVector = Vector(x: vector.x / magnitude, y: vector.y / magnitude, z: vector.z / magnitude)
-    let orthogonalAxis = Vector(x: 0, y: -normalizedVector.z, z: normalizedVector.y)
-    let cosTheta = cos(angle)
-    let sinTheta = sin(angle)
-    let rotatedX = normalizedVector.x
-    let rotatedY = normalizedVector.y * cosTheta + orthogonalAxis.y * sinTheta
-    let rotatedZ = normalizedVector.z * cosTheta + orthogonalAxis.z * sinTheta
-    return Vector(x: rotatedX, y: rotatedY, z: rotatedZ)
-}
-
-func rotateZ(vector: Vector, angle: Double) -> Vector {
-    let magnitude = sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z)
-    let normalizedVector = Vector(x: vector.x / magnitude, y: vector.y / magnitude, z: vector.z / magnitude)
-    let orthogonalAxis = Vector(x: -normalizedVector.y, y: normalizedVector.y, z: 0)
-    let cosTheta = cos(angle)
-    let sinTheta = sin(angle)
-    let rotatedX = normalizedVector.x * cosTheta + orthogonalAxis.x * sinTheta
-    let rotatedY = normalizedVector.y * cosTheta + orthogonalAxis.y * sinTheta
-    let rotatedZ = normalizedVector.z
-    return Vector(x: rotatedX, y: rotatedY, z: rotatedZ)
 }
 
 func main() {
@@ -216,15 +180,25 @@ func main() {
         if(false){
             let relativeVelocity = cameraTarget.velocity - moon.velocity
             camera.position = cameraTarget.position + relativeVelocity.normalized() * cameraTarget.radius * -2.0
-            camera.orientation = (cameraTarget.position - camera.position).normalized()
+            camera.orientation = Quaternion(w: 0, v: (cameraTarget.position - camera.position).normalized())
         } else {
-            let relativeVelocity = cameraTarget.velocity - moon.velocity
+            //let relativeVelocity = cameraTarget.velocity - moon.velocity
+            let relativeVelocity = camera.velocity - moon.velocity
             camera.position = cameraTarget.position + relativeVelocity.normalized() * cameraTarget.radius * -2.0
-            camera.orientation = (cameraTarget.position - camera.position).normalized()
-            camera.orientation = rotateX(vector: camera.orientation, angle: cameraVector.x * 3.1415)
-            camera.orientation = rotateZ(vector: camera.orientation, angle: cameraVector.y * 3.1415)
+            camera.orientation = Quaternion(w: 0, v: (relativeVelocity).normalized())
         }
-        renderMisc.camDirection = (Float(camera.orientation.x), Float(camera.orientation.y), Float(camera.orientation.z))
+        let halfthetaX = cameraVector.x * 0.5
+        let rotX = Quaternion(w: cos(halfthetaX), x: 0, y: 0, z: sin(halfthetaX))
+        let halfthetaY = cameraVector.y * 0.5
+        let rotY = Quaternion(w: cos(halfthetaY), x: 0, y: sin(halfthetaY), z: 0)
+        let rot90 = Quaternion(w: 0, x: 0, y: 0, z: 1)
+        let cameraQuat = camera.orientation * rotX * rotY
+        var cameraUp = cameraQuat * rot90
+        renderMisc.camForward = (Float(cameraQuat.x), Float(cameraQuat.y), Float(cameraQuat.z))
+        cameraUp = Quaternion(w: 0, v: (camera.position - moon.position).normalized())
+        renderMisc.camUp = (Float(cameraUp.x), Float(cameraUp.y), Float(cameraUp.z))
+        //renderMisc.camUp = (Float(cameraUp.x), Float(cameraUp.y), Float(cameraUp.z))
+        //renderMisc.camDirection = (Float(camera.orientation.x), Float(camera.orientation.y), Float(camera.orientation.z))
         // camera is at 0,0,0 to make it easy for the renderer
         renderMisc.camPosition = (0, 0, 0)
 
