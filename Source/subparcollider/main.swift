@@ -44,7 +44,7 @@ var moon = SphericalCow(id: 4,
 var player1 = SphericalCow(id: 5,
                          position: Vector(x: moon.position.x, y: moon.position.y, z: moon.position.z + moon.radius + 50.0),
                          velocity: Vector(x: moon.velocity.x, y: moon.velocity.y + 100.0, z: moon.velocity.z),
-                         orientation: moon.orientation,
+                         orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
                          spin: moon.spin,
                          mass: 10e3, radius:4.0, frictionCoefficient: 0.5)
 var camera = SphericalCow(id: -1,
@@ -126,7 +126,7 @@ func main() {
     var controller: OpaquePointer? = nil
     var shouldExit = false
     var thrustVector = Vector(x: 0, y: 0, z: 0)
-    var cameraVector = Vector(x: 0, y: 0, z: 1.0)
+    var cameraVector = Vector(x: 0, y: 0, z: 0)
     while( !shouldExit ) {
         // poll for inputs, generate actions
         for i in 0..<SDL_NumJoysticks() {
@@ -153,9 +153,9 @@ func main() {
                             } else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_TRIGGERRIGHT.rawValue) {
                                 thrustVector.z = Double(event.caxis.value) / TMAX
                             } else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_RIGHTX.rawValue) {
-                                cameraVector.x = -Double(event.caxis.value) / TMAX
+                                cameraVector.y = -Double(event.caxis.value) / TMAX
                             } else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_RIGHTY.rawValue) {
-                                cameraVector.y = Double(event.caxis.value) / TMAX
+                                cameraVector.x = Double(event.caxis.value) / TMAX
                             }
                         default:
                             break
@@ -185,17 +185,18 @@ func main() {
             //let relativeVelocity = cameraTarget.velocity - moon.velocity
             let relativeVelocity = camera.velocity - moon.velocity
             camera.position = cameraTarget.position + relativeVelocity.normalized() * cameraTarget.radius * -2.0
+            //camera.orientation = cameraTarget.orientation
             camera.orientation = Quaternion(w: 0, v: (relativeVelocity).normalized())
         }
-        let halfthetaX = cameraVector.x * 0.5
-        let rotX = Quaternion(w: cos(halfthetaX), x: 0, y: 0, z: sin(halfthetaX))
-        let halfthetaY = cameraVector.y * 0.5
+        let halfthetaX = cameraVector.x * 0.5 * Double.pi
+        let rotX = Quaternion(w: cos(halfthetaX), x: sin(halfthetaX), y: 0, z: 0)
+        let halfthetaY = cameraVector.y * 0.5 * Double.pi
         let rotY = Quaternion(w: cos(halfthetaY), x: 0, y: sin(halfthetaY), z: 0)
-        let rot90 = Quaternion(w: 0, x: 0, y: 0, z: 1)
-        let cameraQuat = camera.orientation * rotX * rotY
-        var cameraUp = cameraQuat * rot90
+        let rot90 = Quaternion(w: 0, x: 1, y: 0, z: 0)
+        let cameraQuat = rotX * camera.orientation * rotY
+        let cameraUp = cameraQuat * rot90
         renderMisc.camForward = (Float(cameraQuat.x), Float(cameraQuat.y), Float(cameraQuat.z))
-        cameraUp = Quaternion(w: 0, v: (camera.position - moon.position).normalized())
+        //cameraUp = Quaternion(w: 0, v: (camera.position - moon.position).normalized())
         renderMisc.camUp = (Float(cameraUp.x), Float(cameraUp.y), Float(cameraUp.z))
         //renderMisc.camUp = (Float(cameraUp.x), Float(cameraUp.y), Float(cameraUp.z))
         //renderMisc.camDirection = (Float(camera.orientation.x), Float(camera.orientation.y), Float(camera.orientation.z))
