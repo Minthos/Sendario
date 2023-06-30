@@ -75,6 +75,66 @@ Uranus	(0.341176, 0.313725, 0.666667)
 Neptune	(0.211765, 0.407843, 0.588235)
 */
 
+enum CommandType {
+    case beginFire // LB
+    case endFire // LB
+    case lock // RB
+    case toggleRCS // camera button: rcs follows crosshair / rcs disabled
+    case menu // start
+    case toggleDrones // A
+    case beginTalk // B
+    case endTalk // B
+    case beginLeftRoll // X
+    case endLeftRoll // X
+    case beginRightRoll // Y
+    case endRightRoll // Y
+    case dpadup // select weapon/module 2
+    case dpaddn // select weapon/module 4
+    case dpadl // select weapon/module 1
+    case dpadr // select weapon/module 3
+    case toggleAutopilot // left stick button: toggle autopilot (if target locked, match velocity with locked target)
+    case toggleCameraDefault // right stick button: set camera direction to prograde / set camera direction to ship's forward direction
+    case forwardThrust // right throttle
+    case backwardThrust // left throttle
+    case thrustVector // left stick
+    case cameraVector // right stick
+}
+
+func rotateY(vector: Vector, angle: Double) -> Vector {
+    let magnitude = sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z)
+    let normalizedVector = Vector(x: vector.x / magnitude, y: vector.y / magnitude, z: vector.z / magnitude)
+    let orthogonalAxis = Vector(x: -normalizedVector.z, y: 0, z: normalizedVector.x)
+    let cosTheta = cos(angle)
+    let sinTheta = sin(angle)
+    let rotatedX = normalizedVector.x * cosTheta + orthogonalAxis.x * sinTheta
+    let rotatedY = normalizedVector.y
+    let rotatedZ = normalizedVector.z * cosTheta + orthogonalAxis.z * sinTheta
+    return Vector(x: rotatedX, y: rotatedY, z: rotatedZ)
+}
+
+func rotateX(vector: Vector, angle: Double) -> Vector {
+    let magnitude = sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z)
+    let normalizedVector = Vector(x: vector.x / magnitude, y: vector.y / magnitude, z: vector.z / magnitude)
+    let orthogonalAxis = Vector(x: 0, y: -normalizedVector.z, z: normalizedVector.y)
+    let cosTheta = cos(angle)
+    let sinTheta = sin(angle)
+    let rotatedX = normalizedVector.x
+    let rotatedY = normalizedVector.y * cosTheta + orthogonalAxis.y * sinTheta
+    let rotatedZ = normalizedVector.z * cosTheta + orthogonalAxis.z * sinTheta
+    return Vector(x: rotatedX, y: rotatedY, z: rotatedZ)
+}
+
+func rotateZ(vector: Vector, angle: Double) -> Vector {
+    let magnitude = sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z)
+    let normalizedVector = Vector(x: vector.x / magnitude, y: vector.y / magnitude, z: vector.z / magnitude)
+    let orthogonalAxis = Vector(x: -normalizedVector.y, y: normalizedVector.y, z: 0)
+    let cosTheta = cos(angle)
+    let sinTheta = sin(angle)
+    let rotatedX = normalizedVector.x * cosTheta + orthogonalAxis.x * sinTheta
+    let rotatedY = normalizedVector.y * cosTheta + orthogonalAxis.y * sinTheta
+    let rotatedZ = normalizedVector.z
+    return Vector(x: rotatedX, y: rotatedY, z: rotatedZ)
+}
 
 func main() {
     let materialsArray = UnsafeMutablePointer<material>.allocate(capacity: allTheThings.count)
@@ -101,6 +161,8 @@ func main() {
     SDL_Init(SDL_INIT_GAMECONTROLLER)
     var controller: OpaquePointer? = nil
     var shouldExit = false
+    var thrustVector = Vector(x: 0, y: 0, z: 0)
+    var cameraVector = Vector(x: 0, y: 0, z: 1.0)
     while( !shouldExit ) {
         // poll for inputs, generate actions
         for i in 0..<SDL_NumJoysticks() {
@@ -108,6 +170,7 @@ func main() {
                 controller = SDL_GameControllerOpen(i)
                 if controller != nil {
                     var event = SDL_Event()
+                    let TMAX = Double(SDL_JOYSTICK_AXIS_MAX)
                     while SDL_PollEvent(&event) != 0 {
                         switch event.type {
                         case SDL_CONTROLLERBUTTONDOWN.rawValue:
@@ -117,22 +180,30 @@ func main() {
                                 shouldExit = true
                             }
                         case SDL_CONTROLLERAXISMOTION.rawValue:
-                            if event.caxis.axis == SDL_CONTROLLER_AXIS_LEFTX.rawValue || event.caxis.axis == SDL_CONTROLLER_AXIS_LEFTY.rawValue {
-                                continue
+                            if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_LEFTX.rawValue) {
+                                thrustVector.x = Double(event.caxis.value) / TMAX
+                            } else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_LEFTY.rawValue) {
+                                thrustVector.y = Double(event.caxis.value) / TMAX
+                            } else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_TRIGGERLEFT.rawValue) {
+                                thrustVector.z = -Double(event.caxis.value) / TMAX
+                            } else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_TRIGGERRIGHT.rawValue) {
+                                thrustVector.z = Double(event.caxis.value) / TMAX
+                            } else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_RIGHTX.rawValue) {
+                                cameraVector.x = -Double(event.caxis.value) / TMAX
+                            } else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_RIGHTY.rawValue) {
+                                cameraVector.y = Double(event.caxis.value) / TMAX
                             }
                         default:
                             break
                         }
                     }
+
                 } else {
                     let errorMessage = String(cString: SDL_GetError())
                     print("Could not open game controller: \(errorMessage)")
                 }
             }
         }
-    
-
-
 
         tick(actions: actions, movingObjects: &allTheThings, t: t, dt: dt)
         t += dt
@@ -142,16 +213,16 @@ func main() {
         renderMisc.materials = materialsArray
 
         let cameraTarget = player1
-        if(true){
+        if(false){
             let relativeVelocity = cameraTarget.velocity - moon.velocity
             camera.position = cameraTarget.position + relativeVelocity.normalized() * cameraTarget.radius * -2.0
             camera.orientation = (cameraTarget.position - camera.position).normalized()
         } else {
-            camera.position = moon.position + (moon.position - earth.position).normalized() * 10.0 * moon.radius
-            camera.position.x += moon.radius * 2.0
-            camera.position.y += moon.radius * 2.0
-            camera.position.z += moon.radius * 2.0
-            camera.orientation = (moon.position - camera.position).normalized()
+            let relativeVelocity = cameraTarget.velocity - moon.velocity
+            camera.position = cameraTarget.position + relativeVelocity.normalized() * cameraTarget.radius * -2.0
+            camera.orientation = (cameraTarget.position - camera.position).normalized()
+            camera.orientation = rotateX(vector: camera.orientation, angle: cameraVector.x * 3.1415)
+            camera.orientation = rotateZ(vector: camera.orientation, angle: cameraVector.y * 3.1415)
         }
         renderMisc.camDirection = (Float(camera.orientation.x), Float(camera.orientation.y), Float(camera.orientation.z))
         // camera is at 0,0,0 to make it easy for the renderer

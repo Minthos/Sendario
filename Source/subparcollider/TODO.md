@@ -1,6 +1,7 @@
 ## Near term TODO:
 
 * basic camera control with gamepad
+* quaternions to represent orientation, some refactoring of the physics engine
 * spaceship controls and thrust, attitude control
 * fix the rendering bug when camera is near/inside an object
 * reactivate atmospheric drag but make it follow the celestial and not apply to the celestial

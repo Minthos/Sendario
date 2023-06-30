@@ -72,12 +72,20 @@ struct Vector {
         return Vector(x: lhs.x - rhs.x, y: lhs.y - rhs.y, z: lhs.z - rhs.z)
     }
     
+    static func *(lhs: Double, rhs: Vector) -> Vector {
+        return rhs * lhs
+    }
+
     static func *(lhs: Vector, rhs: Double) -> Vector {
         assert(!rhs.isNaN)
         lhs.sanityCheck()
         return Vector(x: lhs.x * rhs, y: lhs.y * rhs, z: lhs.z * rhs)
     }
     
+    static func /(lhs: Double, rhs: Vector) -> Vector {
+        return rhs * lhs
+    }
+
     static func /(lhs: Vector, rhs: Double) -> Vector {
         lhs.sanityCheck()
         assert(rhs != 0)
@@ -110,9 +118,10 @@ struct Vector {
     }
     
     static func /=(lhs: inout Vector, rhs: Double) {
-        lhs.x /= rhs
-        lhs.y /= rhs
-        lhs.z /= rhs
+        let inv = 1.0 / rhs
+        lhs.x *= inv
+        lhs.y *= inv
+        lhs.z *= inv
         assert(rhs != 0)
         assert(!rhs.isNaN)
         lhs.sanityCheck()
@@ -131,6 +140,58 @@ struct Vector {
     static prefix func - (vector: Vector) -> Vector {
         vector.sanityCheck()
         return Vector(x: -vector.x, y: -vector.y, z: -vector.z)
+    }
+}
+
+struct Quaternion {
+    var w: Double
+    var x: Double
+    var y: Double
+    var z: Double
+    
+    init(w: Double, x: Double, y: Double, z: Double) {
+        self.w = w
+        self.x = x
+        self.y = y
+        self.z = z
+    }
+    
+    func length() -> Double {
+        return sqrt(w*w + x*x + y*y + z*z)
+    }
+
+    func normalized() -> Quaternion {
+        let len_inv = 1.0 / length()
+        return Quaternion(w: w * len_inv, x: x * len_inv, y: y * len_inv, z: z * len_inv)
+    }
+    
+    func conjugate() -> Quaternion {
+        return Quaternion(w: w, x: -x, y: -y, z: -z)
+    }
+    
+    static func +(left: Quaternion, right: Quaternion) -> Quaternion {
+        return Quaternion(w: left.w + right.w, x: left.x + right.x, y: left.y + right.y, z: left.z + right.z)
+    }
+    
+    static func -(left: Quaternion, right: Quaternion) -> Quaternion {
+        return Quaternion(w: left.w - right.w, x: left.x - right.x, y: left.y - right.y, z: left.z - right.z)
+    }
+    
+    static func *(left: Quaternion, right: Quaternion) -> Quaternion {
+        let w = left.w*right.w - left.x*right.x - left.y*right.y - left.z*right.z
+        let x = left.w*right.x + left.x*right.w + left.y*right.z - left.z*right.y
+        let y = left.w*right.y - left.x*right.z + left.y*right.w + left.z*right.x
+        let z = left.w*right.z + left.x*right.y - left.y*right.x + left.z*right.w
+        return Quaternion(w: w, x: x, y: y, z: z)
+    }
+    
+    static func fromAxisAngle(axis: (Double, Double, Double), angle: Double) -> Quaternion {
+        let halfAngle = angle / 2.0
+        let s = sin(halfAngle)
+        return Quaternion(w: cos(halfAngle),
+                          x: axis.0 * s,
+                          y: axis.1 * s,
+                          z: axis.2 * s)
     }
 }
 
