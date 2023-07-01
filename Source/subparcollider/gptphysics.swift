@@ -176,6 +176,47 @@ struct Quaternion {
         sanityCheck()
     }
 
+    init(axis: (Double, Double, Double), angle: Double) {
+        let halfAngle = angle * 0.5
+        let s = sin(halfAngle)
+        w = cos(halfAngle)
+        x = axis.0 * s
+        y = axis.1 * s
+        z = axis.2 * s
+        sanityCheck()
+    }
+/*
+    init(pitch: Double, yaw: Double, roll: Double)
+    {
+	// Basically we create 3 Quaternions, one for pitch, one for yaw, one for roll
+	// and multiply those together.
+	// the calculation below does the same, just shorter
+
+	let p = pitch * Double.pi;
+	let y = yaw * Double.pi;
+	let r = roll * Double.pi;
+	//let p = pitch * PIOVER180 / 2.0;
+	//let y = yaw * PIOVER180 / 2.0;
+	//let r = roll * PIOVER180 / 2.0;
+
+	let sinp = sin(p);
+	let siny = sin(y);
+	let sinr = sin(r);
+	let cosp = cos(p);
+	let cosy = cos(y);
+	let cosr = cos(r);
+        var tmp = Quaternion(x: sinr * cosp * cosy - cosr * sinp * siny,
+	                     y: cosr * sinp * cosy + sinr * cosp * siny,
+                             z: cosr * cosp * siny - sinr * sinp * cosy,
+	                     w: cosr * cosp * cosy + sinr * sinp * siny)
+
+        let len_inv = 1.0 / tmp.length()
+        w = tmp.w * len_inv
+        x = tmp.x * len_inv
+        y = tmp.y * len_inv
+        z = tmp.z * len_inv
+    }
+*/
 #if DEBUG
     func sanityCheck() {
         assert( !w.isNaN, "w is NaN")
@@ -187,13 +228,10 @@ struct Quaternion {
     func sanityCheck() {}
 #endif
 
-    static func fromAxisAngle(axis: (Double, Double, Double), angle: Double) -> Quaternion {
-        let halfAngle = angle * 0.5
-        let s = sin(halfAngle)
-        return Quaternion(w: cos(halfAngle),
-                          x: axis.0 * s,
-                          y: axis.1 * s,
-                          z: axis.2 * s)
+    func getAxisAngle() -> (Vector, Double) {
+	let scale = 1.0 / sqrt(x * x + y * y + z * z)
+        let axis = Vector(x: x * scale, y: y * scale, z: z * scale)
+	return (axis, acos(w) * 2.0)
     }
 
     func length() -> Double {
@@ -230,9 +268,14 @@ struct Quaternion {
         let z = left.w*right.z + left.x*right.y - left.y*right.x + left.z*right.w
         return Quaternion(w: w, x: x, y: y, z: z)
     }
+
+    static func *(left: Quaternion, right: Vector) -> Vector {
+	let vn = right.normalized()
+        let vecQuat = Quaternion(w: 0, x: vn.x, y: vn.y, z: vn.z)
+	let resQuat = left * vecQuat * left.conjugate()
+	return Vector(x: resQuat.x, y: resQuat.y, z: resQuat.z)
+    }
 }
-
-
 
 // assuming Earthlike conditions for now
 func atmosphericProperties(altitude: Double) -> (density: Double, pressure: Double, viscosity: Double) {
@@ -406,13 +449,14 @@ class SphericalCow {
         accumulatedForce = Vector(x: 0, y: 0, z: 0)
     }
 
+// oemga should probably be rotated 90 degrees or something
     func integrateTorque(dt: Double) {
         let omega = (spin * dt) + ((prevTorque / momentOfInertia) * (dt * dt * 0.5))
         let angle = omega.length
         let rotation = Quaternion(axis: omega, angle: angle)
         if(omega.x != 0 || omega.y != 0 || omega.z != 0) {
             orientation = (rotation * orientation).normalized()
-            print("spin: \(spin) omega: \(omega)")
+    //        print("spin: \(spin) omega: \(omega)")
         }
         let sum_rotAccel = (prevTorque + accumulatedTorque) / momentOfInertia
         let new_spin = spin + (sum_rotAccel)*(dt*0.5)
@@ -447,7 +491,6 @@ func tick(actions: [Action], movingObjects: inout [SphericalCow], t: Double, dt:
     for action in actions {
         action.object.applyForce(force: action.force, dt: dt)
         action.object.applyTorque(torque: action.torque, dt: dt)
-        // lol, scope crept a little..
     }
 
     for object in movingObjects {

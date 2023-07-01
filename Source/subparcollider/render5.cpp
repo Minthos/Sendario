@@ -81,6 +81,7 @@ void main()
     {
 	// eerie green glow for the debug
         //fragColor = vec4(0.0, 1.0, 0.0, 0.1); 
+        fragColor = vec4(fragPos, 0.25); 
     }
     else
     {

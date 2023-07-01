@@ -42,8 +42,8 @@ var moon = SphericalCow(id: 4,
                          spin: Vector(x: 0, y: 0, z: 0),
                          mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.8)
 var player1 = SphericalCow(id: 5,
-                         position: Vector(x: moon.position.x, y: moon.position.y, z: moon.position.z + moon.radius + 4.1),
-                         velocity: Vector(x: moon.velocity.x, y: moon.velocity.y + 1.00, z: moon.velocity.z),
+                         position: Vector(x: moon.position.x, y: moon.position.y, z: moon.position.z + moon.radius + 200000.1),
+                         velocity: Vector(x: moon.velocity.x, y: moon.velocity.y + 1600.0, z: moon.velocity.z),
                          orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
                          spin: moon.spin,
                          mass: 10e3, radius:4.0, frictionCoefficient: 0.5)
@@ -56,10 +56,10 @@ var camera = SphericalCow(id: -1,
 
 var lights = [sun]
 var allTheThings = [sun, mercury, venus, earth, moon, player1]
-let actions: [Action] = []
+var actions: [Action] = []
 
 let totalTime = 1e12
-var dt = 0.01
+var dt = 0.001
 //let totalTime = 0.0001
 //var dt = 0.00001
 var t = 0.0
@@ -125,8 +125,11 @@ func main() {
     SDL_Init(SDL_INIT_GAMECONTROLLER)
     var controller: OpaquePointer? = nil
     var shouldExit = false
+    let worldUpVector = Vector(x: 0, y: 1, z:0)
     var thrustVector = Vector(x: 0, y: 0, z: 0)
-    var cameraVector = Vector(x: 0, y: 0, z: 0)
+    var cameraSpherical = Spherical(1, 0, 0)
+    
+    // main game loop. handle input, do a physics tick, send results to renderer
     while( !shouldExit ) {
         // poll for inputs, generate actions
         for i in 0..<SDL_NumJoysticks() {
@@ -153,57 +156,68 @@ func main() {
                             } else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_TRIGGERRIGHT.rawValue) {
                                 thrustVector.z = Double(event.caxis.value) / TMAX
                             } else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_RIGHTX.rawValue) {
-                                cameraVector.y = -Double(event.caxis.value) / TMAX
+                                cameraSpherical.theta = -Double(event.caxis.value) / TMAX
                             } else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_RIGHTY.rawValue) {
-                                cameraVector.x = Double(event.caxis.value) / TMAX
+                                cameraSpherical.phi = Double(event.caxis.value) / TMAX
                             }
                         default:
                             break
                         }
                     }
-
                 } else {
                     let errorMessage = String(cString: SDL_GetError())
                     print("Could not open game controller: \(errorMessage)")
                 }
             }
         }
-
+        actions = [Action(object: player1, force: thrustVector * 10000.0 / dt, torque: Vector(x: 0, y: 0, z: 0))]
         tick(actions: actions, movingObjects: &allTheThings, t: t, dt: dt)
         t += dt
         usleep(10000)
 
+        // camera and rendering
         var renderMisc = render_misc()
         renderMisc.materials = materialsArray
-
         let cameraTarget = player1
-        if(false){
+        if(true){
             let relativeVelocity = cameraTarget.velocity - moon.velocity
-            camera.position = cameraTarget.position + relativeVelocity.normalized() * cameraTarget.radius * -2.0
-            camera.orientation = Quaternion(w: 0, v: (cameraTarget.position - camera.position).normalized())
+            if(relativeVelocity.lengthSquared == 0) {
+                camera.position = cameraTarget.position + Vector(x: 0, y: 0, z: -3.0 * cameraTarget.radius)
+            } else {
+                camera.position = cameraTarget.position + relativeVelocity.normalized() * -3.0 * cameraTarget.radius
+            }
+            //let camFwd = (cameraTarget.position - camera.position)
+            //let upVec = cameraTarget.orientation * worldUpVector
+
+            
+            //let rotX = Quaternion(w: cameraSpherical.theta, x: 1, y: 0, z: 0)
+            //let rotY = Quaternion(w: cameraSpherical.phi, x: 0, y: 1, z: 0)
+            //let rotZ = Quaternion(w: 
+            //let sumRot = rotX * rotY
+            let camFwd = (cameraTarget.position - camera.position).normalized()
+            let upVec = (cameraTarget.orientation * worldUpVector).normalized()
+            
+            renderMisc.camForward = (Float(camFwd.x), Float(camFwd.y), Float(camFwd.z))
+            renderMisc.camUp = (Float(upVec.x), Float(upVec.y), Float(upVec.z))
         } else {
-            //let relativeVelocity = cameraTarget.velocity - moon.velocity
             let relativeVelocity = camera.velocity - moon.velocity
             camera.position = cameraTarget.position + relativeVelocity.normalized() * cameraTarget.radius * -2.0
             camera.orientation = cameraTarget.orientation
-            //camera.orientation = Quaternion(w: 0, v: (relativeVelocity).normalized())
-            print(camera.orientation)
+            let halfthetaX = cameraSpherical.theta * 0.5 * Double.pi
+            let rotX = Quaternion(w: cos(halfthetaX), x: sin(halfthetaX), y: 0, z: 0)
+            let halfthetaY = cameraSpherical.phi * 0.5 * Double.pi
+            let rotY = Quaternion(w: cos(halfthetaY), x: 0, y: sin(halfthetaY), z: 0)
+            let rot90 = Quaternion(w: 0, x: 1, y: 0, z: 0)
+            let cameraQuat = rotX * camera.orientation * rotY
+            let cameraUp = cameraQuat * rot90
+            let (camForwardVector, _) = cameraQuat.getAxisAngle()
+            renderMisc.camForward = (Float(camForwardVector.x), Float(camForwardVector.y), Float(camForwardVector.z))
+            let (camUpVector, _) = cameraUp.getAxisAngle()
+            renderMisc.camUp = (Float(camUpVector.x), Float(camUpVector.y), Float(camUpVector.z))
         }
-        let halfthetaX = cameraVector.x * 0.5 * Double.pi
-        let rotX = Quaternion(w: cos(halfthetaX), x: sin(halfthetaX), y: 0, z: 0)
-        let halfthetaY = cameraVector.y * 0.5 * Double.pi
-        let rotY = Quaternion(w: cos(halfthetaY), x: 0, y: sin(halfthetaY), z: 0)
-        let rot90 = Quaternion(w: 0, x: 1, y: 0, z: 0)
-        let cameraQuat = rotX * camera.orientation * rotY
-        let cameraUp = cameraQuat * rot90
-        renderMisc.camForward = (Float(cameraQuat.x), Float(cameraQuat.y), Float(cameraQuat.z))
-        //cameraUp = Quaternion(w: 0, v: (camera.position - moon.position).normalized())
-        renderMisc.camUp = (Float(cameraUp.x), Float(cameraUp.y), Float(cameraUp.z))
-        //renderMisc.camUp = (Float(cameraUp.x), Float(cameraUp.y), Float(cameraUp.z))
-        //renderMisc.camDirection = (Float(camera.orientation.x), Float(camera.orientation.y), Float(camera.orientation.z))
+
         // camera is at 0,0,0 to make it easy for the renderer
         renderMisc.camPosition = (0, 0, 0)
-
         for (index, object) in lights.enumerated() {
             if(index >= MAX_LIGHTS){
                 print("warning: MAX_LIGHTS exceeded")
@@ -230,10 +244,10 @@ func main() {
                                         radius: Float(object.radius),
                                         material_idx: (UInt64(object.id)))
         }
-
         render(sphereArray, allTheThings.count, renderMisc)
         sphereArray.deallocate()
     }
+    // end main game loop
 
     SDL_Quit()
     stopRenderer()
