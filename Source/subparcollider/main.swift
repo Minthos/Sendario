@@ -194,9 +194,17 @@ func main() {
             //let rotY = Quaternion(w: cameraSpherical.phi, x: 0, y: 1, z: 0)
             //let rotZ = Quaternion(w: 
             //let sumRot = rotX * rotY
-            let camFwd = (cameraTarget.position - camera.position).normalized()
-            let upVec = (cameraTarget.orientation * worldUpVector).normalized()
-            
+            var camFwd = (cameraTarget.position - camera.position).normalized()
+
+            // this is wrong, but how to properly define it?
+            //var upVec = (cameraTarget.orientation * worldUpVector).normalized()
+            var upVec = (cameraTarget.position - moon.position).normalized()
+            let pitchAxis = camFwd.cross(upVec).normalized()
+            let pitchQuat = Quaternion(axis: pitchAxis, angle: cameraSpherical.phi)
+            let yawQuat = Quaternion(axis: upVec, angle: cameraSpherical.theta)
+
+            camFwd = yawQuat * pitchQuat * camFwd
+            upVec = pitchQuat * upVec
             renderMisc.camForward = (Float(camFwd.x), Float(camFwd.y), Float(camFwd.z))
             renderMisc.camUp = (Float(upVec.x), Float(upVec.y), Float(upVec.z))
         } else {
