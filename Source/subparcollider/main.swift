@@ -59,9 +59,7 @@ var allTheThings = [sun, mercury, venus, earth, moon, player1]
 var actions: [Action] = []
 
 let totalTime = 1e12
-var dt = 0.001
-//let totalTime = 0.0001
-//var dt = 0.00001
+var dt = 0.1
 var t = 0.0
 
 /*
@@ -178,7 +176,7 @@ func main() {
         actions = [Action(object: player1, force: thrustVector * 10000.0 / dt, torque: Vector(x: 0, y: 0, z: 0))]
         tick(actions: actions, movingObjects: &allTheThings, t: t, dt: dt)
         t += dt
-        usleep(10000)
+        usleep(1000)
 
         // camera and rendering
         var renderMisc = render_misc()
@@ -193,8 +191,8 @@ func main() {
         var camFwd = (cameraTarget.position - camera.position).normalized()
         var upVec = (cameraTarget.position - moon.position).normalized()
         let pitchAxis = camFwd.cross(upVec).normalized()
-        let pitchQuat = Quaternion(axis: pitchAxis, angle: cameraSpherical.phi)
-        let yawQuat = Quaternion(axis: upVec, angle: cameraSpherical.theta)
+        let pitchQuat = Quaternion(axis: pitchAxis, angle: 2.0 * cameraSpherical.phi)
+        let yawQuat = Quaternion(axis: upVec, angle: 2.0 * cameraSpherical.theta)
         camFwd = yawQuat * pitchQuat * camFwd
         upVec = pitchQuat * upVec
         renderMisc.camForward = (Float(camFwd.x), Float(camFwd.y), Float(camFwd.z))
@@ -218,7 +216,7 @@ func main() {
         }
 
         // we have to sort the things before we send them to the renderer, otherwise transparency breaks.
-        allTheThings.sort(by: { ($0.position - camera.position).length > ($1.position - camera.position).length })
+        allTheThings.sort(by: { ($0.position - camera.position).lengthSquared > ($1.position - camera.position).lengthSquared })
         let sphereArray = UnsafeMutablePointer<sphere>.allocate(capacity: allTheThings.count)
         for (index, object) in allTheThings.enumerated() {
             // center everything on the camera before converting to float to avoid float precision issues when rendering
