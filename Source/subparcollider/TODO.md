@@ -1,14 +1,15 @@
 ## Near term TODO:
 
-* basic camera control with gamepad
-* quaternions to represent orientation, some refactoring of the physics engine
-* spaceship controls and thrust, attitude control
-* fix the rendering bug when camera is near/inside an object
+* spaceship attitude control
 * reactivate atmospheric drag but make it follow the celestial and not apply to the celestial
 * visualize future trajectories with lines in colors of the rainbow, to about 1 orbital period
 
 ## Recently done:
 
+* fix the rendering bug when camera is near/inside an object
+* basic camera control with gamepad
+* spaceship controls and thrust
+* quaternions to represent orientation
 * improved gravity (brute force solution is not scalable but good enough for now)
 * create a skybox with the starfield.py shader
 * make the sun really bright
@@ -41,6 +42,7 @@
 
 ## Low priority:
 
+* some refactoring of the physics engine
 * implement tidal effects on celestial spin and orbit
 
 
