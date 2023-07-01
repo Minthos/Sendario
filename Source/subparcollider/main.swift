@@ -142,6 +142,11 @@ func main() {
                         switch event.type {
                         case SDL_CONTROLLERBUTTONDOWN.rawValue:
                             print("\(String(cString: getStringForButton(event.cbutton.button)!)) pressed")
+                            if event.cbutton.button == SDL_CONTROLLER_BUTTON_Y.rawValue {
+                                dt *= 10.0
+                            } else if event.cbutton.button == SDL_CONTROLLER_BUTTON_X.rawValue {
+                                dt *= 0.1
+                            }
                         case SDL_CONTROLLERBUTTONUP.rawValue:
                             if event.cbutton.button == SDL_CONTROLLER_BUTTON_START.rawValue {
                                 shouldExit = true
