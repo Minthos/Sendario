@@ -125,7 +125,7 @@ func main() {
     SDL_Init(SDL_INIT_GAMECONTROLLER)
     var controller: OpaquePointer? = nil
     var shouldExit = false
-    let worldUpVector = Vector(x: 0, y: 1, z:0)
+    //let worldUpVector = Vector(x: 0, y: 1, z:0)
     var thrustVector = Vector(x: 0, y: 0, z: 0)
     var cameraSpherical = Spherical(1, 0, 0)
     
@@ -184,50 +184,21 @@ func main() {
         var renderMisc = render_misc()
         renderMisc.materials = materialsArray
         let cameraTarget = player1
-        if(true){
-            let relativeVelocity = cameraTarget.velocity - moon.velocity
-            if(relativeVelocity.lengthSquared == 0) {
-                camera.position = cameraTarget.position + Vector(x: 0, y: 0, z: -3.0 * cameraTarget.radius)
-            } else {
-                camera.position = cameraTarget.position + relativeVelocity.normalized() * -3.0 * cameraTarget.radius
-            }
-            //let camFwd = (cameraTarget.position - camera.position)
-            //let upVec = cameraTarget.orientation * worldUpVector
-
-            
-            //let rotX = Quaternion(w: cameraSpherical.theta, x: 1, y: 0, z: 0)
-            //let rotY = Quaternion(w: cameraSpherical.phi, x: 0, y: 1, z: 0)
-            //let rotZ = Quaternion(w: 
-            //let sumRot = rotX * rotY
-            var camFwd = (cameraTarget.position - camera.position).normalized()
-
-            // this is wrong, but how to properly define it?
-            //var upVec = (cameraTarget.orientation * worldUpVector).normalized()
-            var upVec = (cameraTarget.position - moon.position).normalized()
-            let pitchAxis = camFwd.cross(upVec).normalized()
-            let pitchQuat = Quaternion(axis: pitchAxis, angle: cameraSpherical.phi)
-            let yawQuat = Quaternion(axis: upVec, angle: cameraSpherical.theta)
-
-            camFwd = yawQuat * pitchQuat * camFwd
-            upVec = pitchQuat * upVec
-            renderMisc.camForward = (Float(camFwd.x), Float(camFwd.y), Float(camFwd.z))
-            renderMisc.camUp = (Float(upVec.x), Float(upVec.y), Float(upVec.z))
+        let relativeVelocity = cameraTarget.velocity - moon.velocity
+        if(relativeVelocity.lengthSquared == 0) {
+            camera.position = cameraTarget.position + Vector(x: 0, y: 0, z: -3.0 * cameraTarget.radius)
         } else {
-            let relativeVelocity = camera.velocity - moon.velocity
-            camera.position = cameraTarget.position + relativeVelocity.normalized() * cameraTarget.radius * -2.0
-            camera.orientation = cameraTarget.orientation
-            let halfthetaX = cameraSpherical.theta * 0.5 * Double.pi
-            let rotX = Quaternion(w: cos(halfthetaX), x: sin(halfthetaX), y: 0, z: 0)
-            let halfthetaY = cameraSpherical.phi * 0.5 * Double.pi
-            let rotY = Quaternion(w: cos(halfthetaY), x: 0, y: sin(halfthetaY), z: 0)
-            let rot90 = Quaternion(w: 0, x: 1, y: 0, z: 0)
-            let cameraQuat = rotX * camera.orientation * rotY
-            let cameraUp = cameraQuat * rot90
-            let (camForwardVector, _) = cameraQuat.getAxisAngle()
-            renderMisc.camForward = (Float(camForwardVector.x), Float(camForwardVector.y), Float(camForwardVector.z))
-            let (camUpVector, _) = cameraUp.getAxisAngle()
-            renderMisc.camUp = (Float(camUpVector.x), Float(camUpVector.y), Float(camUpVector.z))
+            camera.position = cameraTarget.position + relativeVelocity.normalized() * -3.0 * cameraTarget.radius
         }
+        var camFwd = (cameraTarget.position - camera.position).normalized()
+        var upVec = (cameraTarget.position - moon.position).normalized()
+        let pitchAxis = camFwd.cross(upVec).normalized()
+        let pitchQuat = Quaternion(axis: pitchAxis, angle: cameraSpherical.phi)
+        let yawQuat = Quaternion(axis: upVec, angle: cameraSpherical.theta)
+        camFwd = yawQuat * pitchQuat * camFwd
+        upVec = pitchQuat * upVec
+        renderMisc.camForward = (Float(camFwd.x), Float(camFwd.y), Float(camFwd.z))
+        renderMisc.camUp = (Float(upVec.x), Float(upVec.y), Float(upVec.z))
 
         // camera is at 0,0,0 to make it easy for the renderer
         renderMisc.camPosition = (0, 0, 0)
