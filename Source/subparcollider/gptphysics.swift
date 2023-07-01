@@ -431,6 +431,10 @@ class SphericalCow {
         self.frictionCoefficient = frictionCoefficient
     }
 
+    func copy() -> SphericalCow {
+        return SphericalCow(id: id, position: position, velocity: velocity, orientation: orientation, spin: spin, mass: mass, radius: radius, frictionCoefficient: frictionCoefficient)
+    }
+
     func applyForce(force: Vector, dt: Double) {
         self.accumulatedForce += force
     }
@@ -485,6 +489,24 @@ func calculateGravities(subject: SphericalCow, objects: [SphericalCow]) -> Vecto
         }
     }
     return gravity
+}
+
+func extrapolateTrajectory(subject: SphericalCow, relativeTo: SphericalCow, otherObjects: [SphericalCow], t: Double, dt: Double, iterations: Int) -> [Vector] {
+    let s = subject.copy()
+    let other = relativeTo.copy()
+    var c: [SphericalCow] = [s, other]
+    for item in otherObjects {
+        if(item !== subject && item !== relativeTo) {
+            c.append(item.copy())
+        }
+    }
+    let offset = other.position
+    var result: [Vector] = []
+    for i in 0..<iterations {
+        tick(actions: [], movingObjects: &c, t: t + dt * Double(i), dt: dt)
+        result.append(s.position + offset - other.position)
+    }
+    return result
 }
 
 func tick(actions: [Action], movingObjects: inout [SphericalCow], t: Double, dt: Double) {

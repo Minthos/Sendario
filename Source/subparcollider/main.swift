@@ -99,7 +99,7 @@ enum CommandType {
 }
 
 func main() {
-    let materialsArray = UnsafeMutablePointer<material>.allocate(capacity: allTheThings.count)
+    let materialsArray = UnsafeMutablePointer<material>.allocate(capacity: allTheThings.count + 1)
     // Sun
     materialsArray[0].diffuse = (1.0, 1.0, 0.95)
     materialsArray[0].emissive = (4.38e24, 4.38e24, 4.18e24)
@@ -118,6 +118,9 @@ func main() {
     //Player1
     materialsArray[5].diffuse = (1.0, 0.0, 1.0)
     materialsArray[5].emissive = (500.0, 500.0, 15.0)
+    //trajectory
+    materialsArray[6].diffuse = (0.0, 0.0, 0.0)
+    materialsArray[6].emissive = (50.0, 0.0, 0.0)
 
     startRenderer()
     SDL_Init(SDL_INIT_GAMECONTROLLER)
@@ -217,16 +220,29 @@ func main() {
 
         // we have to sort the things before we send them to the renderer, otherwise transparency breaks.
         allTheThings.sort(by: { ($0.position - camera.position).lengthSquared > ($1.position - camera.position).lengthSquared })
-        let sphereArray = UnsafeMutablePointer<sphere>.allocate(capacity: allTheThings.count)
+        var trajectory = extrapolateTrajectory(subject: cameraTarget, relativeTo: moon, otherObjects: allTheThings, t: t, dt: 10.0, iterations: 500)
+        trajectory.sort(by: { ($0 - camera.position).lengthSquared > ($1 - camera.position).lengthSquared })
+        //print("cameraTarget: \(cameraTarget.position)\ntrajectory: \(trajectory)\n")
+        //let sphereArray = UnsafeMutablePointer<sphere>.allocate(capacity: allTheThings.count)
+        let sphereArray = UnsafeMutablePointer<sphere>.allocate(capacity: allTheThings.count + trajectory.count)
         for (index, object) in allTheThings.enumerated() {
             // center everything on the camera before converting to float to avoid float precision issues when rendering
-            sphereArray[index] = sphere(x: Float(object.position.x - camera.position.x),
+            sphereArray[index + trajectory.count] = sphere(x: Float(object.position.x - camera.position.x),
                                         y: Float(object.position.y - camera.position.y),
                                         z: Float(object.position.z - camera.position.z),
                                         radius: Float(object.radius),
                                         material_idx: (UInt64(object.id)))
         }
-        render(sphereArray, allTheThings.count, renderMisc)
+        for (index, object) in trajectory.enumerated() {
+            // center everything on the camera before converting to float to avoid float precision issues when rendering
+            let position = Vector(x: object.x - camera.position.x, y: object.y - camera.position.y, z: object.z - camera.position.z)
+            sphereArray[index] = sphere(x: Float(position.x),
+                                        y: Float(position.y),
+                                        z: Float(position.z),
+                                        radius: Float(player1.radius * pow(position.length * 0.01, 0.9)),
+                                        material_idx: 6)
+        }
+        render(sphereArray, allTheThings.count + trajectory.count, renderMisc)
         sphereArray.deallocate()
     }
     // end main game loop

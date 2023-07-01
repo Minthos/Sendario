@@ -475,6 +475,10 @@ void *rendererThread(void *arg) {
 		glUniform3fv(emissiveLoc, 1, glm::value_ptr(emissiveComponent));
 
                 // Draw the sphere
+		if(i != 5 && i != 4) {
+                    //glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+		}
+
                 glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
             }
         }
