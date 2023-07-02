@@ -1,8 +1,13 @@
 ## Near term TODO:
 
+* spaceship with a shape other than a sphere
+* render exhaust plumes
+* replace the skybox with "snow" that's aligned to the world coordinate space
+* renderer that renders objects with orientation
 * position camera based on ship's orientation instead of ship's velocity
+* rotate the ship's self-thrust vector by the ship's orientation
 * reactivate atmospheric drag but make it follow the celestial and not apply to the celestial
-* visualize future trajectories with lines in colors of the rainbow, to about 1 orbital period
+* improve trajectory visualization: future trajectories with lines in colors of the rainbow with quadratic timestep to about 1 orbital period
 
 ## Recently done:
 
