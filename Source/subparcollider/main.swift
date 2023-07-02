@@ -126,6 +126,7 @@ func main() {
     SDL_Init(SDL_INIT_GAMECONTROLLER)
     var controller: OpaquePointer? = nil
     var shouldExit = false
+    var rcsEnabled = false
     //let worldUpVector = Vector(x: 0, y: 1, z:0)
     var thrustVector = Vector(x: 0, y: 0, z: 0)
     var cameraSpherical = Spherical(1, 0, 0)
@@ -151,6 +152,8 @@ func main() {
                         case SDL_CONTROLLERBUTTONUP.rawValue:
                             if event.cbutton.button == SDL_CONTROLLER_BUTTON_START.rawValue {
                                 shouldExit = true
+                            } else if event.cbutton.button == SDL_CONTROLLER_BUTTON_BACK.rawValue {
+                                rcsEnabled = !rcsEnabled
                             }
                         case SDL_CONTROLLERAXISMOTION.rawValue:
                             if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_LEFTX.rawValue) {
@@ -176,7 +179,11 @@ func main() {
                 }
             }
         }
-        actions = [Action(object: player1, force: thrustVector * 10000.0 / dt, torque: Vector(x: 0, y: 0, z: 0))]
+        if(rcsEnabled) {
+            actions = [Action(object: player1, force: thrustVector * 10000.0 / dt, torque: Vector(x: cameraSpherical.phi, y: 0, z: cameraSpherical.theta) * -100.0 / dt)]
+        } else {
+            actions = [Action(object: player1, force: thrustVector * 10000.0 / dt, torque: Vector(x: 0, y: 0, z: 0))]
+        }
         tick(actions: actions, movingObjects: &allTheThings, t: t, dt: dt)
         t += dt
         usleep(1000)
@@ -194,10 +201,10 @@ func main() {
         var camFwd = (cameraTarget.position - camera.position).normalized()
         var upVec = (cameraTarget.position - moon.position).normalized()
         let pitchAxis = camFwd.cross(upVec).normalized()
-        let pitchQuat = Quaternion(axis: pitchAxis, angle: 2.0 * cameraSpherical.phi)
-        let yawQuat = Quaternion(axis: upVec, angle: 2.0 * cameraSpherical.theta)
-        camFwd = yawQuat * pitchQuat * camFwd
-        upVec = pitchQuat * upVec
+        let pitchQuat = Quaternion(axis: pitchAxis, angle: 2.0 * cameraSpherical.phi * (rcsEnabled ? 0.0 : 1.0))
+        let yawQuat = Quaternion(axis: upVec, angle: 2.0 * cameraSpherical.theta * (rcsEnabled ? 0.0 : 1.0))
+        camFwd = yawQuat * pitchQuat * cameraTarget.orientation * camFwd
+        upVec = pitchQuat * cameraTarget.orientation * upVec
         renderMisc.camForward = (Float(camFwd.x), Float(camFwd.y), Float(camFwd.z))
         renderMisc.camUp = (Float(upVec.x), Float(upVec.y), Float(upVec.z))
 
