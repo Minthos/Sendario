@@ -30,7 +30,7 @@ out vec4 vertexPosClip;
 void main()
 {
     fragPos = vec3(model * vec4(position, 1.0)); // transform vertex from object space to world space
-    vec4 posClip = projection * view * vec4(fragPos, 1.0); // transform vertex from world space to camera space
+    vec4 posClip = projection * view * vec4(fragPos, 1.0); // transform vertex from world space to clip space
     vertexPosClip = posClip;  // Pass the clip space position to the fragment shader
     gl_Position = posClip;
 }
@@ -475,11 +475,9 @@ void *rendererThread(void *arg) {
 		glUniform3fv(emissiveLoc, 1, glm::value_ptr(emissiveComponent));
 
                 // Draw the sphere
-		if(i != 5 && i != 4) {
-                    //glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-		}
-
-                glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+		//if(i != 5 && i != 4) {
+                    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+		//}
             }
         }
         glBindVertexArray(0);

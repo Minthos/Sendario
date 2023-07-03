@@ -19,9 +19,9 @@ typedef enum {
 
 typedef struct {
     float corners[3 * 8];
-    float roundness[6];
-    int material_idx;
-    unsigned int missing_faces; // could have been unsigned char, but padding is nice
+    float bulge[12]; // modify the roundness of each edge. if two edges on opposite sides of a face are rounded, the face inherits the roundness of the edge value that's closest to 0, along the axis defined by those edges. setting all 12 edges to 1 gives a spheroid shape. all to 0 gives a box shape. negative values gives a kiki shape. this way we can produce cylinders, capsules, cones and weird custom shapes.
+    int material_idx; // placeholder
+    unsigned int missing_faces; // bit field specifying which faces to omit from rendering. could have been unsigned char, but padding is nice.
 } Boxoid;
 
 typedef struct {
@@ -37,10 +37,10 @@ typedef struct {
 } Ribbon;
 
 typedef struct {
-    float orientation[4];
-    float position[3];
-    float scale;
-    size_t num_children;
+    float orientation[4]; // w,x,y,z quaternion specifying the object's rotation from object space to world space
+    float position[3]; // x,y,z coordinates in world space
+    float scale; // default is 1
+    size_t num_children; // how many boxoid shapes the object is composed of
     Boxoid children[0];
 } Composite;
 
