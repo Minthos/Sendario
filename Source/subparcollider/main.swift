@@ -126,8 +126,8 @@ func main() {
     SDL_Init(SDL_INIT_GAMECONTROLLER)
     var controller: OpaquePointer? = nil
     var shouldExit = false
-    var rcsEnabled = false
-    //let worldUpVector = Vector(x: 0, y: 1, z:0)
+    var rcsIsEnabled = false
+    let worldUpVector = Vector(x: 0, y: 1, z:0)
     var thrustVector = Vector(x: 0, y: 0, z: 0)
     var cameraSpherical = Spherical(1, 0, 0)
     
@@ -153,7 +153,7 @@ func main() {
                             if event.cbutton.button == SDL_CONTROLLER_BUTTON_START.rawValue {
                                 shouldExit = true
                             } else if event.cbutton.button == SDL_CONTROLLER_BUTTON_BACK.rawValue {
-                                rcsEnabled = !rcsEnabled
+                                rcsIsEnabled = !rcsIsEnabled
                             }
                         case SDL_CONTROLLERAXISMOTION.rawValue:
                             if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_LEFTX.rawValue) {
@@ -179,8 +179,8 @@ func main() {
                 }
             }
         }
-        if(rcsEnabled) {
-            actions = [Action(object: player1, force: thrustVector * 10000.0 / dt, torque: Vector(x: cameraSpherical.phi, y: 0, z: cameraSpherical.theta) * -100.0 / dt)]
+        if(rcsIsEnabled) {
+            actions = [Action(object: player1, force: thrustVector * 10000.0 / dt, torque: Vector(x: cameraSpherical.phi, y: 0, z: cameraSpherical.theta) * -1000.0)]
         } else {
             actions = [Action(object: player1, force: thrustVector * 10000.0 / dt, torque: Vector(x: 0, y: 0, z: 0))]
         }
@@ -192,17 +192,21 @@ func main() {
         var renderMisc = render_misc()
         renderMisc.materials = materialsArray
         let cameraTarget = player1
-        let relativeVelocity = cameraTarget.velocity - moon.velocity
+        let nearestCelestial = moon
+        let relativeVelocity = cameraTarget.velocity - nearestCelestial.velocity
+        var prograde = relativeVelocity
         if(relativeVelocity.lengthSquared == 0) {
             camera.position = cameraTarget.position + Vector(x: 0, y: 0, z: -3.0 * cameraTarget.radius)
+            prograde = cameraTarget.orientation * Vector(x: 0, y: 0, z: 1)
         } else {
+            prograde = relativeVelocity.normalized()
             camera.position = cameraTarget.position + relativeVelocity.normalized() * -3.0 * cameraTarget.radius
         }
         var camFwd = (cameraTarget.position - camera.position).normalized()
-        var upVec = (cameraTarget.position - moon.position).normalized()
+        var upVec = (cameraTarget.position - nearestCelestial.position).normalized()
         let pitchAxis = camFwd.cross(upVec).normalized()
-        let pitchQuat = Quaternion(axis: pitchAxis, angle: 2.0 * cameraSpherical.phi * (rcsEnabled ? 0.0 : 1.0))
-        let yawQuat = Quaternion(axis: upVec, angle: 2.0 * cameraSpherical.theta * (rcsEnabled ? 0.0 : 1.0))
+        let pitchQuat = Quaternion(axis: pitchAxis, angle: 2.0 * cameraSpherical.phi * (rcsIsEnabled ? 0.0 : 1.0))
+        let yawQuat = Quaternion(axis: upVec, angle: 2.0 * cameraSpherical.theta * (rcsIsEnabled ? 0.0 : 1.0))
         camFwd = yawQuat * pitchQuat * cameraTarget.orientation * camFwd
         upVec = pitchQuat * cameraTarget.orientation * upVec
         renderMisc.camForward = (Float(camFwd.x), Float(camFwd.y), Float(camFwd.z))
@@ -227,7 +231,7 @@ func main() {
 
         // we have to sort the things before we send them to the renderer, otherwise transparency breaks.
         allTheThings.sort(by: { ($0.position - camera.position).lengthSquared > ($1.position - camera.position).lengthSquared })
-        var trajectory = extrapolateTrajectory(subject: cameraTarget, relativeTo: moon, otherObjects: allTheThings, t: t, dt: 10.0, iterations: 500)
+        var trajectory = extrapolateTrajectory(subject: cameraTarget, relativeTo: nearestCelestial, otherObjects: allTheThings, t: t, dt: 10.0, iterations: 500)
         trajectory.sort(by: { ($0 - camera.position).lengthSquared > ($1 - camera.position).lengthSquared })
         //print("cameraTarget: \(cameraTarget.position)\ntrajectory: \(trajectory)\n")
         //let sphereArray = UnsafeMutablePointer<sphere>.allocate(capacity: allTheThings.count)
