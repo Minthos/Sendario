@@ -235,21 +235,22 @@ func main() {
         trajectory.sort(by: { ($0 - camera.position).lengthSquared > ($1 - camera.position).lengthSquared })
         //print("cameraTarget: \(cameraTarget.position)\ntrajectory: \(trajectory)\n")
         //let sphereArray = UnsafeMutablePointer<sphere>.allocate(capacity: allTheThings.count)
-        let sphereArray = UnsafeMutablePointer<sphere>.allocate(capacity: allTheThings.count + trajectory.count)
+        let sphereArray = UnsafeMutablePointer<Sphere>.allocate(capacity: allTheThings.count + trajectory.count)
         for (index, object) in allTheThings.enumerated() {
+            // the mapping from object.id to material_idx should not be 1:1 in the future but it's good enough for now
             // center everything on the camera before converting to float to avoid float precision issues when rendering
-            sphereArray[index + trajectory.count] = sphere(x: Float(object.position.x - camera.position.x),
-                                        y: Float(object.position.y - camera.position.y),
-                                        z: Float(object.position.z - camera.position.z),
+            sphereArray[index + trajectory.count] = Sphere(position: (Float(object.position.x - camera.position.x),
+                                        Float(object.position.y - camera.position.y),
+                                        Float(object.position.z - camera.position.z)),
                                         radius: Float(object.radius),
-                                        material_idx: (UInt64(object.id)))
+                                        material_idx: (Int32(object.id)))
         }
         for (index, object) in trajectory.enumerated() {
             // center everything on the camera before converting to float to avoid float precision issues when rendering
             let position = Vector(x: object.x - camera.position.x, y: object.y - camera.position.y, z: object.z - camera.position.z)
-            sphereArray[index] = sphere(x: Float(position.x),
-                                        y: Float(position.y),
-                                        z: Float(position.z),
+            sphereArray[index] = Sphere(position: (Float(position.x),
+                                        Float(position.y),
+                                        Float(position.z)),
                                         radius: Float(player1.radius * pow(position.length * 0.01, 0.9)),
                                         material_idx: 6)
         }

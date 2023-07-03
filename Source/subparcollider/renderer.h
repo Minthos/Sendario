@@ -18,41 +18,41 @@ typedef enum {
 } shape_type;
 
 typedef struct {
-    shape_type type;
-    union {
-	Sphere sphere;
-	Boxoid boxoid;
-	Ribbon ribbon;
-	Composite composite;
-    }
-} shape_wrapper;
-
-typedef struct {
-    float orientation[4];
-    float position[3];
-    size_t num_children;
-    size_t sizeof_children;
-    shape_wrapper children[0];
-} Composite;
-
-typedef struct {
-    float orientation[4];
-    float position[3];
-    float radius;
-    uint64_t material_idx;
-} Sphere;
-
-typedef struct {
     float corners[3 * 8];
     float roundness[6];
-    unsigned int missing_faces;
+    int material_idx;
+    unsigned int missing_faces; // could have been unsigned char, but padding is nice
 } Boxoid;
 
 typedef struct {
+    float position[3];
+    float radius;
+    int material_idx;
+} Sphere;
+
+typedef struct {
     size_t num_points;
-    uint64_t material_idx;
-    float point[4]; // x, y, z, width
+    int material_idx;
+    float point[4 * 0]; // (x, y, z, width) * num_points
 } Ribbon;
+
+typedef struct {
+    float orientation[4];
+    float position[3];
+    float scale;
+    size_t num_children;
+    Boxoid children[0];
+} Composite;
+
+typedef struct {
+    shape_type type;
+    union {
+	Boxoid boxoid;
+	Sphere sphere;
+	Ribbon ribbon;
+	Composite composite;
+    };
+} shape_wrapper;
 
 typedef struct {
     float position[3];
@@ -74,7 +74,7 @@ typedef struct {
 } render_misc;
 
 void startRenderer();
-void render(sphere* spheres, size_t sphereCount, render_misc renderMisc);
+void render(Sphere* spheres, size_t sphereCount, render_misc renderMisc);
 void stopRenderer();
 
 bool isGameController(int joystick_index);

@@ -284,9 +284,9 @@ GLuint indices[] = {
 };
 
 typedef struct {
-    sphere *spheres;
+    Sphere *spheres;
     int numSpheres;
-    sphere *nextBatch;
+    Sphere *nextBatch;
     int nextNum;
     render_misc renderMisc;
     pthread_t renderer_tid;
@@ -452,16 +452,16 @@ void *rendererThread(void *arg) {
         // Geometry
         if (sharedData.spheres != NULL) {
             for (int i = 0; i < sharedData.numSpheres; ++i) {
-                sphere currentSphere = sharedData.spheres[i];
+                Sphere currentSphere = sharedData.spheres[i];
                 glm::mat4 scaling = glm::scale(glm::mat4(1.0f), glm::vec3(currentSphere.radius));
 
                 // translate our model view to position the sphere in world space
-                model = glm::translate(glm::mat4(1.0f), glm::vec3(currentSphere.x, currentSphere.y, currentSphere.z));
+                model = glm::translate(glm::mat4(1.0f), glm::vec3(currentSphere.position[0], currentSphere.position[1], currentSphere.position[2]));
                 model = model * scaling;
                 glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 
                 // send the position of the sphere directly to the fragment shader, bypassing the vertex shader
-                glUniform3f(sphereCenterLoc, currentSphere.x, currentSphere.y, currentSphere.z);
+                glUniform3f(sphereCenterLoc, currentSphere.position[0], currentSphere.position[1], currentSphere.position[2]);
                 glUniform1f(sphereRadiusLoc, currentSphere.radius);
                
 	       	material* mat = &sharedData.renderMisc.materials[currentSphere.material_idx];
@@ -496,13 +496,13 @@ void *rendererThread(void *arg) {
 }
 
 // thread safe entry point copies all the data to keep things dumb.
-extern "C" void render(sphere* spheres, size_t sphereCount, render_misc renderMisc) {
+extern "C" void render(Sphere* spheres, size_t sphereCount, render_misc renderMisc) {
     pthread_mutex_lock(&sharedData.mutex);
     if(sharedData.nextBatch != NULL) {
         free(sharedData.nextBatch);
     }
-    sharedData.nextBatch = (sphere*)malloc(sizeof(sphere) * sphereCount);
-    memcpy(sharedData.nextBatch, spheres, sizeof(sphere) * sphereCount);
+    sharedData.nextBatch = (Sphere*)malloc(sizeof(Sphere) * sphereCount);
+    memcpy(sharedData.nextBatch, spheres, sizeof(Sphere) * sphereCount);
     sharedData.nextNum = sphereCount;
     sharedData.renderMisc = renderMisc;
     pthread_mutex_unlock(&sharedData.mutex);
