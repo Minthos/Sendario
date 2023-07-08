@@ -1,6 +1,13 @@
 ## Near term TODO:
 
 * spaceship with a shape other than a sphere
+ - boxoid rendering
+ - the shader
+ - the vertex buffer
+ - moving the data from swift to cpp
+ - reading the data from json into swift
+ - cleaning up and improving the rendering code, more generality and less hardcoded stuff
+
 * render exhaust plumes
 * replace the skybox with "snow" that's aligned to the world coordinate space
 * renderer that renders objects with orientation

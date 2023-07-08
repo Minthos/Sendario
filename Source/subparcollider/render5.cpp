@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include <unistd.h>
+#include <vector>
+#include <array>
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -14,6 +16,82 @@
 extern "C" {
     #include "renderer.h"
 }
+
+const char *skyboxVertSource = R"glsl(
+#version 330 core
+
+layout (location = 0) in vec3 position;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+out vec3 fragPos;
+
+void main()
+{
+    fragPos = position; // transform vertex from object space to world space
+    vec4 posClip = projection * view * vec4(fragPos, 1.0); // transform vertex from world space to camera space
+    gl_Position = posClip.xyww;
+}
+)glsl";
+
+const char *skyboxFragSource = R"glsl(
+#version 330 core
+
+uniform float time;
+uniform vec2 resolution;
+
+in vec3 fragPos;
+in vec3 vertexPosClip;
+out vec4 FragColor;
+
+float random(vec2 uv) {
+    return fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+float noise(vec2 uv) {
+    vec2 i = floor(uv);
+    vec2 f = fract(uv);
+    vec2 w = f * f * (3.0 - 2.0 * f);
+
+    return mix(mix(random(i), random(i + vec2(1.0, 0.0)), w.x),
+               mix(random(i + vec2(0.0, 1.0)), random(i + vec2(1.0, 1.0)), w.x),
+               w.y);
+}
+
+vec3 hsv2rgb(vec3 c) {
+    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
+void main() {
+    vec2 uv = fragPos.xy;
+    if(abs(fragPos.x) > 0.999){
+	uv = fragPos.zy;
+    } else if(abs(fragPos.y) > 0.999){
+	uv = fragPos.xz;
+    }
+
+    uv *= 8.0;
+    vec2 uv2 = vec2(uv.y, uv.x);
+    float baseNoise = noise(uv * 250 + 50 + (time + 5.0) * -0.001);
+    float basedNoise = noise(uv2 * 250 + 3.14 + (time + 10.0) * 0.0007);
+    float crossNoise = (basedNoise + baseNoise) * 0.5;
+    float baseNoise2 = noise(uv2 * -100 + 22 + (time + 15.0) * -0.0025);
+    float basedNoise2 = noise(uv * -100 + 1.444 + (time + 23.0) * 0.0014);
+    float crossNoise2 = (basedNoise2 + baseNoise2) * 0.5;
+    crossNoise = max(crossNoise, crossNoise2);
+    float detailNoise = noise(uv2 * 150.0 + time * 0.0015);
+    float combinedNoise = mix(crossNoise, detailNoise, 0.6);
+    //float intensity = smoothstep(0.8, 1.0, combinedNoise) * 1.0;
+    float intensity = smoothstep(0.8, 1.0, combinedNoise) * 2.0;
+    vec3 starColor = hsv2rgb(vec3(random(floor(gl_FragCoord.xy / 12) * 12), 0.7-intensity, intensity));
+    FragColor = vec4(starColor, 1.0);
+}
+)glsl";
+
 
 const char *vertexShaderSource = R"glsl(
 #version 330 core
@@ -35,11 +113,6 @@ void main()
     gl_Position = posClip;
 }
 )glsl";
-
-// Setting both gl_Position and vertexPosClip to the same value might seem redundant.
-// However, the GLSL specification stipulates that we cannot directly use gl_Position in the fragment
-// shader, so we need a separate out variable to pass this data. In other words, gl_Position is not
-// interpolated and accessible in the fragment shader, so we can't use it for calculations there.
 
 const char *fragmentShaderSource = R"glsl(
 #version 330 core
@@ -120,122 +193,133 @@ void main()
 
 )glsl";
 
-
 /*
-from GPT:
 
-The easiest way to implement ACES tone mapping in your shader might be to use the ACES filmic tone mapping curve, which is a piecewise function designed to produce visually pleasing results across a wide range of inputs.
+Render a single composite per draw call. 24 vertices per boxoid so that faces don't have to share vertices.
+Use a uniform buffer to store the edge roundness values. Each vertex gets the index to its face passed alongside
+its coordinates to the vertex shader and from there to the fragment shader.
+Do something with the normals and the omit field.
 
-Below is a GLSL implementation of the ACES filmic tone mapping curve:
-
-```glsl
-vec3 RRTAndODTFit(vec3 v)
-{
-    vec3 a = v * (v + 0.0245786) - 0.000090537;
-    vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081;
-    return a / b;
-}
-
-void main()
-{
-    // Perform lighting calculations as before
-
-    // Apply ACES Filmic Tone Mapping
-    vec3 color = RRTAndODTFit(radiance * 0.6);
-    color *= 1.0 / RRTAndODTFit(vec3(0.18));
-    
-    // Apply gamma correction
-    color = pow(color, vec3(1.0 / gamma));
-
-    // Set the final color
-    fragmentColor = vec4(color, 1.0);
-
-    // ... Rest of the shader
-}
-```
-
-In this code, `RRTAndODTFit` is the ACES RRT (Reference Rendering Transform) and ODT (Output Device Transform) combined. The number `0.6` is an exposure bias which you might want to expose as a tweakable parameter in your game. The number `0.18` comes from middle grey and is used to maintain consistent brightness. The result of the tone mapping step is then gamma corrected and written to the output color.
-
-Keep in mind that ACES is a large standard and the full ACES pipeline involves much more than just tone mapping, including color spaces, white balance, color grading, etc. However, just using the ACES tone curve can be a good first step to achieving more physically accurate rendering.
-
-As always, the best tone mapping method to use depends on the specifics of your game and the aesthetic you're aiming for, so it's worth trying out a few different methods to see what works best in your case.
-
- */
-
-
-const char *skyboxVertSource = R"glsl(
+*/
+const char *boxoidVertSource = R"glsl(
 #version 330 core
 
 layout (location = 0) in vec3 position;
+layout (location = 1) in vec3 normal;
+layout (location = 2) in int faceIndex;
 
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
 
 out vec3 fragPos;
+out vec4 vertexPosClip;
+out int fragIndex;
 
 void main()
 {
-    fragPos = position; // transform vertex from object space to world space
-    vec4 posClip = projection * view * vec4(fragPos, 1.0); // transform vertex from world space to camera space
-    gl_Position = posClip.xyww;
+    fragPos = vec3(model * vec4(position, 1.0)); // transform vertex from object space to world space
+    vec4 posClip = projection * view * vec4(fragPos, 1.0); // transform vertex from world space to clip space
+    vertexPosClip = posClip;  // Pass the clip space position to the fragment shader
+    gl_Position = posClip;
+
+    fragNormal = normal;
+    fragIndex = faceIndex;
 }
 )glsl";
 
-const char *skyboxFragSource = R"glsl(
+const char *boxoidFragSource = R"glsl(
 #version 330 core
 
-uniform float time;
-uniform vec2 resolution;
-
 in vec3 fragPos;
-in vec3 vertexPosClip;
-out vec4 FragColor;
+in vec4 vertexPosClip;
+in int fragIndex;
 
-float random(vec2 uv) {
-    return fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453);
-}
+struct light {
+    vec3 position;
+    vec3 color; // W/sr per component
+};
 
-float noise(vec2 uv) {
-    vec2 i = floor(uv);
-    vec2 f = fract(uv);
-    vec2 w = f * f * (3.0 - 2.0 * f);
+const int MAX_LIGHTS = 1;
 
-    return mix(mix(random(i), random(i + vec2(1.0, 0.0)), w.x),
-               mix(random(i + vec2(0.0, 1.0)), random(i + vec2(1.0, 1.0)), w.x),
-               w.y);
-}
+uniform vec3 lightPositions[MAX_LIGHTS];
+uniform vec3 lightColors[MAX_LIGHTS];
+uniform mat4 view;
+uniform vec3 sphereCenter;
+uniform vec3 cameraPos;
+uniform float sphereRadius;
+uniform vec3 materialDiffuse;
+uniform vec3 materialEmissive; // W/sr/m^2
+uniform float gamma;
+uniform float exposure;
 
-vec3 hsv2rgb(vec3 c) {
-    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-}
+out vec4 fragColor;
 
-void main() {
-    vec2 uv = fragPos.xy;
-    if(abs(fragPos.x) > 0.999){
-	uv = fragPos.zy;
-    } else if(abs(fragPos.y) > 0.999){
-	uv = fragPos.xz;
+void main()
+{
+    switch(faceIndex)
+    {
+        case 1: FragColor = vec4(1.0, 0.0, 0.0, 1.0); break;
+        case 2: FragColor = vec4(0.0, 1.0, 0.0, 1.0); break;
+        case 3: FragColor = vec4(0.0, 0.0, 1.0, 1.0); break;
+        case 4: FragColor = vec4(1.0, 1.0, 0.0, 1.0); break;
+        case 5: FragColor = vec4(1.0, 0.0, 1.0, 1.0); break;
+        case 6: FragColor = vec4(0.0, 1.0, 1.0, 1.0); break;
+        default: FragColor = vec4(1.0); // white
     }
 
-    uv *= 8.0;
-    vec2 uv2 = vec2(uv.y, uv.x);
-    float baseNoise = noise(uv * 250 + 50 + (time + 5.0) * -0.001);
-    float basedNoise = noise(uv2 * 250 + 3.14 + (time + 10.0) * 0.0007);
-    float crossNoise = (basedNoise + baseNoise) * 0.5;
-    float baseNoise2 = noise(uv2 * -100 + 22 + (time + 15.0) * -0.0025);
-    float basedNoise2 = noise(uv * -100 + 1.444 + (time + 23.0) * 0.0014);
-    float crossNoise2 = (basedNoise2 + baseNoise2) * 0.5;
-    crossNoise = max(crossNoise, crossNoise2);
-    float detailNoise = noise(uv2 * 150.0 + time * 0.0015);
-    float combinedNoise = mix(crossNoise, detailNoise, 0.6);
-    //float intensity = smoothstep(0.8, 1.0, combinedNoise) * 1.0;
-    float intensity = smoothstep(0.8, 1.0, combinedNoise) * 2.0;
-    vec3 starColor = hsv2rgb(vec3(random(floor(gl_FragCoord.xy / 12) * 12), 0.7-intensity, intensity));
-    FragColor = vec4(starColor, 1.0);
+/*
+//    vec4 sphereCenterCamera = view * vec4(sphereCenter, 1.0);
+    vec3 ray = normalize(fragPos - cameraPos);
+    vec3 sphereToCamera = cameraPos - sphereCenter;
+    float b = dot(ray, sphereToCamera);
+    float c = dot(sphereToCamera, sphereToCamera) - sphereRadius * sphereRadius;
+    float discriminant = b * b - c;
+
+    vec3 radiance = vec3(0.0, 0.0, 0.0);
+    if (discriminant < 0.0 || b > 0.0)
+    {
+	// eerie green glow for the debug
+        //fragColor = vec4(0.0, 1.0, 0.0, 0.1); 
+        //fragColor = vec4(fragPos, 0.25); 
+    }
+    else
+    {
+        float t = -b - sqrt(discriminant);
+        vec3 intersectionPos = cameraPos + ray * t;
+        vec3 surfaceNormal = normalize(intersectionPos - sphereCenter);
+
+	vec3 accumulatedLight = vec3(0.0, 0.0, 0.0);
+
+	for (int i = 0; i < MAX_LIGHTS; ++i) {
+	    vec3 lightVector = lightPositions[i] - fragPos;
+	    float squaredDistance = dot(lightVector, lightVector);
+	    vec3 lightDirection = lightVector / sqrt(squaredDistance);
+	    float attenuation = 1.0 / squaredDistance;
+	    float lambertian = max(dot(surfaceNormal, lightDirection), 0.0);
+	    accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
+	}
+
+	// divide materialEmissive by 4 pi
+	radiance = materialEmissive * 0.079577 + accumulatedLight;	
+	
+	// tone mapping radiance to the 0,1 range by dividing by total brightness. darkness is the inverse of brightness.
+	float darkness = 3.0 / (3.0 + exposure + radiance.r + radiance.g + radiance.b);
+	radiance = radiance * darkness;
+	
+	// gamma correction
+	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
+    }
+
+
+    const float constantForDepth = 1.0;
+    const float farDistance = 3e18;
+    const float offsetForDepth = 1.0;
+    gl_FragDepth = (log(constantForDepth * vertexPosClip.z + offsetForDepth) / log(constantForDepth * farDistance + offsetForDepth));
+
+    */
 }
+
 )glsl";
 
 
@@ -282,6 +366,88 @@ GLuint indices[] = {
     1, 2, 6,
     1, 5, 6
 };
+
+struct Vertex {
+    glm::vec3 position;
+    glm::vec3 normal;
+    int faceIndex;
+};
+
+void calculateFaceNormals(glm::vec3 vertices[8], glm::vec3 normals[6]) {
+    GLuint faceIndices[6][3] = {
+        {0, 1, 4},
+        {3, 2, 7},
+        {1, 0, 3},
+        {4, 5, 6},
+        {0, 4, 2},
+        {1, 3, 5}
+    };
+
+    for (int i = 0; i < 6; i++) {
+        glm::vec3 A = vertices[faceIndices[i][0]];
+        glm::vec3 B = vertices[faceIndices[i][1]];
+        glm::vec3 C = vertices[faceIndices[i][2]];
+        glm::vec3 edge1 = B - A;
+        glm::vec3 edge2 = C - A;
+        normals[i] = glm::normalize(glm::cross(edge1, edge2));
+    }
+}
+
+void setupCube(glm::vec3 cubeVertices[8], GLuint& VAO, GLuint& VBO, GLuint& EBO) {
+    Vertex vertices[24];
+    GLuint indices[36];
+    glm::vec3 normals[6];
+    GLuint faceIndices[6][4] = {
+        {0, 1, 5, 4},
+        {3, 2, 6, 7},
+        {1, 0, 2, 3},
+        {4, 5, 7, 6},
+        {0, 4, 6, 2},
+        {1, 3, 7, 5}
+    };
+
+    calculateFaceNormals(cubeVertices, normals);
+
+    for(int i = 0; i < 6; i++) {
+        for(int j = 0; j < 4; j++) {
+            Vertex vertex;
+            vertex.position = cubeVertices[faceIndices[i][j]];
+            vertex.normal = normals[i];
+            vertex.faceIndex = i;
+            vertices[i * 4 + j] = vertex;
+        }
+        
+        indices[i * 6 + 0] = 4 * i + 0;
+        indices[i * 6 + 1] = 4 * i + 1;
+        indices[i * 6 + 2] = 4 * i + 2;
+        indices[i * 6 + 3] = 4 * i + 0;
+        indices[i * 6 + 4] = 4 * i + 2;
+        indices[i * 6 + 5] = 4 * i + 3;
+    }
+
+    glGenVertexArrays(1, &VAO);
+    glBindVertexArray(VAO);
+
+    glGenBuffers(1, &VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    glGenBuffers(1, &EBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
+    glEnableVertexAttribArray(1);
+
+    glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, faceIndex));
+    glEnableVertexAttribArray(2);
+
+    glBindVertexArray(0);
+}
+
 
 typedef struct {
     Sphere *spheres;
@@ -332,6 +498,15 @@ void *rendererThread(void *arg) {
     glLinkProgram(shaderProgram);
     checkShader(GL_LINK_STATUS, shaderProgram);
 
+    // shaders for boxoids
+    GLuint boxoidVert = compileShader(GL_VERTEX_SHADER, boxoidVertSource);
+    GLuint boxoidFrag = compileShader(GL_FRAGMENT_SHADER, boxoidFragSource);
+    GLuint boxoidProgram = glCreateProgram();
+    glAttachShader(boxoidProgram, boxoidFrag);
+    glAttachShader(boxoidProgram, boxoidVert);
+    glLinkProgram(boxoidProgram);
+    checkShader(GL_LINK_STATUS, boxoidProgram);
+ 
     // shader for the star background
     GLuint skyboxVert = compileShader(GL_VERTEX_SHADER, skyboxVertSource);
     GLuint skyboxFrag = compileShader(GL_FRAGMENT_SHADER, skyboxFragSource);
@@ -342,14 +517,15 @@ void *rendererThread(void *arg) {
     checkShader(GL_LINK_STATUS, skyboxProgram);
  
     // buffers
-    GLuint VAO, VBO, EBO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    GLuint boxoidVAO, boxoidVBO, boxoidEBO;
+    GLuint sphereVAO, sphereVBO, sphereEBO;
+    glGenVertexArrays(1, &sphereVAO);
+    glGenBuffers(1, &sphereVBO);
+    glGenBuffers(1, &sphereEBO);
+    glBindVertexArray(sphereVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, sphereVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sphereEBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
@@ -419,7 +595,7 @@ void *rendererThread(void *arg) {
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
 	// vertex buffer
-        glBindVertexArray(VAO);
+        glBindVertexArray(sphereVAO);
 	
 	// draw the skybox
         glUseProgram(skyboxProgram);
@@ -480,14 +656,28 @@ void *rendererThread(void *arg) {
 		//}
             }
         }
-        glBindVertexArray(0);
-
+        
+	glm::vec3 boxoidVerts[8] = {
+            glm::vec3(0.1, -0.1, 1.0),
+            glm::vec3(-0.1, -0.1, 1.0),
+            glm::vec3(0.1, -0.1, 2.0),
+            glm::vec3(-0.1, -0.1, 2.0),
+            glm::vec3(0.1, 0.1, 1.0),
+            glm::vec3(-0.1, 0.1, 1.0),
+            glm::vec3(0.1, 0.1, 2.0),
+            glm::vec3(-0.1, 0.1, 2.0)
+	};
+	setupCube(boxoidVerts, boxoidVAO, boxoidVBO, boxoidEBO);
+        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+	
+	
+	glBindVertexArray(0);
         glfwSwapBuffers(sharedData.window);
         glfwPollEvents();
     }
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &EBO);
+    glDeleteVertexArrays(1, &sphereVAO);
+    glDeleteBuffers(1, &sphereVBO);
+    glDeleteBuffers(1, &sphereEBO);
     glDeleteProgram(shaderProgram);
     glfwTerminate();
     return 0;
