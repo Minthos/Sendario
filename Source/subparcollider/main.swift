@@ -127,7 +127,7 @@ func main() {
     var controller: OpaquePointer? = nil
     var shouldExit = false
     var rcsIsEnabled = false
-    let worldUpVector = Vector(x: 0, y: 1, z:0)
+    //let worldUpVector = Vector(x: 0, y: 1, z:0)
     var thrustVector = Vector(x: 0, y: 0, z: 0)
     var cameraSpherical = Spherical(1, 0, 0)
     
@@ -212,6 +212,11 @@ func main() {
         renderMisc.camForward = (Float(camFwd.x), Float(camFwd.y), Float(camFwd.z))
         renderMisc.camUp = (Float(upVec.x), Float(upVec.y), Float(upVec.z))
 
+        // delete this, it's just to silence a warning
+        if(prograde.y == 0){
+            print("")
+        }
+
         // camera is at 0,0,0 to make it easy for the renderer
         renderMisc.camPosition = (0, 0, 0)
         for (index, object) in lights.enumerated() {
@@ -231,7 +236,8 @@ func main() {
 
         // we have to sort the things before we send them to the renderer, otherwise transparency breaks.
         allTheThings.sort(by: { ($0.position - camera.position).lengthSquared > ($1.position - camera.position).lengthSquared })
-        var trajectory = extrapolateTrajectory(subject: cameraTarget, relativeTo: nearestCelestial, otherObjects: allTheThings, t: t, dt: 10.0, iterations: 500)
+        var trajectory: [Vector] = []
+        //var trajectory = extrapolateTrajectory(subject: cameraTarget, relativeTo: nearestCelestial, otherObjects: allTheThings, t: t, dt: 10.0, iterations: 500)
         trajectory.sort(by: { ($0 - camera.position).lengthSquared > ($1 - camera.position).lengthSquared })
         //print("cameraTarget: \(cameraTarget.position)\ntrajectory: \(trajectory)\n")
         //let sphereArray = UnsafeMutablePointer<sphere>.allocate(capacity: allTheThings.count)
