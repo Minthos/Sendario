@@ -69,11 +69,10 @@ vec3 hsv2rgb(vec3 c) {
 void main() {
     vec2 uv = fragPos.xy;
     if(abs(fragPos.x) > 0.999){
-	uv = fragPos.zy;
+        uv = fragPos.zy;
     } else if(abs(fragPos.y) > 0.999){
-	uv = fragPos.xz;
+        uv = fragPos.xz;
     }
-
     uv *= 8.0;
     vec2 uv2 = vec2(uv.y, uv.x);
     float baseNoise = noise(uv * 250 + 50 + (time + 5.0) * -0.001);
@@ -151,7 +150,7 @@ void main()
     vec3 radiance = vec3(0.0, 0.0, 0.0);
     if (discriminant < 0.0 || b > 0.0)
     {
-	// eerie green glow for the debug
+        // eerie green glow for the debug
         //fragColor = vec4(0.0, 1.0, 0.0, 0.1); 
         //fragColor = vec4(fragPos, 0.25); 
     }
@@ -160,27 +159,26 @@ void main()
         float t = -b - sqrt(discriminant);
         vec3 intersectionPos = cameraPos + ray * t;
         vec3 surfaceNormal = normalize(intersectionPos - sphereCenter);
+        vec3 accumulatedLight = vec3(0.0, 0.0, 0.0);
 
-	vec3 accumulatedLight = vec3(0.0, 0.0, 0.0);
+        for (int i = 0; i < MAX_LIGHTS; ++i) {
+            vec3 lightVector = lightPositions[i] - fragPos;
+            float squaredDistance = dot(lightVector, lightVector);
+            vec3 lightDirection = lightVector / sqrt(squaredDistance);
+            float attenuation = 1.0 / squaredDistance;
+            float lambertian = max(dot(surfaceNormal, lightDirection), 0.0);
+            accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
+        }
 
-	for (int i = 0; i < MAX_LIGHTS; ++i) {
-	    vec3 lightVector = lightPositions[i] - fragPos;
-	    float squaredDistance = dot(lightVector, lightVector);
-	    vec3 lightDirection = lightVector / sqrt(squaredDistance);
-	    float attenuation = 1.0 / squaredDistance;
-	    float lambertian = max(dot(surfaceNormal, lightDirection), 0.0);
-	    accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
-	}
-
-	// divide materialEmissive by 4 pi
-	radiance = materialEmissive * 0.079577 + accumulatedLight;	
-	
-	// tone mapping radiance to the 0,1 range by dividing by total brightness. darkness is the inverse of brightness.
-	float darkness = 3.0 / (3.0 + exposure + radiance.r + radiance.g + radiance.b);
-	radiance = radiance * darkness;
-	
-	// gamma correction
-	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
+        // divide materialEmissive by 4 pi
+        radiance = materialEmissive * 0.079577 + accumulatedLight;        
+        
+        // tone mapping radiance to the 0,1 range by dividing by total brightness. darkness is the inverse of brightness.
+        float darkness = 3.0 / (3.0 + exposure + radiance.r + radiance.g + radiance.b);
+        radiance = radiance * darkness;
+        
+        // gamma correction
+        fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
     }
 
     const float constantForDepth = 1.0;
@@ -188,7 +186,6 @@ void main()
     const float offsetForDepth = 1.0;
     gl_FragDepth = (log(constantForDepth * vertexPosClip.z + offsetForDepth) / log(constantForDepth * farDistance + offsetForDepth));
 }
-
 )glsl";
 
 /*
@@ -254,8 +251,6 @@ out vec4 fragColor;
 
 void main()
 {
-    
-
 //    vec4 boxoidCenterCamera = view * vec4(boxoidCenter, 1.0);
     vec3 ray = normalize(fragPos - cameraPos);
     vec3 sphereToCamera = cameraPos - boxoidCenter;
@@ -266,17 +261,16 @@ void main()
     vec3 radiance = vec3(0.0, 0.0, 0.0);
     if (discriminant < 0.0 || b > 0.0)
     {
-	// eerie green glow for the debug
         //fragColor = vec4(0.0, 1.0, 0.0, 0.1); 
         //fragColor = vec4(fragPos, 0.25);
         switch(fragIndex)
         {
-            case 1: fragColor = vec4(1.0, 0.0, 0.0, 1.0); break;
-            case 2: fragColor = vec4(0.0, 1.0, 0.0, 1.0); break;
-            case 3: fragColor = vec4(0.0, 0.0, 1.0, 1.0); break;
-            case 4: fragColor = vec4(1.0, 1.0, 0.0, 1.0); break;
-            case 5: fragColor = vec4(1.0, 0.0, 1.0, 1.0); break;
-            case 6: fragColor = vec4(0.0, 1.0, 1.0, 1.0); break;
+            case 0: fragColor = vec4(1.0, 0.0, 0.0, 1.0); break;
+            case 1: fragColor = vec4(0.0, 1.0, 0.0, 1.0); break;
+            case 2: fragColor = vec4(0.0, 0.0, 1.0, 1.0); break;
+            case 3: fragColor = vec4(1.0, 1.0, 0.0, 1.0); break;
+            case 4: fragColor = vec4(1.0, 0.0, 1.0, 1.0); break;
+            case 5: fragColor = vec4(0.0, 1.0, 1.0, 1.0); break;
             default: fragColor = vec4(1.0); // white
         }
     }
@@ -285,22 +279,22 @@ void main()
         float t = -b - sqrt(discriminant);
         vec3 intersectionPos = cameraPos + ray * t;
         vec3 surfaceNormal = normalize(intersectionPos - boxoidCenter);
-	vec3 accumulatedLight = vec3(0.0, 0.0, 0.0);
-	for (int i = 0; i < MAX_LIGHTS; ++i) {
-	    vec3 lightVector = lightPositions[i] - fragPos;
-	    float squaredDistance = dot(lightVector, lightVector);
-	    vec3 lightDirection = lightVector / sqrt(squaredDistance);
-	    float attenuation = 1.0 / squaredDistance;
-	    float lambertian = max(dot(surfaceNormal, lightDirection), 0.0);
-	    accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
-	}
-	// divide materialEmissive by 4 pi
-	radiance = materialEmissive * 0.079577 + accumulatedLight;	
-	// tone mapping radiance to the 0,1 range by dividing by total brightness. darkness is the inverse of brightness.
-	float darkness = 3.0 / (3.0 + exposure + radiance.r + radiance.g + radiance.b);
-	radiance = radiance * darkness;
-	// gamma correction
-	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
+        vec3 accumulatedLight = vec3(0.0, 0.0, 0.0);
+        for (int i = 0; i < MAX_LIGHTS; ++i) {
+            vec3 lightVector = lightPositions[i] - fragPos;
+            float squaredDistance = dot(lightVector, lightVector);
+            vec3 lightDirection = lightVector / sqrt(squaredDistance);
+            float attenuation = 1.0 / squaredDistance;
+            float lambertian = max(dot(surfaceNormal, lightDirection), 0.0);
+            accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
+        }
+        // divide materialEmissive by 4 pi
+        radiance = materialEmissive * 0.079577 + accumulatedLight;        
+        // tone mapping radiance to the 0,1 range by dividing by total brightness. darkness is the inverse of brightness.
+        float darkness = 3.0 / (3.0 + exposure + radiance.r + radiance.g + radiance.b);
+        radiance = radiance * darkness;
+        // gamma correction
+        fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
     }
     const float constantForDepth = 1.0;
     const float farDistance = 3e18;
@@ -569,17 +563,17 @@ void *rendererThread(void *arg) {
         }
         pthread_mutex_unlock(&sharedData.mutex);
 
-	// vertex buffer
+        // vertex buffer
         glBindVertexArray(sphereVAO);
-	
-	// Camera
+        
+        // Camera
         cameraPos = glm::vec3(sharedData.renderMisc.camPosition[0], sharedData.renderMisc.camPosition[1], sharedData.renderMisc.camPosition[2]);
         cameraTarget = glm::vec3(sharedData.renderMisc.camForward[0], sharedData.renderMisc.camForward[1], sharedData.renderMisc.camForward[2]);
         cameraUp = glm::vec3(sharedData.renderMisc.camUp[0], sharedData.renderMisc.camUp[1], sharedData.renderMisc.camUp[2]);
         glm::mat4 view = glm::lookAt(cameraPos, cameraTarget, cameraUp);
         glm::mat4 model = glm::mat4(1.0f);
        
-	// draw the skybox
+        // draw the skybox
         glUseProgram(skyboxProgram);
         float time = static_cast<float>(glfwGetTime());
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -592,7 +586,7 @@ void *rendererThread(void *arg) {
         glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
         glEnable(GL_DEPTH_TEST);
 
-	// clear the depth buffer so the skybox is behind everything else
+        // clear the depth buffer so the skybox is behind everything else
         glClear(GL_DEPTH_BUFFER_BIT);
 
         glUseProgram(boxoidProgram);
@@ -602,7 +596,7 @@ void *rendererThread(void *arg) {
         glUniform1f(boxoidGammaLoc, 2.2f);
         glUniform1f(boxoidExposureLoc, 200.0f);
         for (int i = 0; i < MAX_LIGHTS; ++i) {
-    	    glUniform3fv(boxoidLightPositionsLoc + i, 1, &sharedData.renderMisc.lights[i].position[0]);
+                glUniform3fv(boxoidLightPositionsLoc + i, 1, &sharedData.renderMisc.lights[i].position[0]);
             glUniform3fv(boxoidLightColorsLoc + i, 1, &sharedData.renderMisc.lights[i].color[0]);
         }
         
@@ -613,7 +607,7 @@ void *rendererThread(void *arg) {
         glUniform1f(gammaLoc, 2.2f);
         glUniform1f(exposureLoc, 200.0f);
         for (int i = 0; i < MAX_LIGHTS; ++i) {
-    	    glUniform3fv(lightPositionsLoc + i, 1, &sharedData.renderMisc.lights[i].position[0]);
+                glUniform3fv(lightPositionsLoc + i, 1, &sharedData.renderMisc.lights[i].position[0]);
             glUniform3fv(lightColorsLoc + i, 1, &sharedData.renderMisc.lights[i].color[0]);
         }
 
@@ -635,7 +629,7 @@ void *rendererThread(void *arg) {
                 material* mat = &sharedData.renderMisc.materials[currentSphere.material_idx];
                 glm::vec3 diffuseComponent = glm::vec3(mat->diffuse[0], mat->diffuse[1], mat->diffuse[2]); // 0 to 1
                 glm::vec3 emissiveComponent = glm::vec3(mat->emissive[0], mat->emissive[1], mat->emissive[2]); // W/m^2
-	
+        
                 // colors looked washed out so I did a thing. not quite vibrance so I'll call it vibe. texture saturation? but we don't have textures.
                 float vibe = 3.0;
                 diffuseComponent = glm::vec3(std::pow(diffuseComponent.r, vibe), std::pow(diffuseComponent.g, vibe), std::pow(diffuseComponent.b, vibe));
@@ -649,7 +643,7 @@ void *rendererThread(void *arg) {
             }
         }
 
-	    if(sharedData.numSpheres >= 5) {	
+        if(sharedData.numSpheres >= 5) {	
             glUseProgram(boxoidProgram);
             
             glm::vec3 center = glm::vec3(sharedData.spheres[5].position[0], sharedData.spheres[5].position[1], sharedData.spheres[5].position[2]);
@@ -677,7 +671,7 @@ void *rendererThread(void *arg) {
             model = glm::translate(glm::mat4(1.0f), glm::vec3());
             glUniformMatrix4fv(boxoidModelLoc, 1, GL_FALSE, glm::value_ptr(model));
             glUniform3f(boxoidCenterLoc, center[0], center[1], center[2]);
-	       
+               
             material boxMat = {{1},{0}};
             glm::vec3 diffuseComponent = glm::vec3(boxMat.diffuse[0], boxMat.diffuse[1], boxMat.diffuse[2]); // 0 to 1
             glm::vec3 emissiveComponent = glm::vec3(boxMat.emissive[0], boxMat.emissive[1], boxMat.emissive[2]); // W/m^2
@@ -687,8 +681,6 @@ void *rendererThread(void *arg) {
             diffuseComponent = glm::vec3(std::pow(diffuseComponent.r, vibe), std::pow(diffuseComponent.g, vibe), std::pow(diffuseComponent.b, vibe));
             glUniform3fv(diffuseLoc, 1, glm::value_ptr(diffuseComponent));
             glUniform3fv(emissiveLoc, 1, glm::value_ptr(emissiveComponent));
-			// wrong shader
-            //glUseProgram(shaderProgram);
             glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
         }
         else {
