@@ -213,6 +213,7 @@ uniform mat4 view;
 uniform mat4 projection;
 
 out vec3 fragPos;
+out vec3 fragNormal;
 out vec4 vertexPosClip;
 out int fragIndex;
 
@@ -232,6 +233,7 @@ const char *boxoidFragSource = R"glsl(
 #version 330 core
 
 in vec3 fragPos;
+in vec3 fragNormal;
 in vec4 vertexPosClip;
 in int fragIndex;
 
@@ -257,15 +259,15 @@ out vec4 fragColor;
 
 void main()
 {
-    switch(faceIndex)
+    switch(fragIndex)
     {
-        case 1: FragColor = vec4(1.0, 0.0, 0.0, 1.0); break;
-        case 2: FragColor = vec4(0.0, 1.0, 0.0, 1.0); break;
-        case 3: FragColor = vec4(0.0, 0.0, 1.0, 1.0); break;
-        case 4: FragColor = vec4(1.0, 1.0, 0.0, 1.0); break;
-        case 5: FragColor = vec4(1.0, 0.0, 1.0, 1.0); break;
-        case 6: FragColor = vec4(0.0, 1.0, 1.0, 1.0); break;
-        default: FragColor = vec4(1.0); // white
+        case 1: fragColor = vec4(1.0, 0.0, 0.0, 1.0); break;
+        case 2: fragColor = vec4(0.0, 1.0, 0.0, 1.0); break;
+        case 3: fragColor = vec4(0.0, 0.0, 1.0, 1.0); break;
+        case 4: fragColor = vec4(1.0, 1.0, 0.0, 1.0); break;
+        case 5: fragColor = vec4(1.0, 0.0, 1.0, 1.0); break;
+        case 6: fragColor = vec4(0.0, 1.0, 1.0, 1.0); break;
+        default: fragColor = vec4(1.0); // white
     }
 
 /*
@@ -382,7 +384,6 @@ void calculateFaceNormals(glm::vec3 vertices[8], glm::vec3 normals[6]) {
         {0, 4, 2},
         {1, 3, 5}
     };
-
     for (int i = 0; i < 6; i++) {
         glm::vec3 A = vertices[faceIndices[i][0]];
         glm::vec3 B = vertices[faceIndices[i][1]];
@@ -405,9 +406,7 @@ void setupCube(glm::vec3 cubeVertices[8], GLuint& VAO, GLuint& VBO, GLuint& EBO)
         {0, 4, 6, 2},
         {1, 3, 7, 5}
     };
-
     calculateFaceNormals(cubeVertices, normals);
-
     for(int i = 0; i < 6; i++) {
         for(int j = 0; j < 4; j++) {
             Vertex vertex;
@@ -416,7 +415,6 @@ void setupCube(glm::vec3 cubeVertices[8], GLuint& VAO, GLuint& VBO, GLuint& EBO)
             vertex.faceIndex = i;
             vertices[i * 4 + j] = vertex;
         }
-        
         indices[i * 6 + 0] = 4 * i + 0;
         indices[i * 6 + 1] = 4 * i + 1;
         indices[i * 6 + 2] = 4 * i + 2;
@@ -424,28 +422,20 @@ void setupCube(glm::vec3 cubeVertices[8], GLuint& VAO, GLuint& VBO, GLuint& EBO)
         indices[i * 6 + 4] = 4 * i + 2;
         indices[i * 6 + 5] = 4 * i + 3;
     }
-
     glGenVertexArrays(1, &VAO);
     glBindVertexArray(VAO);
-
     glGenBuffers(1, &VBO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
     glGenBuffers(1, &EBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
     glEnableVertexAttribArray(0);
-
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
     glEnableVertexAttribArray(1);
-
     glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, faceIndex));
     glEnableVertexAttribArray(2);
-
-    glBindVertexArray(0);
 }
 
 
@@ -657,6 +647,8 @@ void *rendererThread(void *arg) {
             }
         }
         
+        glUseProgram(boxoidProgram);
+	
 	glm::vec3 boxoidVerts[8] = {
             glm::vec3(0.1, -0.1, 1.0),
             glm::vec3(-0.1, -0.1, 1.0),
@@ -669,7 +661,6 @@ void *rendererThread(void *arg) {
 	};
 	setupCube(boxoidVerts, boxoidVAO, boxoidVBO, boxoidEBO);
         glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-	
 	
 	glBindVertexArray(0);
         glfwSwapBuffers(sharedData.window);
