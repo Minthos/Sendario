@@ -220,10 +220,10 @@ out int fragIndex;
 void main()
 {
     fragPos = vec3(model * vec4(position, 1.0)); // transform vertex from object space to world space
-    vec4 posClip = projection * view * vec4(fragPos, 1.0); // transform vertex from world space to clip space
+    //vec4 posClip = projection * view * vec4(fragPos, 1.0); // transform vertex from world space to clip space
+    vec4 posClip = vec4(fragPos, 1.0); // transform vertex from world space to clip space
     vertexPosClip = posClip;  // Pass the clip space position to the fragment shader
     gl_Position = posClip;
-
     fragNormal = normal;
     fragIndex = faceIndex;
 }
@@ -247,9 +247,8 @@ const int MAX_LIGHTS = 1;
 uniform vec3 lightPositions[MAX_LIGHTS];
 uniform vec3 lightColors[MAX_LIGHTS];
 uniform mat4 view;
-uniform vec3 sphereCenter;
+uniform vec3 boxoidCenter;
 uniform vec3 cameraPos;
-uniform float sphereRadius;
 uniform vec3 materialDiffuse;
 uniform vec3 materialEmissive; // W/sr/m^2
 uniform float gamma;
@@ -269,30 +268,34 @@ void main()
         case 6: fragColor = vec4(0.0, 1.0, 1.0, 1.0); break;
         default: fragColor = vec4(1.0); // white
     }
+    const float constantForDepth = 1.0;
+    const float farDistance = 3e18;
+    const float offsetForDepth = 1.0;
+    gl_FragDepth = (log(constantForDepth * vertexPosClip.z + offsetForDepth) / log(constantForDepth * farDistance + offsetForDepth));
+}
 
-/*
-//    vec4 sphereCenterCamera = view * vec4(sphereCenter, 1.0);
+void oldMain()
+{
+//    vec4 boxoidCenterCamera = view * vec4(boxoidCenter, 1.0);
     vec3 ray = normalize(fragPos - cameraPos);
-    vec3 sphereToCamera = cameraPos - sphereCenter;
+    vec3 sphereToCamera = cameraPos - boxoidCenter;
     float b = dot(ray, sphereToCamera);
-    float c = dot(sphereToCamera, sphereToCamera) - sphereRadius * sphereRadius;
+    //float c = dot(sphereToCamera, sphereToCamera) - sphereRadius * sphereRadius;
+    float c = dot(sphereToCamera, sphereToCamera) - 1;
     float discriminant = b * b - c;
-
     vec3 radiance = vec3(0.0, 0.0, 0.0);
     if (discriminant < 0.0 || b > 0.0)
     {
 	// eerie green glow for the debug
-        //fragColor = vec4(0.0, 1.0, 0.0, 0.1); 
+        fragColor = vec4(0.0, 1.0, 0.0, 0.1); 
         //fragColor = vec4(fragPos, 0.25); 
     }
     else
     {
         float t = -b - sqrt(discriminant);
         vec3 intersectionPos = cameraPos + ray * t;
-        vec3 surfaceNormal = normalize(intersectionPos - sphereCenter);
-
+        vec3 surfaceNormal = normalize(intersectionPos - boxoidCenter);
 	vec3 accumulatedLight = vec3(0.0, 0.0, 0.0);
-
 	for (int i = 0; i < MAX_LIGHTS; ++i) {
 	    vec3 lightVector = lightPositions[i] - fragPos;
 	    float squaredDistance = dot(lightVector, lightVector);
@@ -301,29 +304,21 @@ void main()
 	    float lambertian = max(dot(surfaceNormal, lightDirection), 0.0);
 	    accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
 	}
-
 	// divide materialEmissive by 4 pi
 	radiance = materialEmissive * 0.079577 + accumulatedLight;	
-	
 	// tone mapping radiance to the 0,1 range by dividing by total brightness. darkness is the inverse of brightness.
 	float darkness = 3.0 / (3.0 + exposure + radiance.r + radiance.g + radiance.b);
 	radiance = radiance * darkness;
-	
 	// gamma correction
-	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
+//	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
     }
-
-
     const float constantForDepth = 1.0;
     const float farDistance = 3e18;
     const float offsetForDepth = 1.0;
-    gl_FragDepth = (log(constantForDepth * vertexPosClip.z + offsetForDepth) / log(constantForDepth * farDistance + offsetForDepth));
-
-    */
+//    gl_FragDepth = (log(constantForDepth * vertexPosClip.z + offsetForDepth) / log(constantForDepth * farDistance + offsetForDepth));
 }
 
 )glsl";
-
 
 void checkShader(GLenum status_enum, GLuint shader) {
     GLint success = 1;
@@ -438,7 +433,6 @@ void setupCube(glm::vec3 cubeVertices[8], GLuint& VAO, GLuint& VBO, GLuint& EBO)
     glEnableVertexAttribArray(2);
 }
 
-
 typedef struct {
     Sphere *spheres;
     int numSpheres;
@@ -536,6 +530,18 @@ void *rendererThread(void *arg) {
     GLuint gammaLoc = glGetUniformLocation(shaderProgram, "gamma");
     GLuint exposureLoc = glGetUniformLocation(shaderProgram, "exposure");
 
+    GLuint boxoidModelLoc = glGetUniformLocation(boxoidProgram, "model");
+    GLuint boxoidViewLoc = glGetUniformLocation(boxoidProgram, "view");
+    GLuint boxoidProjLoc = glGetUniformLocation(boxoidProgram, "projection");
+    GLuint boxoidCenterLoc = glGetUniformLocation(boxoidProgram, "boxoidCenter");
+    GLuint boxoidCameraPosLoc = glGetUniformLocation(boxoidProgram, "cameraPos");
+    GLuint boxoidLightPositionsLoc = glGetUniformLocation(boxoidProgram, "lightPositions");
+    GLuint boxoidLightColorsLoc = glGetUniformLocation(boxoidProgram, "lightColors");
+    GLuint boxoidDiffuseLoc = glGetUniformLocation(boxoidProgram, "materialDiffuse");
+    GLuint boxoidEmissiveLoc = glGetUniformLocation(boxoidProgram, "materialEmissive");
+    GLuint boxoidGammaLoc = glGetUniformLocation(boxoidProgram, "gamma");
+    GLuint boxoidExposureLoc = glGetUniformLocation(boxoidProgram, "exposure");
+
     GLuint skyboxModelLoc = glGetUniformLocation(skyboxProgram, "model");
     GLuint skyboxViewLoc = glGetUniformLocation(skyboxProgram, "view");
     GLuint skyboxProjLoc = glGetUniformLocation(skyboxProgram, "projection");
@@ -573,20 +579,16 @@ void *rendererThread(void *arg) {
         }
         pthread_mutex_unlock(&sharedData.mutex);
 
-	// Camera
-        glUseProgram(shaderProgram);
-        cameraPos = glm::vec3(sharedData.renderMisc.camPosition[0], sharedData.renderMisc.camPosition[1], sharedData.renderMisc.camPosition[2]);
-        cameraTarget = glm::vec3(sharedData.renderMisc.camForward[0], sharedData.renderMisc.camForward[1], sharedData.renderMisc.camForward[2]);
-        cameraUp = glm::vec3(sharedData.renderMisc.camUp[0], sharedData.renderMisc.camUp[1], sharedData.renderMisc.camUp[2]);
-        glUniform3f(cameraPosLoc, cameraPos.x, cameraPos.y, cameraPos.z);
-        glm::mat4 view = glm::lookAt(cameraPos, cameraTarget, cameraUp);
-        glm::mat4 model = glm::mat4(1.0f);
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-
 	// vertex buffer
         glBindVertexArray(sphereVAO);
 	
+	// Camera
+        cameraPos = glm::vec3(sharedData.renderMisc.camPosition[0], sharedData.renderMisc.camPosition[1], sharedData.renderMisc.camPosition[2]);
+        cameraTarget = glm::vec3(sharedData.renderMisc.camForward[0], sharedData.renderMisc.camForward[1], sharedData.renderMisc.camForward[2]);
+        cameraUp = glm::vec3(sharedData.renderMisc.camUp[0], sharedData.renderMisc.camUp[1], sharedData.renderMisc.camUp[2]);
+        glm::mat4 view = glm::lookAt(cameraPos, cameraTarget, cameraUp);
+        glm::mat4 model = glm::mat4(1.0f);
+       
 	// draw the skybox
         glUseProgram(skyboxProgram);
         float time = static_cast<float>(glfwGetTime());
@@ -602,14 +604,26 @@ void *rendererThread(void *arg) {
 
 	// clear the depth buffer so the skybox is behind everything else
         glClear(GL_DEPTH_BUFFER_BIT);
-
-        glUseProgram(shaderProgram);
 	
-	// Brightness controls
+
+
+        glUseProgram(boxoidProgram);
+	glUniform3f(boxoidCameraPosLoc, cameraPos.x, cameraPos.y, cameraPos.z);
+        glUniformMatrix4fv(boxoidViewLoc, 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(boxoidProjLoc, 1, GL_FALSE, glm::value_ptr(projection));
+	glUniform1f(boxoidGammaLoc, 2.2f);
+	glUniform1f(boxoidExposureLoc, 200.0f);
+	for (int i = 0; i < MAX_LIGHTS; ++i) {
+    	    glUniform3fv(boxoidLightPositionsLoc + i, 1, &sharedData.renderMisc.lights[i].position[0]);
+            glUniform3fv(boxoidLightColorsLoc + i, 1, &sharedData.renderMisc.lights[i].color[0]);
+        }
+        
+        glUseProgram(shaderProgram);
+	glUniform3f(cameraPosLoc, cameraPos.x, cameraPos.y, cameraPos.z);
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
 	glUniform1f(gammaLoc, 2.2f);
 	glUniform1f(exposureLoc, 200.0f);
-
-	// Lights
 	for (int i = 0; i < MAX_LIGHTS; ++i) {
     	    glUniform3fv(lightPositionsLoc + i, 1, &sharedData.renderMisc.lights[i].position[0]);
             glUniform3fv(lightColorsLoc + i, 1, &sharedData.renderMisc.lights[i].color[0]);
@@ -642,7 +656,7 @@ void *rendererThread(void *arg) {
 
                 // Draw the sphere
 		//if(i != 5 && i != 4) {
-                    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+                //    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 		//}
             }
         }
@@ -650,17 +664,38 @@ void *rendererThread(void *arg) {
         glUseProgram(boxoidProgram);
 	
 	glm::vec3 boxoidVerts[8] = {
-            glm::vec3(0.1, -0.1, 1.0),
-            glm::vec3(-0.1, -0.1, 1.0),
-            glm::vec3(0.1, -0.1, 2.0),
-            glm::vec3(-0.1, -0.1, 2.0),
-            glm::vec3(0.1, 0.1, 1.0),
-            glm::vec3(-0.1, 0.1, 1.0),
-            glm::vec3(0.1, 0.1, 2.0),
-            glm::vec3(-0.1, 0.1, 2.0)
+            glm::vec3(0.5, -0.8, 1.0),
+            glm::vec3(-0.5, -0.8, 1.0),
+            glm::vec3(0.5, -0.8, 2.0),
+            glm::vec3(-0.5, -0.8, 2.0),
+            glm::vec3(0.5, 0.8, 1.0),
+            glm::vec3(-0.5, 0.8, 1.0),
+            glm::vec3(0.5, 0.8, 2.0),
+            glm::vec3(-0.5, 0.8, 2.0)
 	};
+	glm::vec3 sum(0.0f);
+	for (int i = 0; i < 8; i++) {
+	    sum += boxoidVerts[i];
+	}
+	glm::vec3 center = sum / 8.0f;
 	setupCube(boxoidVerts, boxoidVAO, boxoidVBO, boxoidEBO);
-        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+	
+	// translate our model view to position the sphere in world space
+	model = glm::translate(glm::mat4(1.0f), glm::vec3());
+	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+	glUniform3f(boxoidCenterLoc, center[0], center[1], center[2]);
+       
+	material boxMat = {{1},{0}};
+	glm::vec3 diffuseComponent = glm::vec3(boxMat.diffuse[0], boxMat.diffuse[1], boxMat.diffuse[2]); // 0 to 1
+	glm::vec3 emissiveComponent = glm::vec3(boxMat.emissive[0], boxMat.emissive[1], boxMat.emissive[2]); // W/m^2
+
+	// colors looked washed out so I did a thing. not quite vibrance so I'll call it vibe. texture saturation? but we don't have textures.
+	float vibe = 3.0;
+	diffuseComponent = glm::vec3(std::pow(diffuseComponent.r, vibe), std::pow(diffuseComponent.g, vibe), std::pow(diffuseComponent.b, vibe));
+	glUniform3fv(diffuseLoc, 1, glm::value_ptr(diffuseComponent));
+	glUniform3fv(emissiveLoc, 1, glm::value_ptr(emissiveComponent));
+
+	glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 	
 	glBindVertexArray(0);
         glfwSwapBuffers(sharedData.window);
