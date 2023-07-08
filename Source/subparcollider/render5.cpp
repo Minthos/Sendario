@@ -675,7 +675,7 @@ void *rendererThread(void *arg) {
             
             // translate our model view to position the sphere in world space
             model = glm::translate(glm::mat4(1.0f), glm::vec3());
-            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+            glUniformMatrix4fv(boxoidModelLoc, 1, GL_FALSE, glm::value_ptr(model));
             glUniform3f(boxoidCenterLoc, center[0], center[1], center[2]);
 	       
             material boxMat = {{1},{0}};
@@ -688,7 +688,7 @@ void *rendererThread(void *arg) {
             glUniform3fv(diffuseLoc, 1, glm::value_ptr(diffuseComponent));
             glUniform3fv(emissiveLoc, 1, glm::value_ptr(emissiveComponent));
 			// wrong shader
-            glUseProgram(shaderProgram);
+            //glUseProgram(shaderProgram);
             glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
         }
         else {
