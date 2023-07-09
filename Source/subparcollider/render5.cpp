@@ -418,9 +418,9 @@ void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
         indices[i * 6 + 3] = 4 * i + 0;
         indices[i * 6 + 4] = 4 * i + 2;
         indices[i * 6 + 5] = 4 * i + 3;
-        float time = static_cast<float>(glfwGetTime());
+        float time = static_cast<float>(glfwGetTime()) / 10.0;
         glm::vec3 faceNormal = glm::normalize(glm::cross(
-					corners[faceCornerIndices[i][0]] - corners[faceCornerIndices[i][2]],
+					corners[faceCornerIndices[i][2]] - corners[faceCornerIndices[i][0]],
 					corners[faceCornerIndices[i][1]] - corners[faceCornerIndices[i][3]]));
         for(int j = 0; j < 4; j++) {
 			int iself = faceCornerIndices[i][j];
@@ -428,14 +428,14 @@ void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
 			int iminus = faceCornerIndices[i][(j + 3) % 4];
             vertices[i * 4 + j].position = corners[iself];
             vertices[i * 4 + j].faceIndex = i;
-			float curvature1 = box.curvature[i * 2 + (j % 2)];
-			float curvature2 = box.curvature[i * 2 + ((j + 1) % 2)];
+			float curvature1 = (0.5 + 0.5 * sin(time)) * box.curvature[i * 2 + (j % 2)];
+			float curvature2 = (0.5 + 0.5 * sin(time)) * box.curvature[i * 2 + ((j + 1) % 2)];
 			float flatness1 = 1.0f - curvature1;
 			float flatness2 = 1.0f - curvature2;
             glm::vec3 edgeU = glm::normalize(corners[iself] - corners[iminus]);
             glm::vec3 edgeV = glm::normalize(corners[iself] - corners[iplus]);
-			glm::vec3 component1 = edgeV * 0.5f * curvature1 + faceNormal * flatness1;
-			glm::vec3 component2 = edgeU * 0.5f * curvature2 + faceNormal * flatness2;
+			glm::vec3 component1 = edgeU * 0.5f * curvature1 + faceNormal * flatness1;
+			glm::vec3 component2 = edgeV * 0.5f * curvature2 + faceNormal * flatness2;
 			vertices[i * 4 + j].normal = glm::normalize(component1 + component2);
 			//vertices[i * 4 + j].normal = faceNormal;
         }
