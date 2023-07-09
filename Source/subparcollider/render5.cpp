@@ -383,7 +383,7 @@ glm::vec3 vlerp(glm::vec3 a, glm::vec3 b, float f) {
 void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
     Vertex vertices[24];
     GLuint indices[36];
-    GLuint faceIndices[6][4] = {
+    GLuint faceCornerIndices[6][4] = {
         {0, 1, 5, 4}, // left
         {3, 2, 6, 7}, // right
         {1, 0, 2, 3}, // bottom
@@ -410,7 +410,8 @@ void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
     for(int i = 0; i < 8; i++) {
         cornerNormals[i] = glm::normalize(corners[i] - center);
     }
-	for (int i = 0; i < 6; i++) {    
+
+    for (int i = 0; i < 6; i++) {
         indices[i * 6 + 0] = 4 * i + 0;
         indices[i * 6 + 1] = 4 * i + 1;
         indices[i * 6 + 2] = 4 * i + 2;
@@ -418,22 +419,46 @@ void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
         indices[i * 6 + 4] = 4 * i + 2;
         indices[i * 6 + 5] = 4 * i + 3;
         // corners
-        glm::vec3 A = corners[faceIndices[i][0]];
-        glm::vec3 B = corners[faceIndices[i][1]];
-        glm::vec3 C = corners[faceIndices[i][2]];
-        glm::vec3 D = corners[faceIndices[i][3]];
+        glm::vec3 A = corners[faceCornerIndices[i][0]];
+        glm::vec3 B = corners[faceCornerIndices[i][1]];
+        glm::vec3 C = corners[faceCornerIndices[i][2]];
+        glm::vec3 D = corners[faceCornerIndices[i][3]];
         // curvatures
-        float curvature1 = 0.5; //glm::min(box.curvature[faceEdgeIndices[i][0]], box.curvature[faceEdgeIndices[i][1]]);
-        float curvature2 = 0.5; //glm::min(box.curvature[faceEdgeIndices[i][2]], box.curvature[faceEdgeIndices[i][3]]);
-        glm::vec3 faceNormal = glm::normalize(glm::cross(A - C, B - D));
-		glm::vec3 flatness1 = (1.0f - abs(curvature1)) * faceNormal;
-		glm::vec3 flatness2 = (1.0f - abs(curvature2)) * faceNormal;
+        float time = static_cast<float>(glfwGetTime());
+
+        float curvature1 = 1.0 - glm::max(0.0f, sin(time)); //glm::min(box.curvature[faceEdgeIndices[i][0]], box.curvature[faceEdgeIndices[i][1]]);
+        float curvature2 = 1.0 - glm::max(0.0f, -sin(time)); //glm::min(box.curvature[faceEdgeIndices[i][2]], box.curvature[faceEdgeIndices[i][3]]);
+        curvature1 = 0.0f;
+        glm::vec3 faceNormal = glm::normalize(glm::cross(A - C, A - B));
+        float flatness1 = 1.0f - curvature1;
+        float flatness2 = 1.0f - curvature2;
+
+        int a = faceCornerIndices[i][0];
+        int b = faceCornerIndices[i][1];
+        int c = faceCornerIndices[i][2];
+        int d = faceCornerIndices[i][3];
         
-		for(int j = 0; j < 4; j++) {
-            vertices[i * 4 + j].position = corners[faceIndices[i][j]];
-            vertices[i * 4 + j].normal = glm::normalize(cornerNormals[faceIndices[i][j]] * (curvature1 + curvature2) + flatness1 + flatness2);
+		// TODO NEW: Face normal is 0 curvature. Corner centernormal is 1 curvature. Edge vectors normalized are toward positive curvature.
+
+        for(int j = 0; j < 4; j++) {
+			int iself = faceCornerIndices[i][j];
+			int iplus = faceCornerIndices[i][(j + 1) % 4];
+			int iminus = faceCornerIndices[i][(j + 3) % 4];
+            vertices[i * 4 + j].position = corners[iself];
             vertices[i * 4 + j].faceIndex = i;
+
+            glm::vec3 edgeU = glm::normalize(corners[iself] - corners[iminus]);
+            glm::vec3 edgeV = glm::normalize(corners[iself] - corners[iplus]);
+			glm::vec3 component1 = edgeU * curvature1 + faceNormal * flatness1;
+			glm::vec3 component2 = edgeV * curvature2 + faceNormal * flatness2;
+			vertices[iself].normal = 0.5f * (component1 + component2);
         }
+
+        // OLDTODO: make one for each corner
+        //vertices[i * 4 + j].normal = glm::normalize(
+        //                                cornerNormals[iself] * (curvature1 + curvature2)
+        //                                + cornerNormals[iplus] * flatness1
+        //                                + cornerNormals[iminus] * flatness2);
     }
 
     glGenVertexArrays(1, &VAO);
@@ -683,14 +708,14 @@ void *rendererThread(void *arg) {
             
             glm::vec3 center = glm::vec3(sharedData.spheres[5].position[0], sharedData.spheres[5].position[1], sharedData.spheres[5].position[2]);
             Boxoid box = {
-                {2.5, -0.8, 1.0,
-                -2.5, -0.8, 1.0,
-                2.5, -0.8, 0.3,
-                -2.5, -0.8, 0.3,
-                2.5, 0.8, 1.0,
-                -2.5, 0.8, 1.0,
-                2.5, 0.8, 0.3,
-                -2.5, 0.8, 0.3},
+                {2.5, -1.8, 1.0,
+                -2.5, -1.8, 1.0,
+                2.5, -1.8, -1.3,
+                -2.5, -1.8, -1.3,
+                2.5, 1.8, 1.0,
+                -2.5, 1.8, 1.0,
+                2.5, 1.8, -1.3,
+                -2.5, 1.8, -1.3},
                 {1.0, 1.0,
                 0.0, 0.0,
                 1.0, 1.0,
