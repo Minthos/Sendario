@@ -418,7 +418,7 @@ void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
         indices[i * 6 + 3] = 4 * i + 0;
         indices[i * 6 + 4] = 4 * i + 2;
         indices[i * 6 + 5] = 4 * i + 3;
-        float time = static_cast<float>(glfwGetTime()) / 10.0;
+        float time = static_cast<float>(glfwGetTime());
         glm::vec3 faceNormal = glm::normalize(glm::cross(
 					corners[faceCornerIndices[i][2]] - corners[faceCornerIndices[i][0]],
 					corners[faceCornerIndices[i][1]] - corners[faceCornerIndices[i][3]]));
@@ -428,16 +428,18 @@ void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
 			int iminus = faceCornerIndices[i][(j + 3) % 4];
             vertices[i * 4 + j].position = corners[iself];
             vertices[i * 4 + j].faceIndex = i;
-			float curvature1 = (0.5 + 0.5 * sin(time)) * box.curvature[i * 2 + (j % 2)];
-			float curvature2 = (0.5 + 0.5 * sin(time)) * box.curvature[i * 2 + ((j + 1) % 2)];
+			float curvature1 = 1.0f;//box.curvature[i * 2 + (j % 2)];
+			float curvature2 = 1.0f;//box.curvature[i * 2 + ((j + 1) % 2)];
+			float factor = 2.0f / (abs(curvature1) + abs(curvature2) + 1.0f);
+			curvature1 *= factor;
+			curvature2 *= factor;
 			float flatness1 = 1.0f - curvature1;
 			float flatness2 = 1.0f - curvature2;
             glm::vec3 edgeU = glm::normalize(corners[iself] - corners[iminus]);
             glm::vec3 edgeV = glm::normalize(corners[iself] - corners[iplus]);
-			glm::vec3 component1 = edgeU * 0.5f * curvature1 + faceNormal * flatness1;
-			glm::vec3 component2 = edgeV * 0.5f * curvature2 + faceNormal * flatness2;
+			glm::vec3 component1 = edgeU * curvature1 + faceNormal * flatness1;
+			glm::vec3 component2 = edgeV * curvature2 + faceNormal * flatness2;
 			vertices[i * 4 + j].normal = glm::normalize(component1 + component2);
-			//vertices[i * 4 + j].normal = faceNormal;
         }
     }
 
@@ -687,7 +689,7 @@ void *rendererThread(void *arg) {
             glUseProgram(boxoidProgram);
             
             glm::vec3 center = glm::vec3(sharedData.spheres[5].position[0], sharedData.spheres[5].position[1], sharedData.spheres[5].position[2]);
-            Boxoid box = {
+            /*Boxoid box = {
                 {2.5, -1.8, 1.0,
                 -2.5, -1.8, 1.0,
                 2.5, -1.8, -1.3,
@@ -702,8 +704,8 @@ void *rendererThread(void *arg) {
                 1.0, 1.0,
                 1.0, 1.0,
                 1.0, 1.0},
-                4, 0};
-			/*Boxoid box = {
+                4, 0};*/
+			Boxoid box = {
                 {2.5, -1.8, 1.0, // right bottom rear
                 -2.5, -1.8, 1.0, // left bottom rear
                 2.5, -1.8, -1.3, // right bottom front
@@ -712,13 +714,13 @@ void *rendererThread(void *arg) {
                 -2.5, 1.8, 1.0, // left top rear
                 2.5, 1.8, -1.3, // right top front
                 -2.5, 1.8, -1.3}, // left top front
-                {1.0, 1.0,
-                0.0, 0.0,
-                1.0, 1.0,
-                0.0, 0.0,
-                1.0, 1.0,
-                0.0, 0.0},
-                4, 0};*/
+                {0.0, 1.0,
+                1.0, 0.0,
+                0.0, 1.0,
+                1.0, 0.0,
+                0.0, 1.0,
+                1.0, 0.0},
+                4, 0};
             for (int i = 0; i < 8; i++) {
                 box.corners[i * 3] += center.x;
                 box.corners[i * 3 + 1] += center.y;
