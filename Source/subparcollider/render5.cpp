@@ -376,6 +376,10 @@ struct Vertex {
 // 10 top left
 // 11 top right
 
+glm::vec3 vlerp(glm::vec3 a, glm::vec3 b, float f) {
+    return (a * f) + (b * (1.0f - f));
+}
+
 void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
     Vertex vertices[24];
     GLuint indices[36];
@@ -396,13 +400,17 @@ void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
         {1, 3, 5, 7},
 	};
     glm::vec3 corners[8];
+    glm::vec3 cornerNormals[8];
     glm::vec3 center = glm::vec3(0, 0, 0);
     for(int i = 0; i < 8; i++) {
         corners[i] = vectorize(&box.corners[i * 3]);
         center += corners[i];
     }
     center *= (1.0/8.0);
-    for (int i = 0; i < 6; i++) {    
+    for(int i = 0; i < 8; i++) {
+        cornerNormals[i] = glm::normalize(corners[i] - center);
+    }
+	for (int i = 0; i < 6; i++) {    
         indices[i * 6 + 0] = 4 * i + 0;
         indices[i * 6 + 1] = 4 * i + 1;
         indices[i * 6 + 2] = 4 * i + 2;
@@ -414,50 +422,18 @@ void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
         glm::vec3 B = corners[faceIndices[i][1]];
         glm::vec3 C = corners[faceIndices[i][2]];
         glm::vec3 D = corners[faceIndices[i][3]];
-        // edges
-        glm::vec3 AB = glm::normalize(B - A);
-        glm::vec3 BC = glm::normalize(C - B);
-        glm::vec3 CD = glm::normalize(D - C);
-        glm::vec3 DA = glm::normalize(A - D);
-        // cross products
-        glm::vec3 crossAB_DA = glm::cross(AB, -DA);
-        glm::vec3 crossBC_AB = glm::cross(BC, -AB);
-        glm::vec3 crossCD_BC = glm::cross(CD, -BC);
-        glm::vec3 crossDA_CD = glm::cross(DA, -CD);
-        // angles
-        float angleA = acos(glm::dot(AB, -DA));
-        float angleB = acos(glm::dot(BC, -AB));
-        float angleC = acos(glm::dot(CD, -BC));
-        float angleD = acos(glm::dot(DA, -CD));
         // curvatures
-        float curvature1 = 1.0; //glm::min(box.curvature[faceEdgeIndices[i][0]], box.curvature[faceEdgeIndices[i][1]]);
-        float curvature2 = 1.0; //glm::min(box.curvature[faceEdgeIndices[i][2]], box.curvature[faceEdgeIndices[i][3]]);
-        
+        float curvature1 = 0.5; //glm::min(box.curvature[faceEdgeIndices[i][0]], box.curvature[faceEdgeIndices[i][1]]);
+        float curvature2 = 0.5; //glm::min(box.curvature[faceEdgeIndices[i][2]], box.curvature[faceEdgeIndices[i][3]]);
         glm::vec3 faceNormal = glm::normalize(glm::cross(A - C, B - D));
-        for(int j = 0; j < 4; j++) {
-            vertices[i * 4 + j].position = corners[faceIndices[i][j]];
-            vertices[i * 4 + j].faceIndex = i;
-            vertices[i * 4 + j].normal = glm::normalize(corners[faceIndices[i][j]] - center);
-        }
-		
 		glm::vec3 flatness1 = (1.0f - abs(curvature1)) * faceNormal;
 		glm::vec3 flatness2 = (1.0f - abs(curvature2)) * faceNormal;
         
-		glm::vec3 edgeNormalAB = (vertices[i * 4].normal + vertices[i * 4 + 1].normal) * 0.5f;
-		glm::vec3 edgeNormalCD = (vertices[i * 4 + 2].normal + vertices[i * 4 + 3].normal) * 0.5f;
-		glm::vec3 edgeNormalBC = (vertices[i * 4 + 1].normal + vertices[i * 4 + 2].normal) * 0.5f;
-		glm::vec3 edgeNormalDA = (vertices[i * 4].normal + vertices[i * 4 + 3].normal) * 0.5f;
-
-		// running visual diagnostic.. not looking good :D I don't know wtf I'm doing obviously.
-		vertices[i * 4].normal = edgeNormalAB;
-		vertices[i * 4 + 1].normal = edgeNormalCD;
-		vertices[i * 4 + 2].normal = edgeNormalBC;
-		vertices[i * 4 + 3].normal = edgeNormalDA;
-        
-		//vertices[i * 4].normal = glm::normalize(flatness1 + edgeNormalAB * curvature1 + flatness2 + edgeNormalDA * curvature2);
-		//vertices[i * 4 + 1].normal = glm::normalize(flatness1 + edgeNormalAB * curvature1 + flatness2 + edgeNormalBC * curvature2);
-		//vertices[i * 4 + 2].normal = glm::normalize(flatness1 + edgeNormalCD * curvature1 + flatness2 + edgeNormalBC * curvature2);
-		//vertices[i * 4 + 3].normal = glm::normalize(flatness1 + edgeNormalCD * curvature1 + flatness2 + edgeNormalDA * curvature2);
+		for(int j = 0; j < 4; j++) {
+            vertices[i * 4 + j].position = corners[faceIndices[i][j]];
+            vertices[i * 4 + j].normal = glm::normalize(cornerNormals[faceIndices[i][j]] * (curvature1 + curvature2) + flatness1 + flatness2);
+            vertices[i * 4 + j].faceIndex = i;
+        }
     }
 
     glGenVertexArrays(1, &VAO);
