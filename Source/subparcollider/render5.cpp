@@ -428,8 +428,8 @@ void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
 			int iminus = faceCornerIndices[i][(j + 3) % 4];
             vertices[i * 4 + j].position = corners[iself];
             vertices[i * 4 + j].faceIndex = i;
-			float curvature1 = 1.0f;//box.curvature[i * 2 + (j % 2)];
-			float curvature2 = 1.0f;//box.curvature[i * 2 + ((j + 1) % 2)];
+			float curvature1 = box.curvature[i * 2 + (j % 2)];
+			float curvature2 = box.curvature[i * 2 + ((j + 1) % 2)];
 			float factor = 2.0f / (abs(curvature1) + abs(curvature2) + 1.0f);
 			curvature1 *= factor;
 			curvature2 *= factor;
@@ -687,7 +687,14 @@ void *rendererThread(void *arg) {
 
         if(sharedData.numSpheres >= 5) {
             glUseProgram(boxoidProgram);
-            
+        
+		// right - bottom rear - left -- left - top rear - right // rear plate
+        // left - bottom front - right -- right top front - left // front plate
+        // left - bottom rear - right -- right bottom front left // bottom plate
+        // right top rear left -- left top front right		   // top plate
+        // right bottom rear - top -- right top front - bottom   // right plate
+        // left bottom rear - front -- left top front - rear	   // left plate
+     
             glm::vec3 center = glm::vec3(sharedData.spheres[5].position[0], sharedData.spheres[5].position[1], sharedData.spheres[5].position[2]);
             /*Boxoid box = {
                 {2.5, -1.8, 1.0,
@@ -714,10 +721,10 @@ void *rendererThread(void *arg) {
                 -2.5, 1.8, 1.0, // left top rear
                 2.5, 1.8, -1.3, // right top front
                 -2.5, 1.8, -1.3}, // left top front
-                {0.0, 1.0,
-                1.0, 0.0,
+                {0.0, 0.0,
+                0.0, 0.0,
                 0.0, 1.0,
-                1.0, 0.0,
+                0.0, 1.0,
                 0.0, 1.0,
                 1.0, 0.0},
                 4, 0};
