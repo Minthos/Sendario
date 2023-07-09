@@ -261,18 +261,19 @@ void main()
     vec3 radiance = vec3(0.0, 0.0, 0.0);
     if (discriminant < 0.0 || b > 0.0)
     {
+        fragColor = vec4(abs(fragNormal), 1.0);
         //fragColor = vec4(0.0, 1.0, 0.0, 0.1); 
         //fragColor = vec4(fragPos, 0.25);
-        switch(fragIndex)
-        {
-            case 0: fragColor = vec4(1.0, 0.0, 0.0, 1.0); break;
-            case 1: fragColor = vec4(0.0, 1.0, 0.0, 1.0); break;
-            case 2: fragColor = vec4(0.0, 0.0, 1.0, 1.0); break;
-            case 3: fragColor = vec4(1.0, 1.0, 0.0, 1.0); break;
-            case 4: fragColor = vec4(1.0, 0.0, 1.0, 1.0); break;
-            case 5: fragColor = vec4(0.0, 1.0, 1.0, 1.0); break;
-            default: fragColor = vec4(1.0); // white
-        }
+        //switch(fragIndex)
+        //{
+        //    case 0: fragColor = vec4(1.0, 0.0, 0.0, 1.0); break;
+        //    case 1: fragColor = vec4(0.0, 1.0, 0.0, 1.0); break;
+        //    case 2: fragColor = vec4(0.0, 0.0, 1.0, 1.0); break;
+        //    case 3: fragColor = vec4(1.0, 1.0, 0.0, 1.0); break;
+        //    case 4: fragColor = vec4(1.0, 0.0, 1.0, 1.0); break;
+        //    case 5: fragColor = vec4(0.0, 1.0, 1.0, 1.0); break;
+        //    default: fragColor = vec4(1.0); // white
+        //}
     }
     else
     {
@@ -303,6 +304,10 @@ void main()
 }
 
 )glsl";
+
+glm::vec3 vectorize(float in[3]) {
+    return glm::vec3(in[0], in[1], in[2]);
+}
 
 void checkShader(GLenum status_enum, GLuint shader) {
     GLint success = 1;
@@ -363,20 +368,11 @@ void calculateFaceNormals(glm::vec3 vertices[8], glm::vec3 normals[6]) {
         {0, 4, 2},
         {1, 3, 5}
     };
-    for (int i = 0; i < 6; i++) {
-        glm::vec3 A = vertices[faceIndices[i][0]];
-        glm::vec3 B = vertices[faceIndices[i][1]];
-        glm::vec3 C = vertices[faceIndices[i][2]];
-        glm::vec3 edge1 = B - A;
-        glm::vec3 edge2 = C - A;
-        normals[i] = glm::normalize(glm::cross(edge1, edge2));
-    }
 }
 
-void setupCube(glm::vec3 cubeVertices[8], GLuint& VAO, GLuint& VBO, GLuint& EBO) {
+void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
     Vertex vertices[24];
     GLuint indices[36];
-    glm::vec3 normals[6];
     GLuint faceIndices[6][4] = {
         {0, 1, 5, 4},
         {3, 2, 6, 7},
@@ -385,14 +381,12 @@ void setupCube(glm::vec3 cubeVertices[8], GLuint& VAO, GLuint& VBO, GLuint& EBO)
         {0, 4, 6, 2},
         {1, 3, 7, 5}
     };
-    calculateFaceNormals(cubeVertices, normals);
-    for(int i = 0; i < 6; i++) {
-        for(int j = 0; j < 4; j++) {
-            Vertex vertex;
-            vertex.position = cubeVertices[faceIndices[i][j]];
-            vertex.normal = normals[i];
-            vertex.faceIndex = i;
-            vertices[i * 4 + j] = vertex;
+	for (int i = 0; i < 6; i++) {
+		for(int j = 0; j < 4; j++) {
+            vertices[i * 4 + j].position = glm::vec3(box.corners[faceIndices[i][j] * 3],
+								box.corners[faceIndices[i][j] * 3 + 1],
+								box.corners[faceIndices[i][j] * 3 + 2]);
+            vertices[i * 4 + j].faceIndex = i;
         }
         indices[i * 6 + 0] = 4 * i + 0;
         indices[i * 6 + 1] = 4 * i + 1;
@@ -400,7 +394,45 @@ void setupCube(glm::vec3 cubeVertices[8], GLuint& VAO, GLuint& VBO, GLuint& EBO)
         indices[i * 6 + 3] = 4 * i + 0;
         indices[i * 6 + 4] = 4 * i + 2;
         indices[i * 6 + 5] = 4 * i + 3;
-    }
+		// corners
+		glm::vec3 A = glm::vec3(box.corners[faceIndices[i][0] * 3],
+								box.corners[faceIndices[i][0] * 3 + 1],
+								box.corners[faceIndices[i][0] * 3 + 2]);
+		glm::vec3 B = glm::vec3(box.corners[faceIndices[i][1] * 3],
+								box.corners[faceIndices[i][1] * 3 + 1],
+								box.corners[faceIndices[i][1] * 3 + 2]);
+		glm::vec3 C = glm::vec3(box.corners[faceIndices[i][2] * 3],
+								box.corners[faceIndices[i][2] * 3 + 1],
+								box.corners[faceIndices[i][2] * 3 + 2]);
+		glm::vec3 D = glm::vec3(box.corners[faceIndices[i][3] * 3],
+								box.corners[faceIndices[i][3] * 3 + 1],
+								box.corners[faceIndices[i][3] * 3 + 2]);
+		// edges
+		glm::vec3 AB = glm::normalize(B - A);
+		glm::vec3 BC = glm::normalize(C - B);
+		glm::vec3 CD = glm::normalize(D - C);
+		glm::vec3 DA = glm::normalize(A - D);
+		// cross products
+		glm::vec3 crossAB_DA = glm::cross(AB, -DA);
+		glm::vec3 crossBC_AB = glm::cross(BC, -AB);
+		glm::vec3 crossCD_BC = glm::cross(CD, -BC);
+		glm::vec3 crossDA_CD = glm::cross(DA, -CD);
+		// angles
+		float angleA = acos(glm::dot(AB, -DA));
+		float angleB = acos(glm::dot(BC, -AB));
+		float angleC = acos(glm::dot(CD, -BC));
+		float angleD = acos(glm::dot(DA, -CD));
+		// curvatures
+		float curvature1 = box.curvature[i * 2];  // curvature for AB-CD direction
+		float curvature2 = box.curvature[i * 2 + 1];  // curvature for BC-DA direction
+		float flatness1 = 1.0f - curvature1;
+		float flatness2 = 1.0f - curvature2;
+		// calculate normals for all four corners at once
+		vertices[i * 4].normal = glm::normalize((crossAB_DA / angleA) * flatness1 + (crossBC_AB / angleB));
+		vertices[i * 4 + 1].normal = glm::normalize((crossBC_AB / angleB) * flatness1 + (crossCD_BC / angleC));
+		vertices[i * 4 + 2].normal = glm::normalize((crossCD_BC / angleC) * flatness1 + (crossDA_CD / angleD));
+		vertices[i * 4 + 3].normal = glm::normalize((crossDA_CD / angleD) * flatness1 + (crossAB_DA / angleA));
+	}
     glGenVertexArrays(1, &VAO);
     glBindVertexArray(VAO);
     glGenBuffers(1, &VBO);
@@ -643,40 +675,43 @@ void *rendererThread(void *arg) {
             }
         }
 
-        if(sharedData.numSpheres >= 5) {	
+        if(sharedData.numSpheres >= 5) {
             glUseProgram(boxoidProgram);
             
             glm::vec3 center = glm::vec3(sharedData.spheres[5].position[0], sharedData.spheres[5].position[1], sharedData.spheres[5].position[2]);
-            glm::vec3 boxoidVerts[8] = {
-                glm::vec3(2.5, -0.8, 1.0),
-                glm::vec3(-2.5, -0.8, 1.0),
-                glm::vec3(2.5, -0.8, 0.3),
-                glm::vec3(-2.5, -0.8, 0.3),
-                glm::vec3(2.5, 0.8, 1.0),
-                glm::vec3(-2.5, 0.8, 1.0),
-                glm::vec3(2.5, 0.8, 0.3),
-                glm::vec3(-2.5, 0.8, 0.3)
-            };
-            glm::vec3 sum(0.0f);
+            Boxoid box = {
+				{2.5, -0.8, 1.0,
+                -2.5, -0.8, 1.0,
+                2.5, -0.8, 0.3,
+                -2.5, -0.8, 0.3,
+                2.5, 0.8, 1.0,
+                -2.5, 0.8, 1.0,
+                2.5, 0.8, 0.3,
+                -2.5, 0.8, 0.3},
+				{0.5, 0.5,
+				0.5, 0.5,
+				0.5, 0.5,
+				0.5, 0.5,
+				0.5, 0.5,
+				0.5, 0.5},
+				4, 0};
             for (int i = 0; i < 8; i++) {
-                boxoidVerts[i] += center;
-                sum += boxoidVerts[i];
+				box.corners[i * 3] += center.x;
+				box.corners[i * 3 + 1] += center.y;
+				box.corners[i * 3 + 2] += center.z;
             }
-            //glm::vec3 center = sum / 8.0f;
             model = glm::translate(glm::mat4(1.0f), center);
             glBindVertexArray(0);
-            setupCube(boxoidVerts, boxoidVAO, boxoidVBO, boxoidEBO);
+            setupBoxoid(box, boxoidVAO, boxoidVBO, boxoidEBO);
             
             // translate our model view to position the sphere in world space
             model = glm::translate(glm::mat4(1.0f), glm::vec3());
             glUniformMatrix4fv(boxoidModelLoc, 1, GL_FALSE, glm::value_ptr(model));
             glUniform3f(boxoidCenterLoc, center[0], center[1], center[2]);
                
-            material boxMat = {{1},{0}};
-            glm::vec3 diffuseComponent = glm::vec3(boxMat.diffuse[0], boxMat.diffuse[1], boxMat.diffuse[2]); // 0 to 1
-            glm::vec3 emissiveComponent = glm::vec3(boxMat.emissive[0], boxMat.emissive[1], boxMat.emissive[2]); // W/m^2
+            glm::vec3 diffuseComponent = vectorize(sharedData.renderMisc.materials[box.material_idx].diffuse);
+            glm::vec3 emissiveComponent = vectorize(sharedData.renderMisc.materials[box.material_idx].emissive);
 
-            // colors looked washed out so I did a thing. not quite vibrance so I'll call it vibe. texture saturation? but we don't have textures.
             float vibe = 3.0;
             diffuseComponent = glm::vec3(std::pow(diffuseComponent.r, vibe), std::pow(diffuseComponent.g, vibe), std::pow(diffuseComponent.b, vibe));
             glUniform3fv(diffuseLoc, 1, glm::value_ptr(diffuseComponent));
