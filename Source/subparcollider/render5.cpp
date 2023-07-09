@@ -379,26 +379,27 @@ struct Vertex {
 glm::vec3 vlerp(glm::vec3 a, glm::vec3 b, float f) {
     return (a * f) + (b * (1.0f - f));
 }
-
+/*      corners
+	{2.5, -1.8, 1.0, // right bottom rear
+	-2.5, -1.8, 1.0, // left bottom rear
+	2.5, -1.8, -1.3, // right bottom front
+	-2.5, -1.8, -1.3, // left bottom front
+	2.5, 1.8, 1.0, // right top rear
+	-2.5, 1.8, 1.0, // left top rear
+	2.5, 1.8, -1.3, // right top front
+	-2.5, 1.8, -1.3}, // left top front
+*/
 void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
     Vertex vertices[24];
     GLuint indices[36];
     GLuint faceCornerIndices[6][4] = {
-        {0, 1, 5, 4}, // left
-        {3, 2, 6, 7}, // right
-        {1, 0, 2, 3}, // bottom
-        {4, 5, 7, 6}, // top
-        {0, 4, 6, 2}, // front
-        {1, 3, 7, 5}  // back
+        {0, 1, 5, 4}, // right - bottom rear - left -- left - top rear - right // rear plate
+        {3, 2, 6, 7}, // left - bottom front - right -- right top front - left // front plate
+        {1, 0, 2, 3}, // left - bottom rear - right -- right bottom front left // bottom plate
+        {4, 5, 7, 6}, // right top rear left -- left top front right		   // top plate
+        {0, 4, 6, 2}, // right bottom rear - top -- right top front - bottom   // right plate
+        {1, 3, 7, 5}  // left bottom rear - front -- left top front - rear	   // left plate
     };
-	GLuint faceEdgeIndices[6][4] = {
-        {0, 1, 8, 10},
-        {2, 3, 9, 11},
-        {4, 5, 8, 9},
-        {6, 7, 10, 11},
-        {0, 2, 4, 6},
-        {1, 3, 5, 7},
-	};
     glm::vec3 corners[8];
     glm::vec3 cornerNormals[8];
     glm::vec3 center = glm::vec3(0, 0, 0);
@@ -410,7 +411,6 @@ void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
     for(int i = 0; i < 8; i++) {
         cornerNormals[i] = glm::normalize(corners[i] - center);
     }
-
     for (int i = 0; i < 6; i++) {
         indices[i * 6 + 0] = 4 * i + 0;
         indices[i * 6 + 1] = 4 * i + 1;
@@ -418,53 +418,27 @@ void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
         indices[i * 6 + 3] = 4 * i + 0;
         indices[i * 6 + 4] = 4 * i + 2;
         indices[i * 6 + 5] = 4 * i + 3;
-        // corners
-        glm::vec3 A = corners[faceCornerIndices[i][0]];
-        glm::vec3 B = corners[faceCornerIndices[i][1]];
-        glm::vec3 C = corners[faceCornerIndices[i][2]];
-        glm::vec3 D = corners[faceCornerIndices[i][3]];
-        // curvatures
         float time = static_cast<float>(glfwGetTime());
-
-        //float curvature1 = 1.0 - glm::max(0.0f, sin(time)); //glm::min(box.curvature[faceEdgeIndices[i][0]], box.curvature[faceEdgeIndices[i][1]]);
-        //float curvature2 = 1.0 - glm::max(0.0f, -sin(time)); //glm::min(box.curvature[faceEdgeIndices[i][2]], box.curvature[faceEdgeIndices[i][3]]);
-        //curvature1 = 0.0f;
-        //float flatness1 = 1.0f - curvature1;
-        //float flatness2 = 1.0f - curvature2;
-
-        int a = faceCornerIndices[i][0];
-        int b = faceCornerIndices[i][1];
-        int c = faceCornerIndices[i][2];
-        int d = faceCornerIndices[i][3];
-        
-		// TODO NEW: Face normal is 0 curvature. Corner centernormal is 1 curvature. Edge vectors normalized are toward positive curvature.
-        glm::vec3 faceNormal = glm::normalize(glm::cross(A - C, A - B));
-
+        glm::vec3 faceNormal = glm::normalize(glm::cross(
+					corners[faceCornerIndices[i][0]] - corners[faceCornerIndices[i][2]],
+					corners[faceCornerIndices[i][1]] - corners[faceCornerIndices[i][3]]));
         for(int j = 0; j < 4; j++) {
 			int iself = faceCornerIndices[i][j];
 			int iplus = faceCornerIndices[i][(j + 1) % 4];
 			int iminus = faceCornerIndices[i][(j + 3) % 4];
             vertices[i * 4 + j].position = corners[iself];
             vertices[i * 4 + j].faceIndex = i;
-
-			// ok, so time to get the curvature values?
-			float curvature1 = box.curvature[faceEdgeIndices[i][j]];
-			float curvature2 = box.curvature[faceEdgeIndices[i][(j+1) % 4]];
+			float curvature1 = box.curvature[i * 2 + (j % 2)];
+			float curvature2 = box.curvature[i * 2 + ((j + 1) % 2)];
 			float flatness1 = 1.0f - curvature1;
 			float flatness2 = 1.0f - curvature2;
-
             glm::vec3 edgeU = glm::normalize(corners[iself] - corners[iminus]);
             glm::vec3 edgeV = glm::normalize(corners[iself] - corners[iplus]);
-			glm::vec3 component1 = edgeU * curvature1 + faceNormal * flatness1;
-			glm::vec3 component2 = edgeV * curvature2 + faceNormal * flatness2;
-			vertices[iself].normal = 0.5f * (component1 + component2);
+			glm::vec3 component1 = edgeV * 0.5f * curvature1 + faceNormal * flatness1;
+			glm::vec3 component2 = edgeU * 0.5f * curvature2 + faceNormal * flatness2;
+			vertices[i * 4 + j].normal = glm::normalize(component1 + component2);
+			//vertices[i * 4 + j].normal = faceNormal;
         }
-
-        // OLDTODO: make one for each corner
-        //vertices[i * 4 + j].normal = glm::normalize(
-        //                                cornerNormals[iself] * (curvature1 + curvature2)
-        //                                + cornerNormals[iplus] * flatness1
-        //                                + cornerNormals[iminus] * flatness2);
     }
 
     glGenVertexArrays(1, &VAO);
@@ -730,14 +704,14 @@ void *rendererThread(void *arg) {
                 1.0, 1.0},
                 4, 0};
 			/*Boxoid box = {
-                {2.5, -1.8, 1.0,
-                -2.5, -1.8, 1.0,
-                2.5, -1.8, -1.3,
-                -2.5, -1.8, -1.3,
-                2.5, 1.8, 1.0,
-                -2.5, 1.8, 1.0,
-                2.5, 1.8, -1.3,
-                -2.5, 1.8, -1.3},
+                {2.5, -1.8, 1.0, // right bottom rear
+                -2.5, -1.8, 1.0, // left bottom rear
+                2.5, -1.8, -1.3, // right bottom front
+                -2.5, -1.8, -1.3, // left bottom front
+                2.5, 1.8, 1.0, // right top rear
+                -2.5, 1.8, 1.0, // left top rear
+                2.5, 1.8, -1.3, // right top front
+                -2.5, 1.8, -1.3}, // left top front
                 {1.0, 1.0,
                 0.0, 0.0,
                 1.0, 1.0,
