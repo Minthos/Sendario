@@ -261,7 +261,7 @@ void main()
     vec3 radiance = vec3(0.0, 0.0, 0.0);
     if (discriminant < 0.0 || b > 0.0)
     {
-        fragColor = vec4(abs(fragNormal), 1.0);
+        fragColor = vec4(fragNormal, 1.0);
         //fragColor = vec4(0.0, 1.0, 0.0, 0.1); 
         //fragColor = vec4(fragPos, 0.25);
         //switch(fragIndex)
@@ -359,28 +359,42 @@ struct Vertex {
     int faceIndex;
 };
 
-void calculateFaceNormals(glm::vec3 vertices[8], glm::vec3 normals[6]) {
-    GLuint faceIndices[6][3] = {
-        {0, 1, 4},
-        {3, 2, 7},
-        {1, 0, 3},
-        {4, 5, 6},
-        {0, 4, 2},
-        {1, 3, 5}
-    };
-}
+// edges
+// -- vertical
+// 0 left front corner
+// 1 left back corner
+// 2 right front corner
+// 3 right back corner
+// -- transverse
+// 4 bottom front
+// 5 bottom back
+// 6 top front
+// 7 top back
+// -- inline
+// 8 bottom left
+// 9 bottom right
+// 10 top left
+// 11 top right
 
 void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
     Vertex vertices[24];
     GLuint indices[36];
     GLuint faceIndices[6][4] = {
-        {0, 1, 5, 4},
-        {3, 2, 6, 7},
-        {1, 0, 2, 3},
-        {4, 5, 7, 6},
-        {0, 4, 6, 2},
-        {1, 3, 7, 5}
+        {0, 1, 5, 4}, // left
+        {3, 2, 6, 7}, // right
+        {1, 0, 2, 3}, // bottom
+        {4, 5, 7, 6}, // top
+        {0, 4, 6, 2}, // front
+        {1, 3, 7, 5}  // back
     };
+	GLuint faceEdgeIndices[6][4] = {
+        {0, 1, 8, 10},
+        {2, 3, 9, 11},
+        {4, 5, 8, 9},
+        {6, 7, 10, 11},
+        {0, 2, 4, 6},
+        {1, 3, 5, 7},
+	};
     glm::vec3 corners[8];
     glm::vec3 center = glm::vec3(0, 0, 0);
     for(int i = 0; i < 8; i++) {
@@ -416,8 +430,8 @@ void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
         float angleC = acos(glm::dot(CD, -BC));
         float angleD = acos(glm::dot(DA, -CD));
         // curvatures
-        float curvature1 = box.curvature[i * 2];  // curvature for AB-CD direction
-        float curvature2 = box.curvature[i * 2 + 1];  // curvature for BC-DA direction
+        float curvature1 = 1.0; //glm::min(box.curvature[faceEdgeIndices[i][0]], box.curvature[faceEdgeIndices[i][1]]);
+        float curvature2 = 1.0; //glm::min(box.curvature[faceEdgeIndices[i][2]], box.curvature[faceEdgeIndices[i][3]]);
         
         glm::vec3 faceNormal = glm::normalize(glm::cross(A - C, B - D));
         for(int j = 0; j < 4; j++) {
@@ -425,6 +439,25 @@ void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
             vertices[i * 4 + j].faceIndex = i;
             vertices[i * 4 + j].normal = glm::normalize(corners[faceIndices[i][j]] - center);
         }
+		
+		glm::vec3 flatness1 = (1.0f - abs(curvature1)) * faceNormal;
+		glm::vec3 flatness2 = (1.0f - abs(curvature2)) * faceNormal;
+        
+		glm::vec3 edgeNormalAB = (vertices[i * 4].normal + vertices[i * 4 + 1].normal) * 0.5f;
+		glm::vec3 edgeNormalCD = (vertices[i * 4 + 2].normal + vertices[i * 4 + 3].normal) * 0.5f;
+		glm::vec3 edgeNormalBC = (vertices[i * 4 + 1].normal + vertices[i * 4 + 2].normal) * 0.5f;
+		glm::vec3 edgeNormalDA = (vertices[i * 4].normal + vertices[i * 4 + 3].normal) * 0.5f;
+
+		// running visual diagnostic.. not looking good :D I don't know wtf I'm doing obviously.
+		vertices[i * 4].normal = edgeNormalAB;
+		vertices[i * 4 + 1].normal = edgeNormalCD;
+		vertices[i * 4 + 2].normal = edgeNormalBC;
+		vertices[i * 4 + 3].normal = edgeNormalDA;
+        
+		//vertices[i * 4].normal = glm::normalize(flatness1 + edgeNormalAB * curvature1 + flatness2 + edgeNormalDA * curvature2);
+		//vertices[i * 4 + 1].normal = glm::normalize(flatness1 + edgeNormalAB * curvature1 + flatness2 + edgeNormalBC * curvature2);
+		//vertices[i * 4 + 2].normal = glm::normalize(flatness1 + edgeNormalCD * curvature1 + flatness2 + edgeNormalBC * curvature2);
+		//vertices[i * 4 + 3].normal = glm::normalize(flatness1 + edgeNormalCD * curvature1 + flatness2 + edgeNormalDA * curvature2);
     }
 
     glGenVertexArrays(1, &VAO);
@@ -566,7 +599,7 @@ void *rendererThread(void *arg) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_CULL_FACE);
-    glm::mat4 projection = glm::perspective(glm::radians(90.0f), (float)screenWidth / (float)screenHeight, 1.0f, 1e12f);
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenWidth / (float)screenHeight, 1.0f, 1e12f);
     glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 0.0f);
     glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
     glm::vec3 cameraUp = glm::vec3(1.0f, 0.0f, 0.0f);
@@ -682,12 +715,12 @@ void *rendererThread(void *arg) {
                 -2.5, 0.8, 1.0,
                 2.5, 0.8, 0.3,
                 -2.5, 0.8, 0.3},
-                {0.5, 0.5,
-                0.5, 0.5,
-                0.5, 0.5,
-                0.5, 0.5,
-                0.5, 0.5,
-                0.5, 0.5},
+                {1.0, 1.0,
+                0.0, 0.0,
+                1.0, 1.0,
+                0.0, 0.0,
+                1.0, 1.0,
+                0.0, 0.0},
                 4, 0};
             for (int i = 0; i < 8; i++) {
                 box.corners[i * 3] += center.x;
