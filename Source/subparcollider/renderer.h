@@ -19,7 +19,8 @@ typedef enum {
 
 typedef struct {
     float corners[3 * 8];
-    float curvature[12]; // modify the roundness of each edge. if two edges on opposite sides of a face are rounded, the face inherits the roundness of the edge value that's closest to 0, along the axis defined by those edges. setting all 12 edges to 1 gives a spheroid shape. all to 0 gives a box shape. negative values gives a kiki shape. this way we can produce cylinders, capsules, cones and weird custom shapes.
+    float curvature[12]; // the curvature of each face in two axes per face. setting all 12 curvatures to 1 gives a spheroid shape.
+// all to 0 gives a box shape. negative values gives a kiki shape. this way we can produce cylinders, capsules, cones and weird custom shapes.
     int material_idx; // placeholder
     unsigned int missing_faces; // bit field specifying which faces to omit from rendering. could have been unsigned char, but padding is nice.
 } Boxoid;

@@ -202,6 +202,7 @@ layout (location = 0) in vec3 position;
 layout (location = 1) in vec3 normal;
 layout (location = 2) in int faceIndex;
 
+uniform mat4 rotation;
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
@@ -213,11 +214,11 @@ flat out int fragIndex;
 
 void main()
 {
-    fragPos = vec3(model * vec4(position, 1.0)); // transform vertex from object space to world space
+    fragPos = vec3(model * rotation * vec4(position, 1.0)); // transform vertex from object space to world space
+    fragNormal = vec3(rotation * vec4(normal, 1.0));
     vec4 posClip = projection * view * vec4(fragPos, 1.0); // transform vertex from world space to clip space
     vertexPosClip = posClip;  // Pass the clip space position to the fragment shader
     gl_Position = posClip;
-    fragNormal = normal;
     fragIndex = faceIndex;
 }
 )glsl";
@@ -251,52 +252,21 @@ out vec4 fragColor;
 
 void main()
 {
-//    vec4 boxoidCenterCamera = view * vec4(boxoidCenter, 1.0);
-    vec3 ray = normalize(fragPos - cameraPos);
-    vec3 sphereToCamera = cameraPos - boxoidCenter;
-    float b = dot(ray, sphereToCamera);
-    //float c = dot(sphereToCamera, sphereToCamera) - sphereRadius * sphereRadius;
-    float c = dot(sphereToCamera, sphereToCamera) - 1;
-    float discriminant = b * b - c;
-    vec3 radiance = vec3(0.0, 0.0, 0.0);
-    if (discriminant < 0.0 || b > 0.0)
-    {
-        fragColor = vec4(fragNormal, 1.0);
-        //fragColor = vec4(0.0, 1.0, 0.0, 0.1); 
-        //fragColor = vec4(fragPos, 0.25);
-        //switch(fragIndex)
-        //{
-        //    case 0: fragColor = vec4(1.0, 0.0, 0.0, 1.0); break;
-        //    case 1: fragColor = vec4(0.0, 1.0, 0.0, 1.0); break;
-        //    case 2: fragColor = vec4(0.0, 0.0, 1.0, 1.0); break;
-        //    case 3: fragColor = vec4(1.0, 1.0, 0.0, 1.0); break;
-        //    case 4: fragColor = vec4(1.0, 0.0, 1.0, 1.0); break;
-        //    case 5: fragColor = vec4(0.0, 1.0, 1.0, 1.0); break;
-        //    default: fragColor = vec4(1.0); // white
-        //}
-    }
-    else
-    {
-        float t = -b - sqrt(discriminant);
-        vec3 intersectionPos = cameraPos + ray * t;
-        vec3 surfaceNormal = normalize(intersectionPos - boxoidCenter);
-        vec3 accumulatedLight = vec3(0.0, 0.0, 0.0);
-        for (int i = 0; i < MAX_LIGHTS; ++i) {
-            vec3 lightVector = lightPositions[i] - fragPos;
-            float squaredDistance = dot(lightVector, lightVector);
-            vec3 lightDirection = lightVector / sqrt(squaredDistance);
-            float attenuation = 1.0 / squaredDistance;
-            float lambertian = max(dot(surfaceNormal, lightDirection), 0.0);
-            accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
-        }
-        // divide materialEmissive by 4 pi
-        radiance = materialEmissive * 0.079577 + accumulatedLight;        
-        // tone mapping radiance to the 0,1 range by dividing by total brightness. darkness is the inverse of brightness.
-        float darkness = 3.0 / (3.0 + exposure + radiance.r + radiance.g + radiance.b);
-        radiance = radiance * darkness;
-        // gamma correction
-        fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
-    }
+	vec3 accumulatedLight = vec3(0.0, 0.0, 0.0);
+	for (int i = 0; i < MAX_LIGHTS; ++i) {
+		vec3 lightVector = lightPositions[i] - fragPos;
+		float squaredDistance = dot(lightVector, lightVector);
+		vec3 lightDirection = lightVector / sqrt(squaredDistance);
+		float attenuation = 1.0 / squaredDistance;
+		float lambertian = max(dot(fragNormal, lightDirection), 0.0);
+		//accumulatedLight += attenuation * vec3(1) * lightColors[i] * lambertian;
+		accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
+	}
+	vec3 radiance = materialEmissive * 0.079577 + accumulatedLight;        
+	//vec3 radiance = vec3(500, 500, 0) * 0.079577 + accumulatedLight;        
+	float darkness = 3.0 / (3.0 + exposure + radiance.r + radiance.g + radiance.b);
+	radiance = radiance * darkness;
+	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
     const float constantForDepth = 1.0;
     const float farDistance = 3e18;
     const float offsetForDepth = 1.0;
@@ -359,35 +329,18 @@ struct Vertex {
     int faceIndex;
 };
 
-// edges
-// -- vertical
-// 0 left front corner
-// 1 left back corner
-// 2 right front corner
-// 3 right back corner
-// -- transverse
-// 4 bottom front
-// 5 bottom back
-// 6 top front
-// 7 top back
-// -- inline
-// 8 bottom left
-// 9 bottom right
-// 10 top left
-// 11 top right
-
 glm::vec3 vlerp(glm::vec3 a, glm::vec3 b, float f) {
     return (a * f) + (b * (1.0f - f));
 }
 /*      corners
-	{2.5, -1.8, 1.0, // right bottom rear
-	-2.5, -1.8, 1.0, // left bottom rear
-	2.5, -1.8, -1.3, // right bottom front
-	-2.5, -1.8, -1.3, // left bottom front
-	2.5, 1.8, 1.0, // right top rear
-	-2.5, 1.8, 1.0, // left top rear
-	2.5, 1.8, -1.3, // right top front
-	-2.5, 1.8, -1.3}, // left top front
+    {2.5, -1.8, 1.0, // right bottom rear
+    -2.5, -1.8, 1.0, // left bottom rear
+    2.5, -1.8, -1.3, // right bottom front
+    -2.5, -1.8, -1.3, // left bottom front
+    2.5, 1.8, 1.0, // right top rear
+    -2.5, 1.8, 1.0, // left top rear
+    2.5, 1.8, -1.3, // right top front
+    -2.5, 1.8, -1.3}, // left top front
 */
 void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
     Vertex vertices[24];
@@ -396,9 +349,9 @@ void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
         {0, 1, 5, 4}, // right - bottom rear - left -- left - top rear - right // rear plate
         {3, 2, 6, 7}, // left - bottom front - right -- right top front - left // front plate
         {1, 0, 2, 3}, // left - bottom rear - right -- right bottom front left // bottom plate
-        {4, 5, 7, 6}, // right top rear left -- left top front right		   // top plate
+        {4, 5, 7, 6}, // right top rear left -- left top front right           // top plate
         {0, 4, 6, 2}, // right bottom rear - top -- right top front - bottom   // right plate
-        {1, 3, 7, 5}  // left bottom rear - front -- left top front - rear	   // left plate
+        {5, 1, 3, 7}  // left top rear - left bottom rear - left front rear - left top front       // left plate
     };
     glm::vec3 corners[8];
     glm::vec3 cornerNormals[8];
@@ -420,26 +373,26 @@ void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
         indices[i * 6 + 5] = 4 * i + 3;
         float time = static_cast<float>(glfwGetTime());
         glm::vec3 faceNormal = glm::normalize(glm::cross(
-					corners[faceCornerIndices[i][2]] - corners[faceCornerIndices[i][0]],
-					corners[faceCornerIndices[i][1]] - corners[faceCornerIndices[i][3]]));
+                    corners[faceCornerIndices[i][2]] - corners[faceCornerIndices[i][0]],
+                    corners[faceCornerIndices[i][1]] - corners[faceCornerIndices[i][3]]));
         for(int j = 0; j < 4; j++) {
-			int iself = faceCornerIndices[i][j];
-			int iplus = faceCornerIndices[i][(j + 1) % 4];
-			int iminus = faceCornerIndices[i][(j + 3) % 4];
+            int iself = faceCornerIndices[i][j];
+            int iplus = faceCornerIndices[i][(j + 1) % 4];
+            int iminus = faceCornerIndices[i][(j + 3) % 4];
             vertices[i * 4 + j].position = corners[iself];
             vertices[i * 4 + j].faceIndex = i;
-			float curvature1 = box.curvature[i * 2 + (j % 2)];
-			float curvature2 = box.curvature[i * 2 + ((j + 1) % 2)];
-			float factor = 2.0f / (abs(curvature1) + abs(curvature2) + 1.0f);
-			curvature1 *= factor;
-			curvature2 *= factor;
-			float flatness1 = 1.0f - curvature1;
-			float flatness2 = 1.0f - curvature2;
+            float curvature1 = box.curvature[i * 2 + (j % 2)];
+            float curvature2 = box.curvature[i * 2 + ((j + 1) % 2)];
+            float factor = 2.0f / (abs(curvature1) + abs(curvature2) + 1.0f);
+            curvature1 *= factor;
+            curvature2 *= factor;
+            float flatness1 = 1.0f - curvature1;
+            float flatness2 = 1.0f - curvature2;
             glm::vec3 edgeU = glm::normalize(corners[iself] - corners[iminus]);
             glm::vec3 edgeV = glm::normalize(corners[iself] - corners[iplus]);
-			glm::vec3 component1 = edgeU * curvature1 + faceNormal * flatness1;
-			glm::vec3 component2 = edgeV * curvature2 + faceNormal * flatness2;
-			vertices[i * 4 + j].normal = glm::normalize(component1 + component2);
+            glm::vec3 component1 = edgeU * curvature1 + faceNormal * flatness1;
+            glm::vec3 component2 = edgeV * curvature2 + faceNormal * flatness2;
+            vertices[i * 4 + j].normal = glm::normalize(component1 + component2);
         }
     }
 
@@ -556,6 +509,7 @@ void *rendererThread(void *arg) {
     GLuint gammaLoc = glGetUniformLocation(shaderProgram, "gamma");
     GLuint exposureLoc = glGetUniformLocation(shaderProgram, "exposure");
 
+    GLuint boxoidRotationLoc = glGetUniformLocation(boxoidProgram, "rotation");
     GLuint boxoidModelLoc = glGetUniformLocation(boxoidProgram, "model");
     GLuint boxoidViewLoc = glGetUniformLocation(boxoidProgram, "view");
     GLuint boxoidProjLoc = glGetUniformLocation(boxoidProgram, "projection");
@@ -638,7 +592,7 @@ void *rendererThread(void *arg) {
         glUniform1f(boxoidGammaLoc, 2.2f);
         glUniform1f(boxoidExposureLoc, 200.0f);
         for (int i = 0; i < MAX_LIGHTS; ++i) {
-                glUniform3fv(boxoidLightPositionsLoc + i, 1, &sharedData.renderMisc.lights[i].position[0]);
+		    glUniform3fv(boxoidLightPositionsLoc + i, 1, &sharedData.renderMisc.lights[i].position[0]);
             glUniform3fv(boxoidLightColorsLoc + i, 1, &sharedData.renderMisc.lights[i].color[0]);
         }
         
@@ -649,7 +603,7 @@ void *rendererThread(void *arg) {
         glUniform1f(gammaLoc, 2.2f);
         glUniform1f(exposureLoc, 200.0f);
         for (int i = 0; i < MAX_LIGHTS; ++i) {
-                glUniform3fv(lightPositionsLoc + i, 1, &sharedData.renderMisc.lights[i].position[0]);
+            glUniform3fv(lightPositionsLoc + i, 1, &sharedData.renderMisc.lights[i].position[0]);
             glUniform3fv(lightColorsLoc + i, 1, &sharedData.renderMisc.lights[i].color[0]);
         }
 
@@ -687,15 +641,14 @@ void *rendererThread(void *arg) {
 
         if(sharedData.numSpheres >= 5) {
             glUseProgram(boxoidProgram);
-        
-		// right - bottom rear - left -- left - top rear - right // rear plate
+        // right - bottom rear - left -- left - top rear - right // rear plate
         // left - bottom front - right -- right top front - left // front plate
         // left - bottom rear - right -- right bottom front left // bottom plate
-        // right top rear left -- left top front right		   // top plate
+        // right top rear left -- left top front right           // top plate
         // right bottom rear - top -- right top front - bottom   // right plate
-        // left bottom rear - front -- left top front - rear	   // left plate
-     
+        // left bottom rear - front -- left top front - rear     // left plate
             glm::vec3 center = glm::vec3(sharedData.spheres[5].position[0], sharedData.spheres[5].position[1], sharedData.spheres[5].position[2]);
+            // this boxoid is spherical
             /*Boxoid box = {
                 {2.5, -1.8, 1.0,
                 -2.5, -1.8, 1.0,
@@ -711,8 +664,9 @@ void *rendererThread(void *arg) {
                 1.0, 1.0,
                 1.0, 1.0,
                 1.0, 1.0},
-                4, 0};*/
-			Boxoid box = {
+                3, 0};*/
+			// discus shaped right now
+            Boxoid box = {
                 {2.5, -1.8, 1.0, // right bottom rear
                 -2.5, -1.8, 1.0, // left bottom rear
                 2.5, -1.8, -1.3, // right bottom front
@@ -721,24 +675,28 @@ void *rendererThread(void *arg) {
                 -2.5, 1.8, 1.0, // left top rear
                 2.5, 1.8, -1.3, // right top front
                 -2.5, 1.8, -1.3}, // left top front
-                {0.0, 0.0,
-                0.0, 0.0,
-                0.0, 1.0,
-                0.0, 1.0,
-                0.0, 1.0,
+                {0.0, 0.0,// "top" or "bottom" in simulation
+                0.0, 0.0,// "top" or "bottom" in simulation
+                1.0, 0.0,
+                1.0, 0.0,
+                1.0, 0.0,
                 1.0, 0.0},
-                4, 0};
-            for (int i = 0; i < 8; i++) {
-                box.corners[i * 3] += center.x;
-                box.corners[i * 3 + 1] += center.y;
-                box.corners[i * 3 + 2] += center.z;
-            }
-            model = glm::translate(glm::mat4(1.0f), center);
+                3, 0};
+            //for (int i = 0; i < 8; i++) {
+            //    box.corners[i * 3] += center.x;
+            //    box.corners[i * 3 + 1] += center.y;
+            //    box.corners[i * 3 + 2] += center.z;
+            //}
+
+			model = glm::translate(glm::mat4(1.0f), center);
             glBindVertexArray(0);
             setupBoxoid(box, boxoidVAO, boxoidVBO, boxoidEBO);
             
             // translate our model view to position the sphere in world space
-            model = glm::translate(glm::mat4(1.0f), glm::vec3());
+            glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), sin(time), glm::vec3(0.0f, 1.0f, 0.0f));
+            glUniformMatrix4fv(boxoidRotationLoc, 1, GL_FALSE, glm::value_ptr(rotation));
+            // Ohhh snap! model matrix does nothing indeed! because we baked our model translation into the coordinates!
+			//model = glm::translate(glm::mat4(1.0f), glm::vec3());
             glUniformMatrix4fv(boxoidModelLoc, 1, GL_FALSE, glm::value_ptr(model));
             glUniform3f(boxoidCenterLoc, center[0], center[1], center[2]);
                
@@ -747,8 +705,8 @@ void *rendererThread(void *arg) {
 
             float vibe = 3.0;
             diffuseComponent = glm::vec3(std::pow(diffuseComponent.r, vibe), std::pow(diffuseComponent.g, vibe), std::pow(diffuseComponent.b, vibe));
-            glUniform3fv(diffuseLoc, 1, glm::value_ptr(diffuseComponent));
-            glUniform3fv(emissiveLoc, 1, glm::value_ptr(emissiveComponent));
+            glUniform3fv(boxoidDiffuseLoc, 1, glm::value_ptr(diffuseComponent));
+            glUniform3fv(boxoidEmissiveLoc, 1, glm::value_ptr(emissiveComponent));
             glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
         }
         else {
@@ -787,7 +745,6 @@ extern "C" void startRenderer() {
     sharedData.nextNum = 0;
     sharedData.shouldExit = false;
     pthread_mutex_init(&sharedData.mutex, NULL);
-
     // start the rendering thread
     pthread_create(&sharedData.renderer_tid, NULL, rendererThread, &sharedData);
 }
