@@ -140,7 +140,6 @@ out vec4 fragColor;
 
 void main()
 {
-//    vec4 sphereCenterCamera = view * vec4(sphereCenter, 1.0);
     vec3 ray = normalize(fragPos - cameraPos);
     vec3 sphereToCamera = cameraPos - sphereCenter;
     float b = dot(ray, sphereToCamera);
@@ -200,7 +199,8 @@ const char *boxoidVertSource = R"glsl(
 
 layout (location = 0) in vec3 position;
 layout (location = 1) in vec3 normal;
-layout (location = 2) in int faceIndex;
+layout (location = 2) in vec3 faceNormalVert;
+layout (location = 3) in int faceIndex;
 
 uniform mat4 rotation;
 uniform mat4 model;
@@ -210,12 +210,14 @@ uniform mat4 projection;
 out vec3 fragPos;
 out vec3 fragNormal;
 out vec4 vertexPosClip;
+flat out vec3 faceNormal;
 flat out int fragIndex;
 
 void main()
 {
     fragPos = vec3(model * rotation * vec4(position, 1.0)); // transform vertex from object space to world space
     fragNormal = vec3(rotation * vec4(normal, 1.0));
+    faceNormal = vec3(rotation * vec4(faceNormalVert, 1.0));
     vec4 posClip = projection * view * vec4(fragPos, 1.0); // transform vertex from world space to clip space
     vertexPosClip = posClip;  // Pass the clip space position to the fragment shader
     gl_Position = posClip;
@@ -229,6 +231,7 @@ const char *boxoidFragSource = R"glsl(
 in vec3 fragPos;
 in vec3 fragNormal;
 in vec4 vertexPosClip;
+flat in vec3 faceNormal;
 flat in int fragIndex;
 
 struct light {
@@ -252,25 +255,31 @@ out vec4 fragColor;
 
 void main()
 {
-	vec3 accumulatedLight = vec3(0.0, 0.0, 0.0);
-	for (int i = 0; i < MAX_LIGHTS; ++i) {
-		vec3 lightVector = lightPositions[i] - fragPos;
-		float squaredDistance = dot(lightVector, lightVector);
-		vec3 lightDirection = lightVector / sqrt(squaredDistance);
-		float attenuation = 1.0 / squaredDistance;
-		float lambertian = max(dot(fragNormal, lightDirection), 0.0);
-		//accumulatedLight += attenuation * vec3(1) * lightColors[i] * lambertian;
-		accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
+	// figure out if we're inside or outside the boxoid
+	float angle = acos(dot(normalize(fragNormal), normalize(faceNormal)));
+
+	if(abs(angle) > 0.75) {
+		//fragColor = vec4(0);
+		//fragColor = vec4(angle);
+	} else {
+		vec3 accumulatedLight = vec3(0.0, 0.0, 0.0);
+		for (int i = 0; i < MAX_LIGHTS; ++i) {
+			vec3 lightVector = lightPositions[i] - fragPos;
+			float squaredDistance = dot(lightVector, lightVector);
+			vec3 lightDirection = lightVector / sqrt(squaredDistance);
+			float attenuation = 1.0 / squaredDistance;
+			float lambertian = max(dot(fragNormal, lightDirection), 0.0);
+			accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
+		}
+		vec3 radiance = materialEmissive * 0.079577 + accumulatedLight;        
+		float darkness = 3.0 / (3.0 + exposure + radiance.r + radiance.g + radiance.b);
+		radiance = radiance * darkness;
+		fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
 	}
-	vec3 radiance = materialEmissive * 0.079577 + accumulatedLight;        
-	//vec3 radiance = vec3(500, 500, 0) * 0.079577 + accumulatedLight;        
-	float darkness = 3.0 / (3.0 + exposure + radiance.r + radiance.g + radiance.b);
-	radiance = radiance * darkness;
-	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
-    const float constantForDepth = 1.0;
-    const float farDistance = 3e18;
-    const float offsetForDepth = 1.0;
-    gl_FragDepth = (log(constantForDepth * vertexPosClip.z + offsetForDepth) / log(constantForDepth * farDistance + offsetForDepth));
+	const float constantForDepth = 1.0;
+	const float farDistance = 3e18;
+	const float offsetForDepth = 1.0;
+	gl_FragDepth = (log(constantForDepth * vertexPosClip.z + offsetForDepth) / log(constantForDepth * farDistance + offsetForDepth));
 }
 
 )glsl";
@@ -326,6 +335,7 @@ GLuint indices[] = {
 struct Vertex {
     glm::vec3 position;
     glm::vec3 normal;
+    glm::vec3 faceNormalVert;
     int faceIndex;
 };
 
@@ -393,6 +403,7 @@ void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
             glm::vec3 component1 = edgeU * curvature1 + faceNormal * flatness1;
             glm::vec3 component2 = edgeV * curvature2 + faceNormal * flatness2;
             vertices[i * 4 + j].normal = glm::normalize(component1 + component2);
+			vertices[i * 4 + j].faceNormalVert = faceNormal;
         }
     }
 
@@ -408,8 +419,10 @@ void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
     glEnableVertexAttribArray(1);
-    glVertexAttribIPointer(2, 1, GL_INT, sizeof(Vertex), (void*)offsetof(Vertex, faceIndex));
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, faceNormalVert));
     glEnableVertexAttribArray(2);
+    glVertexAttribIPointer(3, 1, GL_INT, sizeof(Vertex), (void*)offsetof(Vertex, faceIndex));
+    glEnableVertexAttribArray(3);
 }
 
 typedef struct {
@@ -694,7 +707,7 @@ void *rendererThread(void *arg) {
             glUniform3f(boxoidCenterLoc, center[0], center[1], center[2]);
             
 			// separate rotation from translation so we can rotate normals in the vertex shader
-			glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), 3.14f * sin(time), glm::vec3(1.0f, 0.0f, 0.0f));
+			glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), 3.14f * sin(time / 10.0f), glm::vec3(1.0f, 0.0f, 0.0f));
             glUniformMatrix4fv(boxoidRotationLoc, 1, GL_FALSE, glm::value_ptr(rotation));
                
             glm::vec3 diffuseComponent = vectorize(sharedData.renderMisc.materials[box->material_idx].diffuse);
