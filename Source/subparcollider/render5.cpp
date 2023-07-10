@@ -349,9 +349,9 @@ void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
         {0, 1, 5, 4}, // right - bottom rear - left -- left - top rear - right // rear plate
         {3, 2, 6, 7}, // left - bottom front - right -- right top front - left // front plate
         {1, 0, 2, 3}, // left - bottom rear - right -- right bottom front left // bottom plate
-        {4, 5, 7, 6}, // right top rear left -- left top front right           // top plate
-        {0, 4, 6, 2}, // right bottom rear - top -- right top front - bottom   // right plate
-        {5, 1, 3, 7}  // left top rear - left bottom rear - left front rear - left top front       // left plate
+        {4, 5, 7, 6}, // right top rear - left -- left top front - right       // top plate
+        {0, 4, 6, 2}, // right bottom rear - top -- top front - bottom         // right plate
+        {5, 1, 3, 7}  // left top rear - bottom rear - front rear - top front  // left plate
     };
     glm::vec3 corners[8];
     glm::vec3 cornerNormals[8];
@@ -649,7 +649,7 @@ void *rendererThread(void *arg) {
         // left bottom rear - front -- left top front - rear     // left plate
             glm::vec3 center = glm::vec3(sharedData.spheres[5].position[0], sharedData.spheres[5].position[1], sharedData.spheres[5].position[2]);
             // this boxoid is spherical
-            /*Boxoid box = {
+            Boxoid sphere = {
                 {2.5, -1.8, 1.0,
                 -2.5, -1.8, 1.0,
                 2.5, -1.8, -1.3,
@@ -664,9 +664,9 @@ void *rendererThread(void *arg) {
                 1.0, 1.0,
                 1.0, 1.0,
                 1.0, 1.0},
-                3, 0};*/
+                3, 0};
 			// discus shaped right now
-            Boxoid box = {
+            Boxoid discus = {
                 {2.5, -1.8, 1.0, // right bottom rear
                 -2.5, -1.8, 1.0, // left bottom rear
                 2.5, -1.8, -1.3, // right bottom front
@@ -682,26 +682,23 @@ void *rendererThread(void *arg) {
                 1.0, 0.0,
                 1.0, 0.0},
                 3, 0};
-            //for (int i = 0; i < 8; i++) {
-            //    box.corners[i * 3] += center.x;
-            //    box.corners[i * 3 + 1] += center.y;
-            //    box.corners[i * 3 + 2] += center.z;
-            //}
 
-			model = glm::translate(glm::mat4(1.0f), center);
+			Boxoid* box = &sphere;
+
             glBindVertexArray(0);
-            setupBoxoid(box, boxoidVAO, boxoidVBO, boxoidEBO);
+            setupBoxoid(*box, boxoidVAO, boxoidVBO, boxoidEBO);
             
             // translate our model view to position the sphere in world space
-            glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), sin(time), glm::vec3(0.0f, 1.0f, 0.0f));
-            glUniformMatrix4fv(boxoidRotationLoc, 1, GL_FALSE, glm::value_ptr(rotation));
-            // Ohhh snap! model matrix does nothing indeed! because we baked our model translation into the coordinates!
-			//model = glm::translate(glm::mat4(1.0f), glm::vec3());
+			model = glm::translate(glm::mat4(1.0f), center);
             glUniformMatrix4fv(boxoidModelLoc, 1, GL_FALSE, glm::value_ptr(model));
             glUniform3f(boxoidCenterLoc, center[0], center[1], center[2]);
+            
+			// separate rotation from translation so we can rotate normals in the vertex shader
+			glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), 3.14f * sin(time), glm::vec3(1.0f, 0.0f, 0.0f));
+            glUniformMatrix4fv(boxoidRotationLoc, 1, GL_FALSE, glm::value_ptr(rotation));
                
-            glm::vec3 diffuseComponent = vectorize(sharedData.renderMisc.materials[box.material_idx].diffuse);
-            glm::vec3 emissiveComponent = vectorize(sharedData.renderMisc.materials[box.material_idx].emissive);
+            glm::vec3 diffuseComponent = vectorize(sharedData.renderMisc.materials[box->material_idx].diffuse);
+            glm::vec3 emissiveComponent = vectorize(sharedData.renderMisc.materials[box->material_idx].emissive);
 
             float vibe = 3.0;
             diffuseComponent = glm::vec3(std::pow(diffuseComponent.r, vibe), std::pow(diffuseComponent.g, vibe), std::pow(diffuseComponent.b, vibe));
