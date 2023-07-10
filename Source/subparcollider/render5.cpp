@@ -258,9 +258,14 @@ void main()
 	// figure out if we're inside or outside the boxoid
 	float angle = acos(dot(normalize(fragNormal), normalize(faceNormal)));
 
-	if(abs(angle) > 0.75) {
+	if(angle > 0.75) {
 		//fragColor = vec4(0);
 		//fragColor = vec4(angle);
+		const float constantForDepth = 1.0;
+		const float farDistance = 3e18;
+		const float offsetForDepth = 1.0;
+		// 1.5 is wrong, should be distance between vertexPosClip.z and z-coord of backplate in clip space plus "epsilon" but I have no idea what epsilon should be
+		gl_FragDepth = (log(constantForDepth * 1.5 * vertexPosClip.z + offsetForDepth) / log(constantForDepth * farDistance + offsetForDepth));
 	} else {
 		vec3 accumulatedLight = vec3(0.0, 0.0, 0.0);
 		for (int i = 0; i < MAX_LIGHTS; ++i) {
@@ -275,14 +280,28 @@ void main()
 		float darkness = 3.0 / (3.0 + exposure + radiance.r + radiance.g + radiance.b);
 		radiance = radiance * darkness;
 		fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
+		const float constantForDepth = 1.0;
+		const float farDistance = 3e18;
+		const float offsetForDepth = 1.0;
+		gl_FragDepth = (log(constantForDepth * vertexPosClip.z + offsetForDepth) / log(constantForDepth * farDistance + offsetForDepth));
 	}
-	const float constantForDepth = 1.0;
-	const float farDistance = 3e18;
-	const float offsetForDepth = 1.0;
-	gl_FragDepth = (log(constantForDepth * vertexPosClip.z + offsetForDepth) / log(constantForDepth * farDistance + offsetForDepth));
 }
 
 )glsl";
+
+typedef struct {
+    Sphere *spheres;
+    int numSpheres;
+    Sphere *nextBatch;
+    int nextNum;
+    render_misc renderMisc;
+    pthread_t renderer_tid;
+    pthread_mutex_t mutex;
+    bool shouldExit;
+    GLFWwindow *window;
+} SharedData;
+
+SharedData sharedData;
 
 glm::vec3 vectorize(float in[3]) {
     return glm::vec3(in[0], in[1], in[2]);
@@ -342,6 +361,7 @@ struct Vertex {
 glm::vec3 vlerp(glm::vec3 a, glm::vec3 b, float f) {
     return (a * f) + (b * (1.0f - f));
 }
+
 /*      corners
     {2.5, -1.8, 1.0, // right bottom rear
     -2.5, -1.8, 1.0, // left bottom rear
@@ -352,9 +372,7 @@ glm::vec3 vlerp(glm::vec3 a, glm::vec3 b, float f) {
     2.5, 1.8, -1.3, // right top front
     -2.5, 1.8, -1.3}, // left top front
 */
-void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
-    Vertex vertices[24];
-    GLuint indices[36];
+void setupBoxoid(Boxoid box, Vertex *vertices) {
     GLuint faceCornerIndices[6][4] = {
         {0, 1, 5, 4}, // right - bottom rear - left -- left - top rear - right // rear plate
         {3, 2, 6, 7}, // left - bottom front - right -- right top front - left // front plate
@@ -375,12 +393,6 @@ void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
         cornerNormals[i] = glm::normalize(corners[i] - center);
     }
     for (int i = 0; i < 6; i++) {
-        indices[i * 6 + 0] = 4 * i + 0;
-        indices[i * 6 + 1] = 4 * i + 1;
-        indices[i * 6 + 2] = 4 * i + 2;
-        indices[i * 6 + 3] = 4 * i + 0;
-        indices[i * 6 + 4] = 4 * i + 2;
-        indices[i * 6 + 5] = 4 * i + 3;
         float time = static_cast<float>(glfwGetTime());
         glm::vec3 faceNormal = glm::normalize(glm::cross(
                     corners[faceCornerIndices[i][2]] - corners[faceCornerIndices[i][0]],
@@ -407,37 +419,7 @@ void setupBoxoid(Boxoid box, GLuint& VAO, GLuint& VBO, GLuint& EBO) {
         }
     }
 
-    glGenVertexArrays(1, &VAO);
-    glBindVertexArray(VAO);
-    glGenBuffers(1, &VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    glGenBuffers(1, &EBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, faceNormalVert));
-    glEnableVertexAttribArray(2);
-    glVertexAttribIPointer(3, 1, GL_INT, sizeof(Vertex), (void*)offsetof(Vertex, faceIndex));
-    glEnableVertexAttribArray(3);
 }
-
-typedef struct {
-    Sphere *spheres;
-    int numSpheres;
-    Sphere *nextBatch;
-    int nextNum;
-    render_misc renderMisc;
-    pthread_t renderer_tid;
-    pthread_mutex_t mutex;
-    bool shouldExit;
-    GLFWwindow *window;
-} SharedData;
-
-SharedData sharedData;
 
 void *rendererThread(void *arg) {
     // Initialize GLFW
@@ -495,7 +477,10 @@ void *rendererThread(void *arg) {
     // buffers
     GLuint boxoidVAO, boxoidVBO, boxoidEBO;
     GLuint sphereVAO, sphereVBO, sphereEBO;
-    glGenVertexArrays(1, &sphereVAO);
+    glGenVertexArrays(1, &boxoidVAO);
+	glGenBuffers(1, &boxoidVBO);
+	glGenBuffers(1, &boxoidEBO);
+	glGenVertexArrays(1, &sphereVAO);
     glGenBuffers(1, &sphereVBO);
     glGenBuffers(1, &sphereEBO);
     glBindVertexArray(sphereVAO);
@@ -508,7 +493,7 @@ void *rendererThread(void *arg) {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
-    // uniforms
+	// uniforms
     GLuint modelLoc = glGetUniformLocation(shaderProgram, "model");
     GLuint viewLoc = glGetUniformLocation(shaderProgram, "view");
     GLuint projLoc = glGetUniformLocation(shaderProgram, "projection");
@@ -572,8 +557,6 @@ void *rendererThread(void *arg) {
         }
         pthread_mutex_unlock(&sharedData.mutex);
 
-        // vertex buffer
-        glBindVertexArray(sphereVAO);
         
         // Camera
         cameraPos = glm::vec3(sharedData.renderMisc.camPosition[0], sharedData.renderMisc.camPosition[1], sharedData.renderMisc.camPosition[2]);
@@ -622,6 +605,8 @@ void *rendererThread(void *arg) {
 
         // Geometry
         if (sharedData.spheres != NULL) {
+			// vertex buffer
+			glBindVertexArray(sphereVAO);
             for (int i = 0; i < sharedData.numSpheres; ++i) {
                 Sphere currentSphere = sharedData.spheres[i];
                 glm::mat4 scaling = glm::scale(glm::mat4(1.0f), glm::vec3(currentSphere.radius));
@@ -662,7 +647,8 @@ void *rendererThread(void *arg) {
         // left bottom rear - front -- left top front - rear     // left plate
             glm::vec3 center = glm::vec3(sharedData.spheres[5].position[0], sharedData.spheres[5].position[1], sharedData.spheres[5].position[2]);
             // this boxoid is spherical
-            Boxoid sphere = {
+			Boxoid boxoids[2] =
+				{
                 {2.5, -1.8, 1.0,
                 -2.5, -1.8, 1.0,
                 2.5, -1.8, -1.3,
@@ -677,29 +663,64 @@ void *rendererThread(void *arg) {
                 1.0, 1.0,
                 1.0, 1.0,
                 1.0, 1.0},
-                3, 0};
-			// discus shaped right now
-            Boxoid discus = {
-                {2.5, -1.8, 1.0, // right bottom rear
-                -2.5, -1.8, 1.0, // left bottom rear
-                2.5, -1.8, -1.3, // right bottom front
-                -2.5, -1.8, -1.3, // left bottom front
-                2.5, 1.8, 1.0, // right top rear
-                -2.5, 1.8, 1.0, // left top rear
-                2.5, 1.8, -1.3, // right top front
-                -2.5, 1.8, -1.3}, // left top front
+                3, 0},
+				{
+                {2.5, 1.8, 3.0, // right bottom rear
+                -2.5, 1.8, 3.0, // left bottom rear
+                2.5, 1.8, 1.3, // right bottom front
+                -2.5, -1.8, 1.3, // left bottom front
+                2.5, 1.8, 3.0, // right top rear
+                -2.5, 1.8, 3.0, // left top rear
+                2.5, 1.8, 1.3, // right top front
+                -2.5, 1.8, 1.3}, // left top front
                 {0.0, 0.0,// "top" or "bottom" in simulation
                 0.0, 0.0,// "top" or "bottom" in simulation
                 1.0, 0.0,
                 1.0, 0.0,
                 1.0, 0.0,
                 1.0, 0.0},
-                3, 0};
+                3, 0}};
 
-			Boxoid* box = &sphere;
 
-            glBindVertexArray(0);
-            setupBoxoid(*box, boxoidVAO, boxoidVBO, boxoidEBO);
+			size_t numBoxoids = 2;
+
+			GLuint boxoidIndices[36];
+			for (int i = 0; i < 6; i++) {
+				boxoidIndices[i * 6 + 0] = 4 * i + 0;
+				boxoidIndices[i * 6 + 1] = 4 * i + 1;
+				boxoidIndices[i * 6 + 2] = 4 * i + 2;
+				boxoidIndices[i * 6 + 3] = 4 * i + 0;
+				boxoidIndices[i * 6 + 4] = 4 * i + 2;
+				boxoidIndices[i * 6 + 5] = 4 * i + 3;
+			}
+
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, boxoidEBO);
+			glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(boxoidIndices), boxoidIndices, GL_STATIC_DRAW);
+
+			// Generate the vertices and update the buffer data for the entire array of boxoids
+			size_t bufferSize = numBoxoids * sizeof(Vertex) * 24;
+			Vertex vertices[numBoxoids * 24];
+			for (size_t i = 0; i < numBoxoids; ++i) {
+				Boxoid currentBoxoid = boxoids[i];
+				Vertex* boxoidVertices = &vertices[i * 24];
+
+				// Generate vertices for the current boxoid
+				setupBoxoid(currentBoxoid, boxoidVertices);
+			}
+
+            glBindVertexArray(boxoidVAO);
+			// Update the buffer data for the entire array of boxoids
+			glBindBuffer(GL_ARRAY_BUFFER, boxoidVBO);
+			glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
+			
+			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
+			glEnableVertexAttribArray(0);
+			glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
+			glEnableVertexAttribArray(1);
+			glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, faceNormalVert));
+			glEnableVertexAttribArray(2);
+			glVertexAttribIPointer(3, 1, GL_INT, sizeof(Vertex), (void*)offsetof(Vertex, faceIndex));
+			glEnableVertexAttribArray(3);
             
             // translate our model view to position the sphere in world space
 			model = glm::translate(glm::mat4(1.0f), center);
@@ -717,7 +738,10 @@ void *rendererThread(void *arg) {
             diffuseComponent = glm::vec3(std::pow(diffuseComponent.r, vibe), std::pow(diffuseComponent.g, vibe), std::pow(diffuseComponent.b, vibe));
             glUniform3fv(boxoidDiffuseLoc, 1, glm::value_ptr(diffuseComponent));
             glUniform3fv(boxoidEmissiveLoc, 1, glm::value_ptr(emissiveComponent));
-            glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+			
+			glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, numBoxoids);
+			glBindBuffer(GL_ARRAY_BUFFER, 0);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
         }
         else {
             printf("numSpheres: %d\n", sharedData.numSpheres);
@@ -726,6 +750,9 @@ void *rendererThread(void *arg) {
         glfwSwapBuffers(sharedData.window);
         glfwPollEvents();
     }
+    glDeleteVertexArrays(1, &boxoidVAO);
+    glDeleteBuffers(1, &boxoidVBO);
+    glDeleteBuffers(1, &boxoidEBO);
     glDeleteVertexArrays(1, &sphereVAO);
     glDeleteBuffers(1, &sphereVBO);
     glDeleteBuffers(1, &sphereEBO);
