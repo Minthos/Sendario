@@ -6,6 +6,22 @@
 #include <unistd.h>
 #include <stdbool.h> 
 
+/* New boxoid rendering pipeline:
+
+3 buffers
+vertices
+indices
+uniforms 
+
+1. Renderer initialization. Create buffers for cuboid objects.
+2. main.swift calls addRenderObjects([Complex]) -> [Int] and gets back the indices of the objects,
+deleteRenderObjects[Int] to delete the objects.
+3. addRenderObjects tessellates the boxoids. Should probably cache different detail levels of
+the mesh and choose between them based on size/distance to maintain uniform detail level at all distances
+4. Sort the boxoids each frame before copying to vertex buffer?
+
+*/
+
 // warning! this is also defined in the shader source, so changing it here requires changing it there as well.
 // you should also change the size of the lights array in the swift source to match it.
 #define MAX_LIGHTS 1
