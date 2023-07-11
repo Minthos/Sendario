@@ -490,10 +490,11 @@ Mesh tessellateMesh(Mesh* original) {
 }
 
 Mesh boxoidToMesh(Boxoid box) {
-	std::vector<Vertex> verts;
-	std::vector<Triangle> tris;
-	std::vector<Edge> edges;
-	std::vector<GLuint> indices = std::vector<GLuint>(sphereIndices, sphereIndices + 12);
+	Vertex verts[8];
+	Triangle tris[12];
+	int e = 0;
+	Edge edges[18];
+	GLuint *indices = sphereIndices;
 	
     glm::vec3 corners[8];
     glm::vec3 center = glm::vec3(0, 0, 0);
@@ -503,21 +504,27 @@ Mesh boxoidToMesh(Boxoid box) {
     }
     center *= (1.0f/8.0f);
     for(int i = 0; i < 8; i++) {
-		verts.push_back(Vertex(corners[i],
+		verts[i] = Vertex(corners[i],
 			glm::normalize(corners[i] - center),
 			vectorize(sharedData.renderMisc.materials[box.material_idx].emissive),
-			VERT_CORNER));
+			VERT_CORNER);
     }
 	for(int i = 0; i < 12; i++) {
 		Vertex* a = &verts[sphereIndices[i * 3]];
 		Vertex* b = &verts[sphereIndices[i * 3 + 1]];
 		Vertex* c = &verts[sphereIndices[i * 3 + 2]];
-		edges.push_back(Edge(a, b));
-		edges.push_back(Edge(b, c));
-		edges.push_back(Edge(c, a));
+		if(a > b) {
+			edges[e++] = Edge(a, b);
+		}
+		if(b > c) {
+			edges[e++] = Edge(b, c);
+		}
+		if(c > a) {
+			edges[e++] = Edge(c, a);
+		}
 		Vertex* tmpVerts[3] = {a, b, c};
 		Edge* tmpEdges[3] = {&edges[i * 3], &edges[i * 3 + 1], &edges[i * 3 + 2]};
-		tris.push_back(Triangle(tmpVerts, tmpEdges, i / 2));
+		tris[i] = Triangle(tmpVerts, tmpEdges, i / 2);
 		if((box.missing_faces & (0x1 << (i/2))) != 0) {
 			a->flags |= VERT_OMIT;
 			b->flags |= VERT_OMIT;
