@@ -356,8 +356,8 @@ glm::vec3 vlerp(glm::vec3 a, glm::vec3 b, float f) {
 }
 
 enum VertFlags {
-	VERT_CORNER,
-	VERT_OMIT
+	VERT_CORNER, // indicates that the vertex is part of a corner
+	VERT_OMIT // if all 3 vertices of a triangle has this flag, don't render the triangle
 };
 
 struct Vertex {
@@ -365,6 +365,55 @@ struct Vertex {
     glm::vec3 normal;
     glm::vec3 light;
     GLuint flags;
+
+	Vertex() {}
+	Vertex(glm::vec3 position, glm::vec3 normal, glm::vec3 light, GLuint flags) {
+		position=position;
+		normal=normal;
+		light=light;
+		flags=flags;
+	}
+};
+
+struct Edge {
+    Vertex *verts[3];
+    Edge* subdivisions[2];
+	
+	Edge() {}
+	Edge(Vertex *vert0, Vertex *vert1) {
+		verts[0] = vert0;
+		verts[1] = vert1;
+		verts[2] = nullptr;
+		subdivisions[0] = nullptr;
+		subdivisions[1] = nullptr;
+	}
+};
+
+struct Triangle {
+    Vertex *verts[3];
+    Edge *edges[3];
+	GLuint faceIndex;
+
+	Triangle() {}
+	Triangle(Vertex *verts[3], Edge *edges[3], GLuint faceIndex) {
+		verts = verts;
+		edges = edges;
+		faceIndex = faceIndex;
+	}
+};
+
+struct Mesh {
+	std::vector<Vertex> verts;
+	std::vector<Triangle> tris;
+	std::vector<Edge> edges;
+	std::vector<GLuint> indices;
+
+	Mesh(std::vector<Vertex> verts, std::vector<Triangle> tris, std::vector<Edge> edges, std::vector<GLuint> indices) {
+		verts=verts;
+		tris=tris;
+		edges=edges;
+		indices=indices;
+	}
 };
 
 glm::vec3 avgOf3(glm::vec3 a, glm::vec3 b, glm::vec3 c) {
@@ -375,29 +424,12 @@ Vertex vertex_interpolate(Vertex* a, Vertex* b, float c) {
 	return Vertex(vlerp(a->position, b->position, c), vlerp(a->normal, b->normal, c), vlerp(a->light, b->light, c), a->flags & b->flags);
 }
 
-Vertex agvOf3Verts(Vertex verts[3]) {
-	return Vertex(avgOf3(verts[0].position, verts[1].position, verts[2].position),
-				  avgOf3(verts[0].normal, verts[1].normal, verts[2].normal),
-				  avgOf3(verts[0].light, verts[1].light, verts[2].light),
-				  verts[0].flags & verts[1].flags & verts[2].flags);
+Vertex avgOf3Verts(Vertex *verts[3]) {
+	return Vertex(avgOf3(verts[0]->position, verts[1]->position, verts[2]->position),
+				  avgOf3(verts[0]->normal, verts[1]->normal, verts[2]->normal),
+				  avgOf3(verts[0]->light, verts[1]->light, verts[2]->light),
+				  verts[0]->flags & verts[1]->flags & verts[2]->flags);
 }
-
-struct Triangle {
-    Vertex *verts[3];
-    Edge *edges[3];
-}
-
-struct Edge {
-    Vertex *verts[3];
-    Edge* subdivisions[2];
-};
-
-struct Mesh {
-	std::vector<Vertex> verts;
-	std::vector<Triangle> tris;
-	std::vector<Edge> edges;
-	std::vector<GLuint> indices;
-};
 
 Edge* getCorrectSubdivision(Edge* in, Vertex* corner) {
 	if(in->subdivisions[0]->verts[0] == corner || in->subdivisions[0]->verts[1] == corner) {
@@ -417,10 +449,11 @@ Mesh tessellateMesh(Mesh* original) {
 	
 	// for each edge create a vertex and 2 new edges
 	for(int i = 0; i < original->edges.size(); i++) {
+		Edge* edge = &original->edges[i];
 		verts.push_back(vertex_interpolate(edge->verts[0], edge->verts[1], 0.5f));
 		edge->verts[2] = &verts[i];
-		edges.push_back(Edge({edge->verts[0], edge->verts[2], nullptr}, {nullptr, nullptr}));
-		edges.push_back(Edge({edge->verts[1], edge->verts[2], nullptr}, {nullptr, nullptr}));
+		edges.push_back(Edge(edge->verts[0], edge->verts[2]));
+		edges.push_back(Edge(edge->verts[1], edge->verts[2]));
 		edge->subdivisions[0] = &edges[i * 2];
 		edge->subdivisions[1] = &edges[i * 2 + 1];
 	}
@@ -430,49 +463,39 @@ Mesh tessellateMesh(Mesh* original) {
 		Triangle *tri = &original->tris[i];
 		verts.push_back(avgOf3Verts(tri->verts));
 		Vertex* newVert = &verts[verts.size() - 1];
-		Vertex newVertices[3];
-		Edge newEdges[3];
-		Triangle newTris[3];
+		newVert->flags &= ~VERT_CORNER; // this vertex can't possibly be a corner vertex
+		Vertex *newVertices[3];
+		Edge *newEdges[3];
+		Triangle *newTris[3];
 		for(int j = 0; j < 3; j++) {
-			newVertices[i] = tri->edges[j].verts[2];
-			edges.push_back(Edge({newVert, newVertices[j], nullptr}, {nullptr, nullptr}));
+			newVertices[i] = tri->edges[j]->verts[2];
+			edges.push_back(Edge(newVert, newVertices[j]));
 			newEdges[j] = &edges[edges.size() - 1];
 		}
 		for(int j = 0; j < 3; j++) {
 			// I have not tested whether this picks the correct triangles according to clockwise/counterclockwise
 			// traversal convention
-			tris.push_back(Triangle(
-				{newVert, newVertices[j], tri->verts[j]},
-				{newEdges[j],
+			Vertex *vertTemp[3] = {newVert, newVertices[j], tri->verts[j]};
+			Edge *edgeTemp[3] = {newEdges[j],
 				 getCorrectSubdivision(tri->edges[j], tri->verts[j]),
-				 getCorrectSubdivision(tri->edges[(j + 1) % 3], tri->verts[(j + 1) % 3]}));
+				 getCorrectSubdivision(tri->edges[(j + 1) % 3], tri->verts[(j + 1) % 3])};
+			tris.push_back(Triangle(vertTemp, edgeTemp, tri->faceIndex));
 			newTris[j] = &tris[tris.size() - 1];
-			indices.push_back((GLuint)(&newTris[j]->verts[0] - &verts[0]));
-			indices.push_back((GLuint)(&newTris[j]->verts[1] - &verts[0]));
-			indices.push_back((GLuint)(&newTris[j]->verts[2] - &verts[0]));
+			indices.push_back((GLuint)(newTris[j]->verts[0] - &verts[0]));
+			indices.push_back((GLuint)(newTris[j]->verts[1] - &verts[0]));
+			indices.push_back((GLuint)(newTris[j]->verts[2] - &verts[0]));
 		}
 	}
     return Mesh(verts, tris, edges, indices);
 }
 
-/*      corners
-    {2.5, -1.8, 1.0, // right bottom rear
-    -2.5, -1.8, 1.0, // left bottom rear
-    2.5, -1.8, -1.3, // right bottom front
-    -2.5, -1.8, -1.3, // left bottom front
-    2.5, 1.8, 1.0, // right top rear
-    -2.5, 1.8, 1.0, // left top rear
-    2.5, 1.8, -1.3, // right top front
-    -2.5, 1.8, -1.3}, // left top front
-*/
-
 Mesh boxoidToMesh(Boxoid box) {
 	std::vector<Vertex> verts;
 	std::vector<Triangle> tris;
 	std::vector<Edge> edges;
-	std::vector<GLuint> indices = vector<GLuint>(sphereIndices);
+	std::vector<GLuint> indices = std::vector<GLuint>(sphereIndices, sphereIndices + 12);
 	
-	glm::vec3 cornerNormals[8];
+    glm::vec3 corners[8];
     glm::vec3 center = glm::vec3(0, 0, 0);
     for(int i = 0; i < 8; i++) {
         corners[i] = vectorize(&box.corners[i * 3]);
@@ -480,67 +503,28 @@ Mesh boxoidToMesh(Boxoid box) {
     }
     center *= (1.0f/8.0f);
     for(int i = 0; i < 8; i++) {
-		verts.push_back(Vertex(corners[i], glm::normalize(corners[i] - center), VERT_CORNER));
+		verts.push_back(Vertex(corners[i],
+			glm::normalize(corners[i] - center),
+			vectorize(sharedData.renderMisc.materials[box.material_idx].emissive),
+			VERT_CORNER));
     }
 	for(int i = 0; i < 12; i++) {
 		Vertex* a = &verts[sphereIndices[i * 3]];
 		Vertex* b = &verts[sphereIndices[i * 3 + 1]];
 		Vertex* c = &verts[sphereIndices[i * 3 + 2]];
-		edges.push_back(Edge({a, b, nullptr},{nullptr, nullptr}))
-		edges.push_back(Edge({b, c, nullptr},{nullptr, nullptr}))
-		edges.push_back(Edge({c, a, nullptr},{nullptr, nullptr}))
-		tris.push_back(Triangle({a, b, c}, {&edges[i * 3], &edges[i * 3 + 1], &edges[i * 3 + 2]}));
+		edges.push_back(Edge(a, b));
+		edges.push_back(Edge(b, c));
+		edges.push_back(Edge(c, a));
+		Vertex* tmpVerts[3] = {a, b, c};
+		Edge* tmpEdges[3] = {&edges[i * 3], &edges[i * 3 + 1], &edges[i * 3 + 2]};
+		tris.push_back(Triangle(tmpVerts, tmpEdges, i / 2));
+		if((box.missing_faces & (0x1 << (i/2))) != 0) {
+			a->flags |= VERT_OMIT;
+			b->flags |= VERT_OMIT;
+			c->flags |= VERT_OMIT;
+		}
 	}
 	return Mesh(verts, tris, edges, indices);
-}
-
-void setupBoxoid(Boxoid box, Vertex *vertices) {
-	GLuint faceCornerIndices[6][4] = {
-        {0, 1, 5, 4}, // right - bottom rear - left -- left - top rear - right // rear plate
-        {3, 2, 6, 7}, // left - bottom front - right -- right top front - left // front plate
-        {1, 0, 2, 3}, // left - bottom rear - right -- right bottom front left // bottom plate
-        {4, 5, 7, 6}, // right top rear - left -- left top front - right       // top plate
-        {0, 4, 6, 2}, // right bottom rear - top -- top front - bottom         // right plate
-        {5, 1, 3, 7}  // left top rear - bottom rear - front rear - top front  // left plate
-    };
-    glm::vec3 corners[8];
-    glm::vec3 cornerNormals[8];
-    glm::vec3 center = glm::vec3(0, 0, 0);
-    for(int i = 0; i < 8; i++) {
-        corners[i] = vectorize(&box.corners[i * 3]);
-        center += corners[i];
-    }
-    center *= (1.0f/8.0f);
-    for(int i = 0; i < 8; i++) {
-        cornerNormals[i] = glm::normalize(corners[i] - center);
-    }
-    for (int i = 0; i < 6; i++) {
-        float time = static_cast<float>(glfwGetTime());
-        glm::vec3 faceNormal = glm::normalize(glm::cross(
-                    corners[faceCornerIndices[i][2]] - corners[faceCornerIndices[i][0]],
-                    corners[faceCornerIndices[i][1]] - corners[faceCornerIndices[i][3]]));
-		for(int j = 0; j < 4; j++) {
-            int iself = faceCornerIndices[i][j];
-            int iplus = faceCornerIndices[i][(j + 1) % 4];
-            int iminus = faceCornerIndices[i][(j + 3) % 4];
-            vertices[i * 4 + j].position = corners[iself];
-            vertices[i * 4 + j].faceIndex = i;
-            float curvature1 = box.curvature[i * 2 + (j % 2)];
-            float curvature2 = box.curvature[i * 2 + ((j + 1) % 2)];
-            float factor = 2.0f / (abs(curvature1) + abs(curvature2) + 1.0f);
-            curvature1 *= factor;
-            curvature2 *= factor;
-            float flatness1 = 1.0f - curvature1;
-            float flatness2 = 1.0f - curvature2;
-            glm::vec3 edgeU = glm::normalize(corners[iself] - corners[iminus]);
-            glm::vec3 edgeV = glm::normalize(corners[iself] - corners[iplus]);
-            glm::vec3 component1 = edgeU * curvature1 + faceNormal * flatness1;
-            glm::vec3 component2 = edgeV * curvature2 + faceNormal * flatness2;
-            vertices[i * 4 + j].normal = glm::normalize(component1 + component2);
-            vertices[i * 4 + j].faceNormalVert = faceNormal;
-            vertices[i * 4 + j].light = sharedData.renderMisc.materials[box.material_idx].emissive;
-        }
-    }
 }
 
 void *rendererThread(void *arg) {
@@ -607,9 +591,9 @@ void *rendererThread(void *arg) {
     glGenBuffers(1, &sphereEBO);
     glBindVertexArray(sphereVAO);
     glBindBuffer(GL_ARRAY_BUFFER, sphereVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(sphereVertices), sphereVertices, GL_STATIC_DRAW);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sphereEBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(sphereIndices), sphereIndices, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -820,7 +804,7 @@ void *rendererThread(void *arg) {
             size_t bufferSize = numBoxoids * sizeof(Vertex) * 24;
             Vertex vertices[numBoxoids * 24];
             for (size_t i = 0; i < numBoxoids; ++i) {
-                setupBoxoid(boxoids[i], &vertices[i * 24]);
+                //setupBoxoid(boxoids[i], &vertices[i * 24]);
             }
 
             glBindVertexArray(boxoidVAO);
@@ -833,9 +817,9 @@ void *rendererThread(void *arg) {
             glEnableVertexAttribArray(0);
             glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
             glEnableVertexAttribArray(1);
-            glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, faceNormalVert));
+            glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, light));
             glEnableVertexAttribArray(2);
-            glVertexAttribIPointer(3, 1, GL_INT, sizeof(Vertex), (void*)offsetof(Vertex, faceIndex));
+            glVertexAttribIPointer(3, 1, GL_INT, sizeof(Vertex), (void*)offsetof(Vertex, flags));
             glEnableVertexAttribArray(3);
             
             // translate our model view to position the sphere in world space
