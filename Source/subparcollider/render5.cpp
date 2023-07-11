@@ -325,7 +325,7 @@ GLuint compileShader(GLenum shaderType, const char* source) {
     return shader;
 }
 
-GLfloat vertices[] = {
+GLfloat sphereVertices[] = {
     -1.0f,  1.0f, 1.0f,
     -1.0f, -1.0f, 1.0f,
      1.0f, -1.0f, 1.0f,
@@ -336,7 +336,7 @@ GLfloat vertices[] = {
      1.0f,  1.0f, -1.0f
 };
 
-GLuint indices[] = {
+GLuint sphereIndices[] = {
     0, 1, 2,
     0, 2, 3,
     4, 5, 6,
@@ -355,6 +355,11 @@ glm::vec3 vlerp(glm::vec3 a, glm::vec3 b, float f) {
     return (a * f) + (b * (1.0f - f));
 }
 
+enum VertFlags {
+	VERT_CORNER,
+	VERT_OMIT
+};
+
 struct Vertex {
     glm::vec3 position;
     glm::vec3 normal;
@@ -366,21 +371,15 @@ glm::vec3 avgOf3(glm::vec3 a, glm::vec3 b, glm::vec3 c) {
 	return (a + b + c) * (1.0f / 3.0f);
 }
 
-
 Vertex vertex_interpolate(Vertex* a, Vertex* b, float c) {
 	return Vertex(vlerp(a->position, b->position, c), vlerp(a->normal, b->normal, c), vlerp(a->light, b->light, c), a->flags & b->flags);
 }
 
 Vertex agvOf3Verts(Vertex verts[3]) {
-	return Vertex(avgOf3(verts[0].position,
-						 verts[1].position,
-						 verts[2].position),
-				  avgOf3(verts[0].normal,
-					     verts[1].normal,
-				     	 verts[2].normal),
-				  avgOf3(verts[0].light,
-						 verts[1].light,
-						 verts[2].light), verts[0].flags & verts[1].flags & verts[2].flags);
+	return Vertex(avgOf3(verts[0].position, verts[1].position, verts[2].position),
+				  avgOf3(verts[0].normal, verts[1].normal, verts[2].normal),
+				  avgOf3(verts[0].light, verts[1].light, verts[2].light),
+				  verts[0].flags & verts[1].flags & verts[2].flags);
 }
 
 struct Triangle {
@@ -400,9 +399,17 @@ struct Mesh {
 	std::vector<GLuint> indices;
 };
 
-// currently doesn't take curvature into account
-//Mesh* tessellateBoxoid(Boxoid box, Mesh* original) {
-Mesh* tessellateBoxoid(Mesh* original) {
+Edge* getCorrectSubdivision(Edge* in, Vertex* corner) {
+	if(in->subdivisions[0]->verts[0] == corner || in->subdivisions[0]->verts[1] == corner) {
+		return in->subdivisions[0];
+	} else {
+		assert(in->subdivisions[1]->verts[0] == corner || in->subdivisions[1]->verts[1] == corner);
+		return in->subdivisions[1];
+	}
+}
+
+// Loop subdivision that doesn't create duplicate edges/vertices, runs in linear time
+Mesh tessellateMesh(Mesh* original) {
 	std::vector<Vertex> verts;
 	std::vector<Triangle> tris;
 	std::vector<Edge> edges;
@@ -411,9 +418,9 @@ Mesh* tessellateBoxoid(Mesh* original) {
 	// for each edge create a vertex and 2 new edges
 	for(int i = 0; i < original->edges.size(); i++) {
 		verts.push_back(vertex_interpolate(edge->verts[0], edge->verts[1], 0.5f));
-		edge->verts[3] = &verts[i];
-		edges.push_back(Edge({edge->verts[0], edge->verts[3]}, {nullptr, nullptr}));
-		edges.push_back(Edge({edge->verts[2], edge->verts[3]}, {nullptr, nullptr}));
+		edge->verts[2] = &verts[i];
+		edges.push_back(Edge({edge->verts[0], edge->verts[2], nullptr}, {nullptr, nullptr}));
+		edges.push_back(Edge({edge->verts[1], edge->verts[2], nullptr}, {nullptr, nullptr}));
 		edge->subdivisions[0] = &edges[i * 2];
 		edge->subdivisions[1] = &edges[i * 2 + 1];
 	}
@@ -427,18 +434,22 @@ Mesh* tessellateBoxoid(Mesh* original) {
 		Edge newEdges[3];
 		Triangle newTris[3];
 		for(int j = 0; j < 3; j++) {
-			newVertices[i] = tri->edges[i].verts[3];
-			edges.push_back(Edge({newVert, newVertices[j]}, {nullptr, nullptr}));
+			newVertices[i] = tri->edges[j].verts[2];
+			edges.push_back(Edge({newVert, newVertices[j], nullptr}, {nullptr, nullptr}));
 			newEdges[j] = &edges[edges.size() - 1];
 		}
 		for(int j = 0; j < 3; j++) {
+			// I have not tested whether this picks the correct triangles according to clockwise/counterclockwise
+			// traversal convention
 			tris.push_back(Triangle(
 				{newVert, newVertices[j], tri->verts[j]},
-				{newEdges[j], tri->edges[j]->subdivisions[0], tri->edges[(j + 1) % 3]->subdivisions[1]}));
+				{newEdges[j],
+				 getCorrectSubdivision(tri->edges[j], tri->verts[j]),
+				 getCorrectSubdivision(tri->edges[(j + 1) % 3], tri->verts[(j + 1) % 3]}));
 			newTris[j] = &tris[tris.size() - 1];
-			indices.push_back((&newTris[j]->verts[0] - &verts[0]) / sizeof(Triangle*));
-			indices.push_back((&newTris[j]->verts[1] - &verts[0]) / sizeof(Triangle*));
-			indices.push_back((&newTris[j]->verts[2] - &verts[0]) / sizeof(Triangle*));
+			indices.push_back((GLuint)(&newTris[j]->verts[0] - &verts[0]));
+			indices.push_back((GLuint)(&newTris[j]->verts[1] - &verts[0]));
+			indices.push_back((GLuint)(&newTris[j]->verts[2] - &verts[0]));
 		}
 	}
     return Mesh(verts, tris, edges, indices);
@@ -454,8 +465,37 @@ Mesh* tessellateBoxoid(Mesh* original) {
     2.5, 1.8, -1.3, // right top front
     -2.5, 1.8, -1.3}, // left top front
 */
+
+Mesh boxoidToMesh(Boxoid box) {
+	std::vector<Vertex> verts;
+	std::vector<Triangle> tris;
+	std::vector<Edge> edges;
+	std::vector<GLuint> indices = vector<GLuint>(sphereIndices);
+	
+	glm::vec3 cornerNormals[8];
+    glm::vec3 center = glm::vec3(0, 0, 0);
+    for(int i = 0; i < 8; i++) {
+        corners[i] = vectorize(&box.corners[i * 3]);
+        center += corners[i];
+    }
+    center *= (1.0f/8.0f);
+    for(int i = 0; i < 8; i++) {
+		verts.push_back(Vertex(corners[i], glm::normalize(corners[i] - center), VERT_CORNER));
+    }
+	for(int i = 0; i < 12; i++) {
+		Vertex* a = &verts[sphereIndices[i * 3]];
+		Vertex* b = &verts[sphereIndices[i * 3 + 1]];
+		Vertex* c = &verts[sphereIndices[i * 3 + 2]];
+		edges.push_back(Edge({a, b, nullptr},{nullptr, nullptr}))
+		edges.push_back(Edge({b, c, nullptr},{nullptr, nullptr}))
+		edges.push_back(Edge({c, a, nullptr},{nullptr, nullptr}))
+		tris.push_back(Triangle({a, b, c}, {&edges[i * 3], &edges[i * 3 + 1], &edges[i * 3 + 2]}));
+	}
+	return Mesh(verts, tris, edges, indices);
+}
+
 void setupBoxoid(Boxoid box, Vertex *vertices) {
-    GLuint faceCornerIndices[6][4] = {
+	GLuint faceCornerIndices[6][4] = {
         {0, 1, 5, 4}, // right - bottom rear - left -- left - top rear - right // rear plate
         {3, 2, 6, 7}, // left - bottom front - right -- right top front - left // front plate
         {1, 0, 2, 3}, // left - bottom rear - right -- right bottom front left // bottom plate
@@ -470,7 +510,7 @@ void setupBoxoid(Boxoid box, Vertex *vertices) {
         corners[i] = vectorize(&box.corners[i * 3]);
         center += corners[i];
     }
-    center *= (1.0/8.0);
+    center *= (1.0f/8.0f);
     for(int i = 0; i < 8; i++) {
         cornerNormals[i] = glm::normalize(corners[i] - center);
     }
@@ -479,7 +519,7 @@ void setupBoxoid(Boxoid box, Vertex *vertices) {
         glm::vec3 faceNormal = glm::normalize(glm::cross(
                     corners[faceCornerIndices[i][2]] - corners[faceCornerIndices[i][0]],
                     corners[faceCornerIndices[i][1]] - corners[faceCornerIndices[i][3]]));
-        for(int j = 0; j < 4; j++) {
+		for(int j = 0; j < 4; j++) {
             int iself = faceCornerIndices[i][j];
             int iplus = faceCornerIndices[i][(j + 1) % 4];
             int iminus = faceCornerIndices[i][(j + 3) % 4];
