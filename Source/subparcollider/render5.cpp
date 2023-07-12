@@ -250,6 +250,10 @@ out vec4 fragColor;
 
 void main()
 {
+	// 0x4000 0000 = set
+	// 0x0040 0000 = set
+	// wtf?
+	//if((fragFlags & 0x40400000) == 0) {
 	if((fragFlags & VERT_OMIT) != 0) {
 		discard;
 	} else {
@@ -262,7 +266,7 @@ void main()
 			float lambertian = max(dot(fragNormal, lightDirection), 0.0);
 			accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
 		}
-		vec3 radiance = materialEmissive * 0.079577 + accumulatedLight + fragLight;
+		vec3 radiance = (fragLight + materialEmissive) * 0.079577 + accumulatedLight;
 		float darkness = 3.0 / (3.0 + exposure + radiance.r + radiance.g + radiance.b);
 		radiance = radiance * darkness;
 		fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
@@ -271,6 +275,7 @@ void main()
 		const float offsetForDepth = 1.0;
 		gl_FragDepth = (log(constantForDepth * vertexPosClip.z + offsetForDepth) / log(constantForDepth * farDistance + offsetForDepth));
 	}
+	//fragColor = vec4(fragNormal, 1.0);
 }
 
 )glsl";
@@ -371,7 +376,7 @@ Boxoid exampleBoxoids[3] =
 	1.0, 1.0,
 	1.0, 1.0,
 	1.0, 1.0},
-	4, 0},
+	4, 0x03},
 	{{2.5, -1.8, 1.0,
 	-2.5, -1.8, 1.0,
 	2.5, -1.8, -1.3,
@@ -409,10 +414,10 @@ glm::vec3 vlerp(glm::vec3 a, glm::vec3 b, float f) {
 	return (a * f) + (b * (1.0f - f));
 }
 
-enum VertFlags {
-	VERT_CORNER = 1, // indicates that the vertex is part of a corner
-	VERT_OMIT = 2 // if all 3 vertices of a triangle has this flag, don't render the triangle
-};
+//enum VertFlags {
+GLuint VERT_CORNER = 1; // indicates that the vertex is part of a corner
+GLuint VERT_OMIT = 2; // if all 3 vertices of a triangle has this flag, don't render the triangle
+//};
 
 struct Vertex {
 	glm::vec3 position;
@@ -597,8 +602,8 @@ Mesh boxoidToMesh(Boxoid box) {
 	for(int i = 0; i < 8; i++) {
 		verts[i] = Vertex(corners[i],
 			glm::normalize(corners[i] - center),
-			//glm::vec3(50.0f, 200.0f, 100.0f),
-			vectorize(sharedData.renderMisc.materials[box.material_idx].emissive),
+			glm::vec3(5.0f, 20.0f, 10.0f),
+			//vectorize(sharedData.renderMisc.materials[box.material_idx].emissive),
 			VERT_CORNER);
 	}
 	for(int i = 0; i < 12; i++) {
@@ -937,7 +942,7 @@ void *rendererThread(void *arg) {
 			meshes[6] = tessellateMesh(&meshes[3]);
 			meshes[7] = tessellateMesh(&meshes[4]);
 			meshes[8] = tessellateMesh(&meshes[5]);
-			renderMeshes(&meshes[(((int)time) % 3) * 3], 1, boxoidVAO, boxoidVBO, boxoidEBO);
+			renderMeshes(&meshes[3], 1, boxoidVAO, boxoidVBO, boxoidEBO);
 			deleteMeshes(meshes, 9);
 		}
 		else {

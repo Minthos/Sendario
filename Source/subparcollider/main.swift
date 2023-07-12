@@ -59,7 +59,7 @@ var allTheThings = [sun, mercury, venus, earth, moon, player1]
 var actions: [Action] = []
 
 let totalTime = 1e12
-var dt = 0.1
+var dt = 0.0001
 var t = 0.0
 
 /*
@@ -196,11 +196,11 @@ func main() {
         let relativeVelocity = cameraTarget.velocity - nearestCelestial.velocity
         var prograde = relativeVelocity
         if(relativeVelocity.lengthSquared == 0) {
-            camera.position = cameraTarget.position + Vector(x: 0, y: 0, z: -3.0 * cameraTarget.radius)
+            camera.position = cameraTarget.position + Vector(x: 0, y: 0, z: -1.5 * cameraTarget.radius)
             prograde = cameraTarget.orientation * Vector(x: 0, y: 0, z: 1)
         } else {
             prograde = relativeVelocity.normalized()
-            camera.position = cameraTarget.position + relativeVelocity.normalized() * -3.0 * cameraTarget.radius
+            camera.position = cameraTarget.position + relativeVelocity.normalized() * -1.5 * cameraTarget.radius
         }
         var camFwd = (cameraTarget.position - camera.position).normalized()
         var upVec = (cameraTarget.position - nearestCelestial.position).normalized()
