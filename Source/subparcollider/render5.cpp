@@ -2,9 +2,9 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 #include <unistd.h>
-#include <vector>
 #include <array>
 
 #include <GL/glew.h>
@@ -91,7 +91,7 @@ void main() {
 }
 )glsl";
 
-const char *vertexShaderSource = R"glsl(
+const char *sphereVertSource = R"glsl(
 #version 330 core
 
 layout (location = 0) in vec3 position;
@@ -112,7 +112,7 @@ void main()
 }
 )glsl";
 
-const char *fragmentShaderSource = R"glsl(
+const char *sphereFragSource = R"glsl(
 #version 330 core
 
 in vec3 fragPos;
@@ -325,6 +325,17 @@ GLuint compileShader(GLenum shaderType, const char* source) {
     return shader;
 }
 
+GLuint mkShader(const char* vertexSource, const char* fragmentSource) {
+    GLuint vert = compileShader(GL_VERTEX_SHADER, vertexSource);
+    GLuint frag = compileShader(GL_FRAGMENT_SHADER, fragmentSource);
+    GLuint program = glCreateProgram();
+    glAttachShader(program, vert);
+    glAttachShader(program, frag);
+    glLinkProgram(program);
+    checkShader(GL_LINK_STATUS, program);
+	return program;
+}
+
 GLfloat sphereVertices[] = {
     -1.0f,  1.0f, 1.0f,
     -1.0f, -1.0f, 1.0f,
@@ -403,18 +414,36 @@ struct Triangle {
 };
 
 struct Mesh {
-	std::vector<Vertex> verts;
-	std::vector<Triangle> tris;
-	std::vector<Edge> edges;
-	std::vector<GLuint> indices;
+	GLuint numVerts;
+	GLuint numTris;
+	GLuint numEdges;
+	GLuint numIndices;
+	Vertex* verts;
+	Triangle* tris;
+	Edge* edges;
+	GLuint* indices;
 
-	Mesh(std::vector<Vertex> verts, std::vector<Triangle> tris, std::vector<Edge> edges, std::vector<GLuint> indices) {
-		verts=verts;
-		tris=tris;
-		edges=edges;
-		indices=indices;
+	Mesh(Vertex* pverts, GLuint pnumVerts, Triangle* ptris, GLuint pnumTris, Edge* pedges, GLuint pnumEdges, GLuint* pindices, GLuint pnumIndices) {
+		verts = pverts;
+		numVerts = pnumVerts;
+		tris = ptris;
+		numTris = pnumTris;
+		edges = pedges;
+		numEdges = pnumEdges;
+		indices = pindices;
+		numIndices = pnumIndices;
 	}
+	Mesh() {}
 };
+
+void deleteMeshes(Mesh *meshes, size_t numMeshes) {
+	for(size_t i = 0; i < numMeshes; i++) {
+		free(meshes[i].verts);
+		free(meshes[i].tris);
+		free(meshes[i].edges);
+		free(meshes[i].indices);
+	}
+}
 
 glm::vec3 avgOf3(glm::vec3 a, glm::vec3 b, glm::vec3 c) {
 	return (a + b + c) * (1.0f / 3.0f);
@@ -442,35 +471,48 @@ Edge* getCorrectSubdivision(Edge* in, Vertex* corner) {
 
 // Loop subdivision that doesn't create duplicate edges/vertices, runs in linear time
 Mesh tessellateMesh(Mesh* original) {
-	std::vector<Vertex> verts;
-	std::vector<Triangle> tris;
-	std::vector<Edge> edges;
-	std::vector<GLuint> indices;
+	GLuint numVerts = original->numEdges + original->numTris + original->numVerts;
+	GLuint numTris = original->numTris * 3;
+	GLuint numEdges = original->numEdges * 2 + original->numTris * 2;
+	GLuint numIndices = numTris * 3;
+	Vertex* verts = malloc(numVerts * sizeof(Vertex));
+	Triangle* tris = malloc(numTris * sizeof(Triangle));
+	Edge* edges = malloc(numEdges * sizeof(Edge));
+	GLuint* indices = malloc(numEdges * sizeof(GLuint));
 	
+	GLuint edgeIndex = 0;
+	GLuint vertIndex = 0;
+	GLuint triIndex = 0;
+	GLuint indexIndex = 0;
+
 	// for each edge create a vertex and 2 new edges
-	for(int i = 0; i < original->edges.size(); i++) {
+	for(int i = 0; i < original->numEdges; i++) {
 		Edge* edge = &original->edges[i];
-		verts.push_back(vertex_interpolate(edge->verts[0], edge->verts[1], 0.5f));
+		verts[i] = vertex_interpolate(edge->verts[0], edge->verts[1], 0.5f);
 		edge->verts[2] = &verts[i];
-		edges.push_back(Edge(edge->verts[0], edge->verts[2]));
-		edges.push_back(Edge(edge->verts[1], edge->verts[2]));
+		vertIndex++;
+		edges[i * 2] = Edge(edge->verts[0], edge->verts[2]);
+		edges[i * 2 + 1] = Edge(edge->verts[1], edge->verts[2]);
 		edge->subdivisions[0] = &edges[i * 2];
 		edge->subdivisions[1] = &edges[i * 2 + 1];
+		edgeIndex += 2;
 	}
-	
-	// for each triangle create a vertex, 3 new edges and 3 new triangles
-	for(int i = 0; i < original->tris.size(); i++) {
+
+	// for each triangle create a vertex, 2 new edges (plus 1 created in the previous loop) and 3 new triangles
+	for(int i = 0; i < original->numTris; i++) {
 		Triangle *tri = &original->tris[i];
-		verts.push_back(avgOf3Verts(tri->verts));
-		Vertex* newVert = &verts[verts.size() - 1];
+		verts[vertIndex] = avgOf3Verts(tri->verts);
+		Vertex* newVert = &verts[vertIndex];
+		vertIndex++;
 		newVert->flags &= ~VERT_CORNER; // this vertex can't possibly be a corner vertex
 		Vertex *newVertices[3];
 		Edge *newEdges[3];
 		Triangle *newTris[3];
 		for(int j = 0; j < 3; j++) {
 			newVertices[i] = tri->edges[j]->verts[2];
-			edges.push_back(Edge(newVert, newVertices[j]));
-			newEdges[j] = &edges[edges.size() - 1];
+			edges[edgeIndex] = Edge(newVert, newVertices[j]);
+			newEdges[j] = &edges[edgeIndex];
+			edgeIndex++;
 		}
 		for(int j = 0; j < 3; j++) {
 			// I have not tested whether this picks the correct triangles according to clockwise/counterclockwise
@@ -479,22 +521,24 @@ Mesh tessellateMesh(Mesh* original) {
 			Edge *edgeTemp[3] = {newEdges[j],
 				 getCorrectSubdivision(tri->edges[j], tri->verts[j]),
 				 getCorrectSubdivision(tri->edges[(j + 1) % 3], tri->verts[(j + 1) % 3])};
-			tris.push_back(Triangle(vertTemp, edgeTemp, tri->faceIndex));
-			newTris[j] = &tris[tris.size() - 1];
-			indices.push_back((GLuint)(newTris[j]->verts[0] - &verts[0]));
-			indices.push_back((GLuint)(newTris[j]->verts[1] - &verts[0]));
-			indices.push_back((GLuint)(newTris[j]->verts[2] - &verts[0]));
+			tris[triIndex] = Triangle(vertTemp, edgeTemp, tri->faceIndex);
+			newTris[j] = &tris[triIndex];
+			triIndex++;
+			indices[indexIndex++] = (GLuint)(newTris[j]->verts[0] - &verts[0]);
+			indices[indexIndex++] = (GLuint)(newTris[j]->verts[1] - &verts[0]);
+			indices[indexIndex++] = (GLuint)(newTris[j]->verts[2] - &verts[0]);
 		}
 	}
-    return Mesh(verts, tris, edges, indices);
+    return Mesh(verts, numVerts, tris, numTris, edges, numEdges, indices, numIndices);
 }
 
 Mesh boxoidToMesh(Boxoid box) {
-	Vertex verts[8];
-	Triangle tris[12];
+	Vertex *verts = malloc(8 * sizeof(Vertex));
+	Triangle *tris = malloc(12 * sizeof(Triangle));
 	int e = 0;
-	Edge edges[18];
-	GLuint *indices = sphereIndices;
+	Edge *edges = malloc(18 * sizeof(Edge));
+	GLuint *indices = malloc(36 * sizeof(GLuint));
+	memcpy(indices, sphereIndices, 36 * sizeof(GLuint));
 	
     glm::vec3 corners[8];
     glm::vec3 center = glm::vec3(0, 0, 0);
@@ -531,8 +575,129 @@ Mesh boxoidToMesh(Boxoid box) {
 			c->flags |= VERT_OMIT;
 		}
 	}
-	return Mesh(verts, tris, edges, indices);
+	return Mesh(verts, 8, tris, 12, edges, 18, indices, 36);
 }
+
+
+void renderMeshes(const Mesh* meshes, int numMeshes, GLuint vertexBuffer, GLuint indexBuffer)
+{
+    GLuint vertexArray;
+    glGenVertexArrays(1, &vertexArray);
+    glBindVertexArray(vertexArray);
+
+    GLuint totalNumVerts = 0;
+    GLuint totalNumIndices = 0;
+
+    // Calculate the total sizes for the vertex buffer and index buffer
+    for (size_t i = 0; i < numMeshes; i++) {
+        totalNumVerts += meshes[i].numVerts;
+        totalNumIndices += meshes[i].numIndices;
+    }
+
+    // Concatenate vertex data into a single buffer
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+    glBufferData(GL_ARRAY_BUFFER, totalNumVerts * sizeof(Vertex), nullptr, GL_STATIC_DRAW);
+    GLuint vertexOffset = 0;
+    for (size_t i = 0; i < numMeshes; i++) {
+        const Mesh& mesh = meshes[i];
+        glBufferSubData(GL_ARRAY_BUFFER, vertexOffset * sizeof(Vertex), mesh.numVerts * sizeof(Vertex), mesh.verts);
+        vertexOffset += mesh.numVerts;
+    }
+
+    // Concatenate index data into a single buffer
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, totalNumIndices * sizeof(GLuint), nullptr, GL_STATIC_DRAW);
+    GLuint indexOffset = 0;
+    for (size_t i = 0; i < numMeshes; i++) {
+        const Mesh& mesh = meshes[i];
+        GLuint* adjustedIndices = (GLuint*)malloc(mesh.numIndices * sizeof(GLuint));
+        for (GLuint j = 0; j < mesh.numIndices; j++) {
+            adjustedIndices[j] = mesh.indices[j] + vertexOffset;
+        }
+        glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, indexOffset * sizeof(GLuint), mesh.numIndices * sizeof(GLuint), adjustedIndices);
+        indexOffset += mesh.numIndices;
+        free(adjustedIndices);
+    }
+
+    // Configure vertex attribute pointers
+    GLint positionAttribLocation = 0;  // Assuming position attribute is at location 0
+    GLint normalAttribLocation = 1;    // Assuming normal attribute is at location 1
+    GLint lightAttribLocation = 2;     // Assuming light attribute is at location 2
+    GLint flagsAttribLocation = 3;     // Assuming flags attribute is at location 3
+
+    GLsizei stride = sizeof(Vertex);
+    glVertexAttribPointer(positionAttribLocation, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, position));
+    glVertexAttribPointer(normalAttribLocation, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, normal));
+    glVertexAttribPointer(lightAttribLocation, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, light));
+    glVertexAttribPointer(flagsAttribLocation, 1, GL_UNSIGNED_INT, GL_FALSE, stride, (void*)offsetof(Vertex, flags));
+
+    glEnableVertexAttribArray(positionAttribLocation);
+    glEnableVertexAttribArray(normalAttribLocation);
+    glEnableVertexAttribArray(lightAttribLocation);
+    glEnableVertexAttribArray(flagsAttribLocation);
+
+    // Draw all the meshes in a single draw call
+    glDrawElements(GL_TRIANGLES, totalNumIndices, GL_UNSIGNED_INT, nullptr);
+
+    // Cleanup (unbind buffers and delete vertex array)
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
+
+GLuint uploadMeshesToBuffers(Mesh* meshes, int numMeshes, GLuint vertexBuffer, GLuint indexBuffer)
+{
+    // Calculate the total sizes for the vertex buffer and index buffer
+    GLuint totalNumVerts = 0;
+    GLuint totalNumIndices = 0;
+    for (int i = 0; i < numMeshes; i++) {
+        totalNumVerts += meshes[i].numVerts;
+        totalNumIndices += meshes[i].numIndices;
+    }
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+    glBufferData(GL_ARRAY_BUFFER, totalNumVerts * sizeof(Vertex), nullptr, GL_STATIC_DRAW);
+    
+	// Copy the vertex data and adjust indices
+	GLuint *adjustedIndices = malloc(totalNumIndices * sizeof(GLuint));
+    GLuint vertexOffset = 0;
+    GLuint indexOffset = 0;
+    for (int i = 0; i < numMeshes; i++) {
+        glBufferSubData(GL_ARRAY_BUFFER, vertexOffset * sizeof(Vertex), meshes[i].numVerts * sizeof(Vertex), meshes[i].verts);
+        for (GLuint j = 0; j < meshes[i].numIndices; j++) {
+            adjustedIndices[j + indexOffset] = meshes[i].indices[j] + vertexOffset;
+        }
+        vertexOffset += meshes[i].numVerts;
+        indexOffset += meshes[i].numIndices;
+    }
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, totalNumIndices * sizeof(GLuint), nullptr, GL_STATIC_DRAW);
+	glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, totalNumIndices * sizeof(GLuint), adjustedIndices);
+
+    // Configure vertex attribute pointers
+    GLint positionAttribLocation = 0;  // Assuming position attribute is at location 0
+    GLint normalAttribLocation = 1;    // Assuming normal attribute is at location 1
+    GLint lightAttribLocation = 2;     // Assuming light attribute is at location 2
+    GLint flagsAttribLocation = 3;     // Assuming flags attribute is at location 3
+
+    GLsizei stride = sizeof(Vertex);
+    glVertexAttribPointer(positionAttribLocation, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, position));
+    glVertexAttribPointer(normalAttribLocation, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, normal));
+    glVertexAttribPointer(lightAttribLocation, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, light));
+    glVertexAttribPointer(flagsAttribLocation, 1, GL_UNSIGNED_INT, GL_FALSE, stride, (void*)offsetof(Vertex, flags));
+
+    glEnableVertexAttribArray(positionAttribLocation);
+    glEnableVertexAttribArray(normalAttribLocation);
+    glEnableVertexAttribArray(lightAttribLocation);
+    glEnableVertexAttribArray(flagsAttribLocation);
+
+    // Cleanup (unbind buffers)
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	free(adjustedIndices);
+	return totalNumIndices;
+}
+
 
 void *rendererThread(void *arg) {
     // Initialize GLFW
@@ -560,32 +725,10 @@ void *rendererThread(void *arg) {
         return 0;
     }
 
-    // shaders for celestial objects
-    GLuint vertexShader = compileShader(GL_VERTEX_SHADER, vertexShaderSource);
-    GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragmentShaderSource);
-    GLuint shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
-    checkShader(GL_LINK_STATUS, shaderProgram);
-
-    // shaders for boxoids
-    GLuint boxoidVert = compileShader(GL_VERTEX_SHADER, boxoidVertSource);
-    GLuint boxoidFrag = compileShader(GL_FRAGMENT_SHADER, boxoidFragSource);
-    GLuint boxoidProgram = glCreateProgram();
-    glAttachShader(boxoidProgram, boxoidFrag);
-    glAttachShader(boxoidProgram, boxoidVert);
-    glLinkProgram(boxoidProgram);
-    checkShader(GL_LINK_STATUS, boxoidProgram);
- 
-    // shader for the star background
-    GLuint skyboxVert = compileShader(GL_VERTEX_SHADER, skyboxVertSource);
-    GLuint skyboxFrag = compileShader(GL_FRAGMENT_SHADER, skyboxFragSource);
-    GLuint skyboxProgram = glCreateProgram();
-    glAttachShader(skyboxProgram, skyboxFrag);
-    glAttachShader(skyboxProgram, skyboxVert);
-    glLinkProgram(skyboxProgram);
-    checkShader(GL_LINK_STATUS, skyboxProgram);
+    // shaders
+    GLuint sphereProgram = mkShader(sphereVertSource, sphereFragSource);
+    GLuint boxoidProgram = mkShader(boxoidVertSource, boxoidFragSource);
+    GLuint skyboxProgram = mkShader(skyboxVertSource, skyboxFragSource);
  
     // buffers
     GLuint boxoidVAO, boxoidVBO, boxoidEBO;
@@ -607,18 +750,18 @@ void *rendererThread(void *arg) {
     glBindVertexArray(0);
 
     // uniforms
-    GLuint modelLoc = glGetUniformLocation(shaderProgram, "model");
-    GLuint viewLoc = glGetUniformLocation(shaderProgram, "view");
-    GLuint projLoc = glGetUniformLocation(shaderProgram, "projection");
-    GLuint sphereCenterLoc = glGetUniformLocation(shaderProgram, "sphereCenter");
-    GLuint sphereRadiusLoc = glGetUniformLocation(shaderProgram, "sphereRadius");
-    GLuint cameraPosLoc = glGetUniformLocation(shaderProgram, "cameraPos");
-    GLuint lightPositionsLoc = glGetUniformLocation(shaderProgram, "lightPositions");
-    GLuint lightColorsLoc = glGetUniformLocation(shaderProgram, "lightColors");
-    GLuint diffuseLoc = glGetUniformLocation(shaderProgram, "materialDiffuse");
-    GLuint emissiveLoc = glGetUniformLocation(shaderProgram, "materialEmissive");
-    GLuint gammaLoc = glGetUniformLocation(shaderProgram, "gamma");
-    GLuint exposureLoc = glGetUniformLocation(shaderProgram, "exposure");
+    GLuint sphereModelLoc = glGetUniformLocation(sphereProgram, "model");
+    GLuint sphereViewLoc = glGetUniformLocation(sphereProgram, "view");
+    GLuint sphereProjLoc = glGetUniformLocation(sphereProgram, "projection");
+    GLuint sphereCenterLoc = glGetUniformLocation(sphereProgram, "sphereCenter");
+    GLuint sphereRadiusLoc = glGetUniformLocation(sphereProgram, "sphereRadius");
+    GLuint sphereCameraPosLoc = glGetUniformLocation(sphereProgram, "cameraPos");
+    GLuint sphereLightPositionsLoc = glGetUniformLocation(sphereProgram, "lightPositions");
+    GLuint sphereLightColorsLoc = glGetUniformLocation(sphereProgram, "lightColors");
+    GLuint sphereDiffuseLoc = glGetUniformLocation(sphereProgram, "materialDiffuse");
+    GLuint sphereEmissiveLoc = glGetUniformLocation(sphereProgram, "materialEmissive");
+    GLuint sphereGammaLoc = glGetUniformLocation(sphereProgram, "gamma");
+    GLuint sphereExposureLoc = glGetUniformLocation(sphereProgram, "exposure");
 
     GLuint boxoidRotationLoc = glGetUniformLocation(boxoidProgram, "rotation");
     GLuint boxoidModelLoc = glGetUniformLocation(boxoidProgram, "model");
@@ -636,8 +779,8 @@ void *rendererThread(void *arg) {
     GLuint skyboxModelLoc = glGetUniformLocation(skyboxProgram, "model");
     GLuint skyboxViewLoc = glGetUniformLocation(skyboxProgram, "view");
     GLuint skyboxProjLoc = glGetUniformLocation(skyboxProgram, "projection");
-    GLuint timeLocation = glGetUniformLocation(skyboxProgram, "time");
-    GLuint resolutionLocation = glGetUniformLocation(skyboxProgram, "resolution");
+    GLuint skyboxTimeLoc = glGetUniformLocation(skyboxProgram, "time");
+    GLuint skyboxResolutionLoc = glGetUniformLocation(skyboxProgram, "resolution");
 
     // viewport
     int screenWidth, screenHeight;
@@ -686,8 +829,8 @@ void *rendererThread(void *arg) {
         glUniformMatrix4fv(skyboxViewLoc, 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(skyboxProjLoc, 1, GL_FALSE, glm::value_ptr(projection));
         glUniformMatrix4fv(skyboxModelLoc, 1, GL_FALSE, glm::value_ptr(model));
-        glUniform1f(timeLocation, time);
-        glUniform2f(resolutionLocation, 3840, 2160);
+        glUniform1f(skyboxTimeLoc, time);
+        glUniform2f(skyboxResolutionLoc, 3840, 2160);
         glDisable(GL_DEPTH_TEST);
         glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
         glEnable(GL_DEPTH_TEST);
@@ -706,18 +849,20 @@ void *rendererThread(void *arg) {
             glUniform3fv(boxoidLightColorsLoc + i, 1, &sharedData.renderMisc.lights[i].color[0]);
         }
         
-        glUseProgram(shaderProgram);
-        glUniform3f(cameraPosLoc, cameraPos.x, cameraPos.y, cameraPos.z);
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-        glUniform1f(gammaLoc, 2.2f);
-        glUniform1f(exposureLoc, 200.0f);
+        glUseProgram(sphereProgram);
+        glUniform3f(sphereCameraPosLoc, cameraPos.x, cameraPos.y, cameraPos.z);
+        glUniformMatrix4fv(sphereViewLoc, 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(sphereProjLoc, 1, GL_FALSE, glm::value_ptr(projection));
+        glUniform1f(sphereGammaLoc, 2.2f);
+        glUniform1f(sphereExposureLoc, 200.0f);
         for (int i = 0; i < MAX_LIGHTS; ++i) {
-            glUniform3fv(lightPositionsLoc + i, 1, &sharedData.renderMisc.lights[i].position[0]);
-            glUniform3fv(lightColorsLoc + i, 1, &sharedData.renderMisc.lights[i].color[0]);
+            glUniform3fv(sphereLightPositionsLoc + i, 1, &sharedData.renderMisc.lights[i].position[0]);
+            glUniform3fv(sphereLightColorsLoc + i, 1, &sharedData.renderMisc.lights[i].color[0]);
         }
 
         // Geometry
+
+		// Spheres
         if (sharedData.spheres != NULL) {
             // vertex buffer
             glBindVertexArray(sphereVAO);
@@ -728,7 +873,7 @@ void *rendererThread(void *arg) {
                 // translate our model view to position the sphere in world space
                 model = glm::translate(glm::mat4(1.0f), glm::vec3(currentSphere.position[0], currentSphere.position[1], currentSphere.position[2]));
                 model = model * scaling;
-                glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+                glUniformMatrix4fv(sphereModelLoc, 1, GL_FALSE, glm::value_ptr(model));
 
                 // send the position of the sphere directly to the fragment shader, bypassing the vertex shader
                 glUniform3f(sphereCenterLoc, currentSphere.position[0], currentSphere.position[1], currentSphere.position[2]);
@@ -741,8 +886,8 @@ void *rendererThread(void *arg) {
                 // colors looked washed out so I did a thing. not quite vibrance so I'll call it vibe. texture saturation? but we don't have textures.
                 float vibe = 3.0;
                 diffuseComponent = glm::vec3(std::pow(diffuseComponent.r, vibe), std::pow(diffuseComponent.g, vibe), std::pow(diffuseComponent.b, vibe));
-                glUniform3fv(diffuseLoc, 1, glm::value_ptr(diffuseComponent));
-                glUniform3fv(emissiveLoc, 1, glm::value_ptr(emissiveComponent));
+                glUniform3fv(sphereDiffuseLoc, 1, glm::value_ptr(diffuseComponent));
+                glUniform3fv(sphereEmissiveLoc, 1, glm::value_ptr(emissiveComponent));
 
                 // Draw the sphere
                 if(i < 5) {
@@ -751,14 +896,15 @@ void *rendererThread(void *arg) {
             }
         }
 
+		// Boxoids
         if(sharedData.numSpheres >= 5) {
             glUseProgram(boxoidProgram);
-        // right - bottom rear - left -- left - top rear - right // rear plate
-        // left - bottom front - right -- right top front - left // front plate
-        // left - bottom rear - right -- right bottom front left // bottom plate
-        // right top rear left -- left top front right           // top plate
-        // right bottom rear - top -- right top front - bottom   // right plate
-        // left bottom rear - front -- left top front - rear     // left plate
+			// right - bottom rear - left -- left - top rear - right // rear plate
+			// left - bottom front - right -- right top front - left // front plate
+			// left - bottom rear - right -- right bottom front left // bottom plate
+			// right top rear left -- left top front right           // top plate
+			// right bottom rear - top -- right top front - bottom   // right plate
+			// left bottom rear - front -- left top front - rear     // left plate
             glm::vec3 center = glm::vec3(sharedData.spheres[5].position[0], sharedData.spheres[5].position[1], sharedData.spheres[5].position[2]);
             // this boxoid is spherical
             Boxoid boxoids[2] =
@@ -797,38 +943,13 @@ void *rendererThread(void *arg) {
 
             size_t numBoxoids = 2;
 
-            GLuint boxoidIndices[36];
-            for (int i = 0; i < 6; i++) {
-                boxoidIndices[i * 6 + 0] = 4 * i + 0;
-                boxoidIndices[i * 6 + 1] = 4 * i + 1;
-                boxoidIndices[i * 6 + 2] = 4 * i + 2;
-                boxoidIndices[i * 6 + 3] = 4 * i + 0;
-                boxoidIndices[i * 6 + 4] = 4 * i + 2;
-                boxoidIndices[i * 6 + 5] = 4 * i + 3;
-            }
+			Mesh meshes[2];
+			meshes[0] = boxoidToMesh(boxoids[0]);
+			meshes[1] = boxoidToMesh(boxoids[1]);
+
+			//GLuint totalNumIndices = uploadMeshesToBuffers(meshes, 2, boxoidVBO, boxoidEBO);
 
 
-            size_t bufferSize = numBoxoids * sizeof(Vertex) * 24;
-            Vertex vertices[numBoxoids * 24];
-            for (size_t i = 0; i < numBoxoids; ++i) {
-                //setupBoxoid(boxoids[i], &vertices[i * 24]);
-            }
-
-            glBindVertexArray(boxoidVAO);
-            glBindBuffer(GL_ARRAY_BUFFER, boxoidVBO);
-            glBufferSubData(GL_ARRAY_BUFFER, 0, bufferSize, vertices);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, boxoidEBO);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(boxoidIndices), boxoidIndices, GL_STATIC_DRAW);
-            
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
-            glEnableVertexAttribArray(0);
-            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
-            glEnableVertexAttribArray(1);
-            glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, light));
-            glEnableVertexAttribArray(2);
-            glVertexAttribIPointer(3, 1, GL_INT, sizeof(Vertex), (void*)offsetof(Vertex, flags));
-            glEnableVertexAttribArray(3);
-            
             // translate our model view to position the sphere in world space
             model = glm::translate(glm::mat4(1.0f), center);
             glUniformMatrix4fv(boxoidModelLoc, 1, GL_FALSE, glm::value_ptr(model));
@@ -845,8 +966,13 @@ void *rendererThread(void *arg) {
             diffuseComponent = glm::vec3(std::pow(diffuseComponent.r, vibe), std::pow(diffuseComponent.g, vibe), std::pow(diffuseComponent.b, vibe));
             glUniform3fv(boxoidDiffuseLoc, 1, glm::value_ptr(diffuseComponent));
             glUniform3fv(boxoidEmissiveLoc, 1, glm::value_ptr(emissiveComponent));
-            
-            glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, numBoxoids);
+           
+            glBindVertexArray(boxoidVAO);
+			renderMeshes(meshes, 2, boxoidVBO, boxoidEBO);
+ 
+			deleteMeshes(meshes, 2);
+		    //glDrawElements(GL_TRIANGLES, totalNumIndices, GL_UNSIGNED_INT, nullptr);
+            //glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, numBoxoids);
             glBindBuffer(GL_ARRAY_BUFFER, 0);
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
         }
@@ -863,7 +989,7 @@ void *rendererThread(void *arg) {
     glDeleteVertexArrays(1, &sphereVAO);
     glDeleteBuffers(1, &sphereVBO);
     glDeleteBuffers(1, &sphereEBO);
-    glDeleteProgram(shaderProgram);
+    glDeleteProgram(sphereProgram);
     glfwTerminate();
     return 0;
 }
