@@ -435,32 +435,35 @@ struct Vertex {
 };
 
 struct Edge {
-	Vertex *verts[3];
+	GLuint verts[3];
 	Edge* subdivisions[2];
 	
 	Edge() {}
-	Edge(Vertex *vert0, Vertex *vert1) {
+	Edge(GLuint vert0, GLuint vert1) {
 		verts[0] = vert0;
 		verts[1] = vert1;
-		verts[2] = nullptr;
+		verts[2] = -1;
 		subdivisions[0] = nullptr;
 		subdivisions[1] = nullptr;
 	}
 };
 
 struct Triangle {
-	Vertex *verts[3];
+	GLuint verts[3];
 	Edge *edges[3];
 	GLuint faceIndex;
 
 	Triangle() {}
-	Triangle(Vertex *pverts[3], Edge *pedges[3], GLuint pfaceIndex) {
+	Triangle(GLuint pverts[3], Edge *pedges[3], GLuint pfaceIndex) {
 		verts[0] = pverts[0];
 		verts[1] = pverts[1];
 		verts[2] = pverts[2];
 		edges[0] = pedges[0];
 		edges[1] = pedges[1];
 		edges[2] = pedges[2];
+		assert(edges[0]->verts[0] == verts[0] || edges[0]->verts[1] == verts[0]);
+		assert(edges[1]->verts[0] == verts[1] || edges[1]->verts[1] == verts[1]);
+		assert(edges[2]->verts[0] == verts[2] || edges[2]->verts[1] == verts[2]);
 		faceIndex = pfaceIndex;
 	}
 };
@@ -512,19 +515,10 @@ Vertex avgOf3Verts(Vertex *verts[3]) {
 				  verts[0]->flags & verts[1]->flags & verts[2]->flags);
 }
 
-Edge* getCorrectSubdivision(Edge* in, Vertex* corner) {
-	if(in->subdivisions[0]->verts[0] == corner || in->subdivisions[0]->verts[1] == corner) {
-		return in->subdivisions[0];
-	} else {
-		//assert(in->subdivisions[1]->verts[0] == corner || in->subdivisions[1]->verts[1] == corner);
-		return in->subdivisions[1];
-	}
-}
-
 // Loop subdivision that doesn't create duplicate edges/vertices, runs in linear time
 Mesh tessellateMesh(Mesh* original) {
-	GLuint numVerts = original->numEdges + original->numTris + original->numVerts;
-	GLuint numTris = original->numTris * 3;
+	GLuint numVerts = original->numEdges + original->numVerts;
+	GLuint numTris = original->numTris * 4;
 	GLuint numEdges = original->numEdges * 2 + original->numTris * 3;
 	GLuint numIndices = numTris * 3;
 	Vertex* verts = malloc(numVerts * sizeof(Vertex));
@@ -537,50 +531,64 @@ Mesh tessellateMesh(Mesh* original) {
 	GLuint triIndex = 0;
 	GLuint indexIndex = 0;
 
+	memcpy(verts, original->verts, original->numVerts * sizeof(Vertex));
+	vertIndex += original->numVerts;
+
 	// for each edge create a vertex and 2 new edges
 	for(int i = 0; i < original->numEdges; i++) {
 		Edge* edge = &(original->edges[i]);
-		verts[i] = vertex_interpolate(edge->verts[0], edge->verts[1], 0.5f);
-		edge->verts[2] = &verts[i];
-		vertIndex++;
+		verts[vertIndex] = vertex_interpolate(&verts[edge->verts[0]], &verts[edge->verts[1]], 0.5f);
+		edge->verts[2] = vertIndex;
 		edges[i * 2] = Edge(edge->verts[0], edge->verts[2]);
 		edges[i * 2 + 1] = Edge(edge->verts[1], edge->verts[2]);
 		edge->subdivisions[0] = &edges[i * 2];
 		edge->subdivisions[1] = &edges[i * 2 + 1];
+		vertIndex++;
 		edgeIndex += 2;
 	}
 
-	// for each triangle create a vertex, 3 new edges (plus 3 created in the previous loop) and 3 new triangles
+	// for each triangle, create 3 new edges and 4 new triangles
 	for(int i = 0; i < original->numTris; i++) {
 		Triangle *tri = &original->tris[i];
-		verts[vertIndex] = avgOf3Verts(tri->verts);
-		Vertex* newVert = &verts[vertIndex];
-		vertIndex++;
-		newVert->flags &= ~VERT_CORNER; // this vertex can't possibly be a corner vertex
-		Vertex *newVertices[3];
-		Edge *newEdges[3];
-		Triangle *newTris[3];
+		GLuint newVertices[3];
+		Edge *edgeEdges[6];
+		Edge *centreEdges[3];
+		Triangle *newTris[4];
 		for(int j = 0; j < 3; j++) {
+			if(tri->edges[j]->subdivisions[0]->verts[0] == tri->verts[j]) {
+				edgeEdges[j * 2] = tri->edges[j]->subdivisions[0];
+				edgeEdges[j * 2 + 1] = tri->edges[j]->subdivisions[1];
+			} else {
+				assert(tri->edges[j]->subdivisions[1]->verts[0] == tri->verts[j]);
+				edgeEdges[j * 2] = tri->edges[j]->subdivisions[1];
+				edgeEdges[j * 2 + 1] = tri->edges[j]->subdivisions[0];
+			}
+			edges[edgeIndex] = Edge(tri->edges[j]->verts[2], tri->edges[(j + 1) % 3]->verts[2]);
+			centreEdges[j] = &edges[edgeIndex];
 			newVertices[j] = tri->edges[j]->verts[2];
-			edges[edgeIndex] = Edge(newVert, newVertices[j]);
-			newEdges[j] = &edges[edgeIndex];
 			edgeIndex++;
 		}
+		// edges have been created and registered, vertices have been registered
+
+		// have to think about this some more, make sure the edges and vertices match up
 		for(int j = 0; j < 3; j++) {
-			// I have not tested whether this picks the correct triangles according to clockwise/counterclockwise
-			// traversal convention
-			Vertex *vertTemp[3] = {newVert, newVertices[j], tri->verts[j]};
-			Edge *edgeTemp[3] = {newEdges[j],
-				 getCorrectSubdivision(tri->edges[j], tri->verts[j]),
-				 getCorrectSubdivision(tri->edges[(j + 1) % 3], tri->verts[(j + 1) % 3])};
+			GLuint vertTemp[3] = {tri->verts[j], newVertices[j], newVertices[(j + 2) % 3]};
+			Edge *edgeTemp[3] = {edgeEdges[(j * 2) % 6], centreEdges[j], edgeEdges[(j * 2 + 5) % 6]};
 			tris[triIndex] = Triangle(vertTemp, edgeTemp, tri->faceIndex);
 			newTris[j] = &tris[triIndex];
 			triIndex++;
-			indices[indexIndex++] = (GLuint)(newTris[j]->verts[0] - &verts[0]);
-			indices[indexIndex++] = (GLuint)(newTris[j]->verts[1] - &verts[0]);
-			indices[indexIndex++] = (GLuint)(newTris[j]->verts[2] - &verts[0]);
+		}
+		tris[triIndex] = Triangle(newVertices, centreEdges, tri->faceIndex);
+		newTris[3] = &tris[triIndex];
+		triIndex++;
+		for(int j = 0; j < 4; j++) {
+			indices[indexIndex++] = newTris[j]->verts[0];
+			indices[indexIndex++] = newTris[j]->verts[1];
+			indices[indexIndex++] = newTris[j]->verts[2];
+			//printf("indices: %d %d %d\n", indices[i * 9 + j * 3], indices[i * 9 + j * 3 + 1], indices[i * 9 + j * 3 + 2]);
 		}
 	}
+	//printf("1 mesh subdivided. %d verts, %d tris, %d edges, %d indices\n", numVerts, numTris, numEdges, numIndices);
 	return Mesh(verts, numVerts, tris, numTris, edges, numEdges, indices, numIndices);
 }
 
@@ -604,22 +612,19 @@ Mesh boxoidToMesh(Boxoid box) {
 			glm::normalize(corners[i] - center),
 			glm::vec3(5.0f, 20.0f, 10.0f),
 			//vectorize(sharedData.renderMisc.materials[box.material_idx].emissive),
-			VERT_CORNER);
+			0x00000000 | VERT_CORNER);
 	}
 	for(int i = 0; i < 12; i++) {
-		Vertex* a = &verts[sphereIndices[i * 3]];
-		Vertex* b = &verts[sphereIndices[i * 3 + 1]];
-		Vertex* c = &verts[sphereIndices[i * 3 + 2]];
-		edges[e++] = Edge(a, b);
-		edges[e++] = Edge(b, c);
-		edges[e++] = Edge(c, a);
-		Vertex* tmpVerts[3] = {a, b, c};
+		GLuint tmpVerts[3] = {sphereIndices[i * 3], sphereIndices[i * 3 + 1], sphereIndices[i * 3 + 2]}; 
+		edges[e++] = Edge(tmpVerts[0], tmpVerts[1]);
+		edges[e++] = Edge(tmpVerts[1], tmpVerts[2]);
+		edges[e++] = Edge(tmpVerts[2], tmpVerts[0]);
 		Edge* tmpEdges[3] = {&edges[i * 3], &edges[i * 3 + 1], &edges[i * 3 + 2]};
 		tris[i] = Triangle(tmpVerts, tmpEdges, i / 2);
 		if((box.missing_faces & (0x1 << (i/2))) != 0) {
-			a->flags |= VERT_OMIT;
-			b->flags |= VERT_OMIT;
-			c->flags |= VERT_OMIT;
+			verts[tmpVerts[0]].flags |= VERT_OMIT;
+			verts[tmpVerts[1]].flags |= VERT_OMIT;
+			verts[tmpVerts[2]].flags |= VERT_OMIT;
 		}
 	}
 	// remove duplicate edges
@@ -632,7 +637,7 @@ Mesh boxoidToMesh(Boxoid box) {
 			b = &realEdges[j];
 			if((a->verts[0] == b->verts[0] && a->verts[1] == b->verts[1] ||
 				(a->verts[1] == b->verts[0] && a->verts[0] == b->verts[1]))) {
-				// we found a pair!
+				// we found a duplicate!
 				goto neeext;
 			}
 		}
@@ -651,6 +656,7 @@ neeext:
 		}
 	}
 	free(edges);
+	//printf("1 mesh generated. 8 verts, 12 tris, 18 edges, 36 indices\n");
 	return Mesh(verts, 8, tris, 12, realEdges, 18, indices, 36);
 }
 
@@ -932,18 +938,18 @@ void *rendererThread(void *arg) {
 			glUniform3fv(boxoidEmissiveLoc, 1, glm::value_ptr(emissiveComponent));
 		  
 			// TODO: meshes and the buffers should be cached and reused between frames. Use LOD to determine how refined meshes should be (up to a low limit).
-			Mesh meshes[9];
+			Mesh meshes[4];
 			meshes[0] = boxoidToMesh(exampleBoxoids[0]);
 			meshes[1] = boxoidToMesh(exampleBoxoids[1]);
 			meshes[2] = boxoidToMesh(exampleBoxoids[2]);
 			meshes[3] = tessellateMesh(&meshes[0]);
-			meshes[4] = tessellateMesh(&meshes[1]);
-			meshes[5] = tessellateMesh(&meshes[2]);
-			meshes[6] = tessellateMesh(&meshes[3]);
-			meshes[7] = tessellateMesh(&meshes[4]);
-			meshes[8] = tessellateMesh(&meshes[5]);
+			//meshes[4] = tessellateMesh(&meshes[1]);
+			//meshes[5] = tessellateMesh(&meshes[2]);
+			//meshes[6] = tessellateMesh(&meshes[3]);
+			//meshes[7] = tessellateMesh(&meshes[4]);
+			//meshes[8] = tessellateMesh(&meshes[5]);
 			renderMeshes(&meshes[3], 1, boxoidVAO, boxoidVBO, boxoidEBO);
-			deleteMeshes(meshes, 9);
+			deleteMeshes(meshes, 4);
 		}
 		else {
 			printf("numSpheres: %d\n", sharedData.numSpheres);
