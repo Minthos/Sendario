@@ -151,6 +151,8 @@ func main() {
                                 dt *= 0.1
                             } else if event.cbutton.button == SDL_CONTROLLER_BUTTON_B.rawValue {
                                 buttonPresses += 1;
+                            } else if event.cbutton.button == SDL_CONTROLLER_BUTTON_A.rawValue {
+                                buttonPresses -= 1;
                             }
                         case SDL_CONTROLLERBUTTONUP.rawValue:
                             if event.cbutton.button == SDL_CONTROLLER_BUTTON_START.rawValue {
@@ -263,7 +265,7 @@ func main() {
                                         radius: Float(player1.radius * pow(position.length * 0.01, 0.9)),
                                         material_idx: 6)
         }
-		renderMisc.buttonPresses = buttonPresses;
+		renderMisc.buttonPresses = abs(buttonPresses);
         render(sphereArray, allTheThings.count + trajectory.count, renderMisc)
         sphereArray.deallocate()
     }

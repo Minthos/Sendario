@@ -942,8 +942,7 @@ void *rendererThread(void *arg) {
 			static int numIndices = 0;
 			// can use a better algorithm to dynamically update meshes when the geometry changes and in response to LOD
 			// considerations
-				Mesh meshes[7];
-			
+			Mesh meshes[7];
 			if(numIndices == 0) {
 				meshes[0] = boxoidToMesh(exampleBoxoids[0]);
 				meshes[1] = boxoidToMesh(exampleBoxoids[1]);
