@@ -657,31 +657,22 @@ neeext:
 		}
 	}
 	free(edges);
-	printf("1 mesh generated. 8 verts, %d tris, %d edges, %d indices\n", t, r, indexIndex);
+	//printf("1 mesh generated. 8 verts, %d tris, %d edges, %d indices\n", t, r, indexIndex);
 	return Mesh(centre, verts, 8, tris, t, realEdges, r, indices, indexIndex);
 }
 
 
-void renderMeshes(const Mesh* meshes, int numMeshes, GLuint meshVAO, GLuint meshVBO, GLuint meshEBO)
+int uploadMeshes(const Mesh* meshes, int numMeshes, GLuint meshVAO, GLuint meshVBO, GLuint meshEBO)
 {
-	glGenVertexArrays(1, &meshVAO);
-	glGenBuffers(1, &meshVBO);
-	glGenBuffers(1, &meshEBO);
-
 	glBindVertexArray(meshVAO);
 	GLuint totalNumVerts = 0;
 	GLuint totalNumIndices = 0;
-
-	// Calculate the total sizes for the vertex buffer and index buffer
 	for (size_t i = 0; i < numMeshes; i++) {
 		totalNumVerts += meshes[i].numVerts;
 		totalNumIndices += meshes[i].numIndices;
 	}
-
-	// Concatenate vertex data into a single buffer
 	glBindBuffer(GL_ARRAY_BUFFER, meshVBO);
 	glBufferData(GL_ARRAY_BUFFER, totalNumVerts * sizeof(Vertex), nullptr, GL_STATIC_DRAW);
-	
 	GLuint* adjustedIndices = (GLuint*)malloc(totalNumIndices * sizeof(GLuint));
 	GLuint indexOffset = 0;
 	GLuint vertexOffset = 0;
@@ -694,38 +685,39 @@ void renderMeshes(const Mesh* meshes, int numMeshes, GLuint meshVAO, GLuint mesh
 		indexOffset += mesh.numIndices;
 		vertexOffset += mesh.numVerts;
 	}
-
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, meshEBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, totalNumIndices * sizeof(GLuint), adjustedIndices, GL_STATIC_DRAW);
 	free(adjustedIndices);
-
-	// Configure vertex attribute pointers
-	GLint positionAttribLocation = 0;  // Assuming position attribute is at location 0
-	GLint normalAttribLocation = 1;	// Assuming normal attribute is at location 1
-	GLint lightAttribLocation = 2;	 // Assuming light attribute is at location 2
-	GLint flagsAttribLocation = 3;	 // Assuming flags attribute is at location 3
-
 	GLsizei stride = sizeof(Vertex);
-	glVertexAttribPointer(positionAttribLocation, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, position));
-	glVertexAttribPointer(normalAttribLocation, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, normal));
-	glVertexAttribPointer(lightAttribLocation, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, light));
-	glVertexAttribPointer(flagsAttribLocation, 1, GL_UNSIGNED_INT, GL_FALSE, stride, (void*)offsetof(Vertex, flags));
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, position));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, normal));
+	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, light));
+	glVertexAttribPointer(3, 1, GL_UNSIGNED_INT, GL_FALSE, stride, (void*)offsetof(Vertex, flags));
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+	glEnableVertexAttribArray(2);
+	glEnableVertexAttribArray(3);
+	return totalNumIndices;
+}
 
-	glEnableVertexAttribArray(positionAttribLocation);
-	glEnableVertexAttribArray(normalAttribLocation);
-	glEnableVertexAttribArray(lightAttribLocation);
-	glEnableVertexAttribArray(flagsAttribLocation);
-
-	// Draw all the meshes in a single draw call
-	glDrawElements(GL_TRIANGLES, totalNumIndices, GL_UNSIGNED_INT, nullptr);
-
-	// Cleanup (unbind buffers and delete vertex array)
+void renderMeshes(int numIndices, GLuint meshVAO, GLuint meshVBO, GLuint meshEBO)
+{
+	glBindVertexArray(meshVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, meshVBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, meshEBO);
+	GLsizei stride = sizeof(Vertex);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, position));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, normal));
+	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, light));
+	glVertexAttribPointer(3, 1, GL_UNSIGNED_INT, GL_FALSE, stride, (void*)offsetof(Vertex, flags));
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+	glEnableVertexAttribArray(2);
+	glEnableVertexAttribArray(3);
+	glDrawElements(GL_TRIANGLES, numIndices, GL_UNSIGNED_INT, nullptr);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
-	glDeleteVertexArrays(1, &meshVAO);
-	glDeleteBuffers(1, &meshVBO);
-	glDeleteBuffers(1, &meshEBO);
 }
 
 void *rendererThread(void *arg) {
@@ -762,6 +754,9 @@ void *rendererThread(void *arg) {
 	// buffers
 	GLuint boxoidVAO, boxoidVBO, boxoidEBO;
 	GLuint sphereVAO, sphereVBO, sphereEBO;
+	glGenVertexArrays(1, &boxoidVAO);
+	glGenBuffers(1, &boxoidVBO);
+	glGenBuffers(1, &boxoidEBO);
 	glGenVertexArrays(1, &sphereVAO);
 	glGenBuffers(1, &sphereVBO);
 	glGenBuffers(1, &sphereEBO);
@@ -938,22 +933,21 @@ void *rendererThread(void *arg) {
 			glUniform3fv(boxoidDiffuseLoc, 1, glm::value_ptr(diffuseComponent));
 			glUniform3fv(boxoidEmissiveLoc, 1, glm::value_ptr(emissiveComponent));
 		  
-			// TODO: meshes and the buffers should be cached and reused between frames. Use LOD to determine how refined meshes should be (up to a low limit).
-			Mesh meshes[7];
-			meshes[0] = boxoidToMesh(exampleBoxoids[0]);
-			meshes[1] = boxoidToMesh(exampleBoxoids[1]);
-			meshes[2] = boxoidToMesh(exampleBoxoids[2]);
-			meshes[3] = tessellateMesh(&meshes[0], 0, &exampleBoxoids[0]);
-			meshes[4] = tessellateMesh(&meshes[3], 1, &exampleBoxoids[0]);
-			meshes[5] = tessellateMesh(&meshes[4], 2, &exampleBoxoids[0]);
-			meshes[6] = tessellateMesh(&meshes[5], 3, &exampleBoxoids[0]);
-			//meshes[4] = tessellateMesh(&meshes[1]);
-			//meshes[5] = tessellateMesh(&meshes[2]);
-			//meshes[6] = tessellateMesh(&meshes[3]);
-			//meshes[7] = tessellateMesh(&meshes[4]);
-			//meshes[8] = tessellateMesh(&meshes[5]);
-			renderMeshes(&meshes[6], 1, boxoidVAO, boxoidVBO, boxoidEBO);
-			deleteMeshes(meshes, 7);
+			int numIndices = 0;
+			// can use a better algorithm to dynamically update meshes when the geometry to render changes
+			if(numIndices == 0) {
+				Mesh meshes[7];
+				meshes[0] = boxoidToMesh(exampleBoxoids[0]);
+				meshes[1] = boxoidToMesh(exampleBoxoids[1]);
+				meshes[2] = boxoidToMesh(exampleBoxoids[2]);
+				meshes[3] = tessellateMesh(&meshes[0], 0, &exampleBoxoids[0]);
+				meshes[4] = tessellateMesh(&meshes[3], 1, &exampleBoxoids[0]);
+				meshes[5] = tessellateMesh(&meshes[4], 2, &exampleBoxoids[0]);
+				meshes[6] = tessellateMesh(&meshes[5], 3, &exampleBoxoids[0]);
+				numIndices = uploadMeshes(&meshes[0], 7, boxoidVAO, boxoidVBO, boxoidEBO);
+				deleteMeshes(meshes, 7);
+			}
+			renderMeshes(numIndices, boxoidVAO, boxoidVBO, boxoidEBO);
 		}
 		else {
 			printf("numSpheres: %d\n", sharedData.numSpheres);
@@ -962,6 +956,9 @@ void *rendererThread(void *arg) {
 		glfwSwapBuffers(sharedData.window);
 		glfwPollEvents();
 	}
+	glDeleteVertexArrays(1, &boxoidVAO);
+	glDeleteBuffers(1, &boxoidVBO);
+	glDeleteBuffers(1, &boxoidEBO);
 	glDeleteVertexArrays(1, &sphereVAO);
 	glDeleteBuffers(1, &sphereVBO);
 	glDeleteBuffers(1, &sphereEBO);
