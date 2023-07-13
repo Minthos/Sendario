@@ -934,7 +934,8 @@ void *rendererThread(void *arg) {
 			glUniform3fv(boxoidEmissiveLoc, 1, glm::value_ptr(emissiveComponent));
 		  
 			static int numIndices = 0;
-			// can use a better algorithm to dynamically update meshes when the geometry to render changes
+			// can use a better algorithm to dynamically update meshes when the geometry changes and in response to LOD
+			// considerations
 			if(numIndices == 0) {
 				Mesh meshes[7];
 				meshes[0] = boxoidToMesh(exampleBoxoids[0]);
@@ -944,7 +945,7 @@ void *rendererThread(void *arg) {
 				meshes[4] = tessellateMesh(&meshes[3], 1, &exampleBoxoids[0]);
 				meshes[5] = tessellateMesh(&meshes[4], 2, &exampleBoxoids[0]);
 				meshes[6] = tessellateMesh(&meshes[5], 3, &exampleBoxoids[0]);
-				numIndices = uploadMeshes(&meshes[0], 7, boxoidVAO, boxoidVBO, boxoidEBO);
+				numIndices = uploadMeshes(&meshes[6], 1, boxoidVAO, boxoidVBO, boxoidEBO);
 				deleteMeshes(meshes, 7);
 			}
 			renderMeshes(numIndices, boxoidVAO, boxoidVBO, boxoidEBO);
