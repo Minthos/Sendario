@@ -262,7 +262,7 @@ void main()
 	vec3 radiance = materialEmissive * 0.079577 + accumulatedLight;
 	float darkness = 3.0 / (3.0 + exposure + radiance.r + radiance.g + radiance.b);
 	radiance = radiance * darkness;
-	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 0.25) + vec4(fragNormal, 0.25);
+	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 0.5) + vec4(fragNormal, 0.25);
 	const float constantForDepth = 1.0;
 	const float farDistance = 3e18;
 	const float offsetForDepth = 1.0;
@@ -335,13 +335,13 @@ GLuint sphereIndices[] = {
 	0, 2, 3,
 	4, 5, 6,
 	4, 6, 7,
-	0, 1, 5,
+	5, 0, 1,
 	5, 0, 4,
 	3, 2, 6,
 	3, 6, 7,
-	0, 3, 7,
+	7, 0, 3,
 	7, 0, 4,
-	1, 2, 6,
+	6, 1, 2,
 	6, 1, 5
 };
 
@@ -436,12 +436,16 @@ struct Triangle {
 		edges[0] = pedges[0];
 		edges[1] = pedges[1];
 		edges[2] = pedges[2];
+		// demand that all triangles are created in strict order
+		// first edge must connect points 1 and 2
 		assert(edges[0]->verts[0] == verts[0] || edges[0]->verts[1] == verts[0]);
-		//assert(edges[0]->verts[0] == verts[1] || edges[0]->verts[1] == verts[1]);
+		assert(edges[0]->verts[0] == verts[1] || edges[0]->verts[1] == verts[1]);
+		// ssecond edge must connect points 2 and 3
 		assert(edges[1]->verts[0] == verts[1] || edges[1]->verts[1] == verts[1]);
-		//assert(edges[1]->verts[0] == verts[2] || edges[1]->verts[1] == verts[2]);
+		assert(edges[1]->verts[0] == verts[2] || edges[1]->verts[1] == verts[2]);
+		// third edge must connect points 3 and 1
 		assert(edges[2]->verts[0] == verts[2] || edges[2]->verts[1] == verts[2]);
-		//assert(edges[2]->verts[0] == verts[0] || edges[2]->verts[1] == verts[0]);
+		assert(edges[2]->verts[0] == verts[0] || edges[2]->verts[1] == verts[0]);
 		faceIndex = pfaceIndex;
 	}
 };
@@ -550,10 +554,10 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 			edgeIndex++;
 		}
 		for(int j = 0; j < 3; j++) {
-			// this shit. The reult looks fine after 1 level of tessellation but after 2 it's messed up.
+			// this shit. The result looks fine after 1 level of tessellation but after 2 it's messed up.
 			// I bet the problem is somewhere around here..
 			GLuint vertTemp[3] = {tri->verts[j], newVertices[j], newVertices[(j + 2) % 3]};
-			Edge *edgeTemp[3] = {edgeEdges[(j * 2) % 6], centreEdges[j], edgeEdges[(j * 2 + 5) % 6]};
+			Edge *edgeTemp[3] = {edgeEdges[(j * 2) % 6], centreEdges[(j + 2) % 3], edgeEdges[(j * 2 + 5) % 6]};
 			tris[triIndex] = Triangle(vertTemp, edgeTemp, tri->faceIndex);
 			newTris[j] = &tris[triIndex];
 			triIndex++;
