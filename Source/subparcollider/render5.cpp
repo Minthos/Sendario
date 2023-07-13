@@ -415,8 +415,8 @@ glm::vec3 vlerp(glm::vec3 a, glm::vec3 b, float f) {
 }
 
 //enum VertFlags {
-GLuint VERT_CORNER = 1; // indicates that the vertex is part of a corner
-GLuint VERT_OMIT = 2; // if all 3 vertices of a triangle has this flag, don't render the triangle
+GLuint VERT_CORNER = 1; // this variable is out of service
+GLuint VERT_OMIT = 2; // this variable is out of service
 //};
 
 struct Vertex {
@@ -470,6 +470,8 @@ struct Triangle {
 
 struct Mesh {
 	glm::vec3 centre;
+	glm::vec3 faceNormals[6];
+	glm::vec3 faceCentres[6];
 	GLuint numVerts;
 	GLuint numTris;
 	GLuint numEdges;
@@ -479,8 +481,12 @@ struct Mesh {
 	Edge* edges;
 	GLuint* indices;
 
-	Mesh(glm::vec3 pcentre, Vertex* pverts, GLuint pnumVerts, Triangle* ptris, GLuint pnumTris, Edge* pedges, GLuint pnumEdges, GLuint* pindices, GLuint pnumIndices) {
+	Mesh(glm::vec3 pcentre, glm::vec3 pfaceNormals[6], glm::vec3 pfaceCentres[6], Vertex* pverts, GLuint pnumVerts, Triangle* ptris, GLuint pnumTris, Edge* pedges, GLuint pnumEdges, GLuint* pindices, GLuint pnumIndices) {
 		centre = pcentre;
+		for(int i = 0; i < 6; i++){
+			faceNormals[i] = pfaceNormals[i];
+			faceCentres[i] = pfaceCentres[i];
+		}
 		verts = pverts;
 		numVerts = pnumVerts;
 		tris = ptris;
@@ -586,7 +592,7 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 		}
 	}
 	printf("1 mesh subdivided. %d verts, %d tris, %d edges, %d indices\n", numVerts, numTris, numEdges, numIndices);
-	return Mesh(original->centre, verts, numVerts, tris, numTris, edges, numEdges, indices, numIndices);
+	return Mesh(original->centre, original->faceNormals, original->faceCentres, verts, numVerts, tris, numTris, edges, numEdges, indices, numIndices);
 }
 
 Mesh boxoidToMesh(Boxoid box) {
@@ -597,6 +603,8 @@ Mesh boxoidToMesh(Boxoid box) {
 	int indexIndex = 0;
 	Edge *edges = malloc(36 * sizeof(Edge));
 	GLuint *indices = malloc(36 * sizeof(GLuint));
+	glm::vec3 faceNormals[6];
+	glm::vec3 faceCentres[6];
 	
 	glm::vec3 corners[8];
 	glm::vec3 centre = glm::vec3(0, 0, 0);
@@ -614,7 +622,7 @@ Mesh boxoidToMesh(Boxoid box) {
 	}
 	for(int i = 0; i < 12; i++) {
 		if(box.missing_faces & (0x1 << (i/2))) {
-			;// skip this triangle
+			// skip this triangle
 		} else {
 			indices[indexIndex++] = sphereIndices[i * 3];
 			indices[indexIndex++] = sphereIndices[i * 3 + 1];
@@ -626,6 +634,11 @@ Mesh boxoidToMesh(Boxoid box) {
 			Edge* tmpEdges[3] = {&edges[e], &edges[e + 1], &edges[e + 2]};
 			e += 3;
 			tris[t++] = Triangle(tmpVerts, tmpEdges, i / 2);
+		}
+		if(i & 0x1 == 0){
+			faceCentres[i / 2] = (corners[sphereIndices[i * 3]] + corners[sphereIndices[i * 3 + 1]] +
+								  corners[sphereIndices[i * 3 + 2]] + corners[sphereIndices[i * 3 + 4]]) * 0.25f;
+			faceNormals[i / 2] = glm::normalize(faceCentres[i / 2] - centre);
 		}
 	}
 	// remove duplicate edges
@@ -658,7 +671,7 @@ neeext:
 	}
 	free(edges);
 	printf("1 mesh generated. 8 verts, %d tris, %d edges, %d indices\n", t, r, indexIndex);
-	return Mesh(centre, verts, 8, tris, t, realEdges, r, indices, indexIndex);
+	return Mesh(centre, faceNormals, faceCentres, verts, 8, tris, t, realEdges, r, indices, indexIndex);
 }
 
 
