@@ -469,6 +469,7 @@ struct Triangle {
 };
 
 struct Mesh {
+	glm::vec3 centre;
 	GLuint numVerts;
 	GLuint numTris;
 	GLuint numEdges;
@@ -478,7 +479,8 @@ struct Mesh {
 	Edge* edges;
 	GLuint* indices;
 
-	Mesh(Vertex* pverts, GLuint pnumVerts, Triangle* ptris, GLuint pnumTris, Edge* pedges, GLuint pnumEdges, GLuint* pindices, GLuint pnumIndices) {
+	Mesh(glm::vec3 pcentre, Vertex* pverts, GLuint pnumVerts, Triangle* ptris, GLuint pnumTris, Edge* pedges, GLuint pnumEdges, GLuint* pindices, GLuint pnumIndices) {
+		centre = pcentre;
 		verts = pverts;
 		numVerts = pnumVerts;
 		tris = ptris;
@@ -584,48 +586,52 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 		}
 	}
 	//printf("1 mesh subdivided. %d verts, %d tris, %d edges, %d indices\n", numVerts, numTris, numEdges, numIndices);
-	return Mesh(verts, numVerts, tris, numTris, edges, numEdges, indices, numIndices);
+	return Mesh(original->centre, verts, numVerts, tris, numTris, edges, numEdges, indices, numIndices);
 }
 
 Mesh boxoidToMesh(Boxoid box) {
 	Vertex *verts = malloc(8 * sizeof(Vertex));
 	Triangle *tris = malloc(12 * sizeof(Triangle));
+	int t = 0;
 	int e = 0;
+	int indexIndex = 0;
 	Edge *edges = malloc(36 * sizeof(Edge));
 	GLuint *indices = malloc(36 * sizeof(GLuint));
-	memcpy(indices, sphereIndices, 36 * sizeof(GLuint));
 	
 	glm::vec3 corners[8];
-	glm::vec3 center = glm::vec3(0, 0, 0);
+	glm::vec3 centre = glm::vec3(0, 0, 0);
 	for(int i = 0; i < 8; i++) {
 		corners[i] = vectorize(&box.corners[i * 3]);
-		center += corners[i];
+		centre += corners[i];
 	}
-	center *= (1.0f/8.0f);
+	centre *= (1.0f/8.0f);
 	for(int i = 0; i < 8; i++) {
 		verts[i] = Vertex(corners[i],
-			glm::normalize(corners[i] - center),
+			glm::normalize(corners[i] - centre),
 			glm::vec3(5.0f, 20.0f, 10.0f),
 			//vectorize(sharedData.renderMisc.materials[box.material_idx].emissive),
 			0x00000000 | VERT_CORNER);
 	}
 	for(int i = 0; i < 12; i++) {
-		GLuint tmpVerts[3] = {sphereIndices[i * 3], sphereIndices[i * 3 + 1], sphereIndices[i * 3 + 2]}; 
-		edges[e++] = Edge(tmpVerts[0], tmpVerts[1]);
-		edges[e++] = Edge(tmpVerts[1], tmpVerts[2]);
-		edges[e++] = Edge(tmpVerts[2], tmpVerts[0]);
-		Edge* tmpEdges[3] = {&edges[i * 3], &edges[i * 3 + 1], &edges[i * 3 + 2]};
-		tris[i] = Triangle(tmpVerts, tmpEdges, i / 2);
-		if((box.missing_faces & (0x1 << (i/2))) != 0) {
-			verts[tmpVerts[0]].flags |= VERT_OMIT;
-			verts[tmpVerts[1]].flags |= VERT_OMIT;
-			verts[tmpVerts[2]].flags |= VERT_OMIT;
+		if(box.missing_faces & (0x1 << (i/2))) {
+			;// skip this triangle
+		} else {
+			indices[indexIndex++] = sphereIndices[i * 3];
+			indices[indexIndex++] = sphereIndices[i * 3 + 1];
+			indices[indexIndex++] = sphereIndices[i * 3 + 2];
+			GLuint tmpVerts[3] = {sphereIndices[i * 3], sphereIndices[i * 3 + 1], sphereIndices[i * 3 + 2]}; 
+			edges[e] = Edge(tmpVerts[0], tmpVerts[1]);
+			edges[e + 1] = Edge(tmpVerts[1], tmpVerts[2]);
+			edges[e + 2] = Edge(tmpVerts[2], tmpVerts[0]);
+			Edge* tmpEdges[3] = {&edges[e], &edges[e + 1], &edges[e + 2]};
+			e += 3;
+			tris[t++] = Triangle(tmpVerts, tmpEdges, i / 2);
 		}
 	}
 	// remove duplicate edges
 	Edge* realEdges = malloc(18 * sizeof(Edge));
 	int r = 0;
-	for(int i = 0; i < 36; i++) {
+	for(int i = 0; i < e; i++) {
 		Edge* a = &edges[i];
 		Edge* b = nullptr;
 		for(int j = 0; j < r; j++) {
@@ -642,7 +648,7 @@ Mesh boxoidToMesh(Boxoid box) {
 		r++;
 neeext:
 		// before discarding a, let's update any pointers pointing to it to point to b instead
-		for(int k = 0; k < 12; k++) {
+		for(int k = 0; k < t; k++) {
 			for(int l = 0; l < 3; l++) {
 				if(tris[k].edges[l] == a) {
 					tris[k].edges[l] = b;
@@ -651,8 +657,8 @@ neeext:
 		}
 	}
 	free(edges);
-	//printf("1 mesh generated. 8 verts, 12 tris, 18 edges, 36 indices\n");
-	return Mesh(verts, 8, tris, 12, realEdges, 18, indices, 36);
+	printf("1 mesh generated. 8 verts, %d tris, %d edges, %d indices\n", t, r, indexIndex);
+	return Mesh(centre, verts, 8, tris, t, realEdges, r, indices, indexIndex);
 }
 
 
