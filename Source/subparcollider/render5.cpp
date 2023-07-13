@@ -262,7 +262,7 @@ void main()
 	vec3 radiance = materialEmissive * 0.079577 + accumulatedLight;
 	float darkness = 3.0 / (3.0 + exposure + radiance.r + radiance.g + radiance.b);
 	radiance = radiance * darkness;
-	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 0.5) + vec4(fragNormal, 0.25);
+	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0) * 0.75 + vec4(fragNormal, 1.0) * 0.25;
 	const float constantForDepth = 1.0;
 	const float farDistance = 3e18;
 	const float offsetForDepth = 1.0;
@@ -554,8 +554,6 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 			edgeIndex++;
 		}
 		for(int j = 0; j < 3; j++) {
-			// this shit. The result looks fine after 1 level of tessellation but after 2 it's messed up.
-			// I bet the problem is somewhere around here..
 			GLuint vertTemp[3] = {tri->verts[j], newVertices[j], newVertices[(j + 2) % 3]};
 			Edge *edgeTemp[3] = {edgeEdges[(j * 2) % 6], centreEdges[(j + 2) % 3], edgeEdges[(j * 2 + 5) % 6]};
 			tris[triIndex] = Triangle(vertTemp, edgeTemp, tri->faceIndex);
@@ -572,18 +570,20 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 			//printf("indices: %d %d %d\n", indices[i * 9 + j * 3], indices[i * 9 + j * 3 + 1], indices[i * 9 + j * 3 + 2]);
 		}
 		for(int j = 0; j < 3; j++) {
-			// should discriminate between these two but we'll just add them together for now
-			float curvature = box->curvature[tri->faceIndex * 2] + box->curvature[tri->faceIndex * 2 + 1];
-			// light is a misnomer. this is heavy. it's also repurposing the "light" variable to store temporary values for the curvature calculation, which is the whole reason we are tessellating this mesh in the first place
-			glm::vec3 light = verts[newVertices[j]].light;
-			float magnitude = 0.025f * curvature * light.y * sqrt(1.0f - (1.0f - light.x) * (1.0f - light.x));
-			glm::vec3 offset = original->faceNormals[tri->faceIndex] * magnitude;
-			verts[newVertices[j]].position += offset;
-			verts[newVertices[j]].flags |= VERT_SHIFTED;
-			glm::vec3 p[3] = {verts[newVertices[j]].position,
-				verts[newVertices[(j + 1) % 3]].position,
-				verts[newVertices[(j + 2) % 3]].position};
-			verts[newVertices[j]].normal = glm::normalize(glm::cross(p[0] - p[1], p[0] - p[2]));
+			if((verts[newVertices[j]].flags & VERT_SHIFTED) == 0) {
+				// should discriminate between these two but we'll just add them together for now
+				float curvature = box->curvature[tri->faceIndex * 2] + box->curvature[tri->faceIndex * 2 + 1];
+				// light is a misnomer. this is heavy. it's also repurposing the "light" variable to store temporary values for the curvature calculation, which is the whole reason we are tessellating this mesh in the first place
+				glm::vec3 light = verts[newVertices[j]].light;
+				float magnitude = 0.1f * curvature * light.y * sqrt(1.0f - (1.0f - light.x) * (1.0f - light.x)) / (iteration * iteration + 1.0f);
+				glm::vec3 offset = original->faceNormals[tri->faceIndex] * magnitude;
+				verts[newVertices[j]].position += offset;
+				verts[newVertices[j]].flags |= VERT_SHIFTED;
+				glm::vec3 p[3] = {verts[newVertices[j]].position,
+					verts[newVertices[(j + 1) % 3]].position,
+					verts[newVertices[(j + 2) % 3]].position};
+				verts[newVertices[j]].normal = glm::normalize(glm::cross(p[0] - p[1], p[0] - p[2]));
+			}
 		}
 	}
 	printf("1 mesh subdivided. %d verts, %d tris, %d edges, %d indices\n", numVerts, numTris, numEdges, numIndices);
@@ -943,7 +943,7 @@ void *rendererThread(void *arg) {
 			static int numIndices = 0;
 			// can use a better algorithm to dynamically update meshes when the geometry changes and in response to LOD
 			// considerations
-			Mesh meshes[7];
+			Mesh meshes[9];
 			if(numIndices == 0) {
 				meshes[0] = boxoidToMesh(exampleBoxoids[0]);
 				meshes[1] = boxoidToMesh(exampleBoxoids[1]);
@@ -952,8 +952,10 @@ void *rendererThread(void *arg) {
 				meshes[4] = tessellateMesh(&meshes[2], 1, &exampleBoxoids[0]);
 				meshes[5] = tessellateMesh(&meshes[3], 1, &exampleBoxoids[1]);
 				meshes[6] = tessellateMesh(&meshes[4], 2, &exampleBoxoids[0]);
+				meshes[7] = tessellateMesh(&meshes[5], 2, &exampleBoxoids[1]);
+				meshes[8] = tessellateMesh(&meshes[6], 3, &exampleBoxoids[0]);
 			}
-			numIndices = uploadMeshes(&meshes[sharedData.renderMisc.buttonPresses % 7], 1, boxoidVAO, boxoidVBO, boxoidEBO);
+			numIndices = uploadMeshes(&meshes[sharedData.renderMisc.buttonPresses % 9], 1, boxoidVAO, boxoidVBO, boxoidEBO);
 			renderMeshes(numIndices, boxoidVAO, boxoidVBO, boxoidEBO);
 		}
 		else {
