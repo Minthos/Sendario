@@ -585,7 +585,7 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 			//printf("indices: %d %d %d\n", indices[i * 9 + j * 3], indices[i * 9 + j * 3 + 1], indices[i * 9 + j * 3 + 2]);
 		}
 	}
-	//printf("1 mesh subdivided. %d verts, %d tris, %d edges, %d indices\n", numVerts, numTris, numEdges, numIndices);
+	printf("1 mesh subdivided. %d verts, %d tris, %d edges, %d indices\n", numVerts, numTris, numEdges, numIndices);
 	return Mesh(original->centre, verts, numVerts, tris, numTris, edges, numEdges, indices, numIndices);
 }
 
@@ -657,7 +657,7 @@ neeext:
 		}
 	}
 	free(edges);
-	//printf("1 mesh generated. 8 verts, %d tris, %d edges, %d indices\n", t, r, indexIndex);
+	printf("1 mesh generated. 8 verts, %d tris, %d edges, %d indices\n", t, r, indexIndex);
 	return Mesh(centre, verts, 8, tris, t, realEdges, r, indices, indexIndex);
 }
 
@@ -933,7 +933,7 @@ void *rendererThread(void *arg) {
 			glUniform3fv(boxoidDiffuseLoc, 1, glm::value_ptr(diffuseComponent));
 			glUniform3fv(boxoidEmissiveLoc, 1, glm::value_ptr(emissiveComponent));
 		  
-			int numIndices = 0;
+			static int numIndices = 0;
 			// can use a better algorithm to dynamically update meshes when the geometry to render changes
 			if(numIndices == 0) {
 				Mesh meshes[7];
