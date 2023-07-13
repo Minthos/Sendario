@@ -267,7 +267,7 @@ void main()
 	const float farDistance = 3e18;
 	const float offsetForDepth = 1.0;
 	gl_FragDepth = (log(constantForDepth * vertexPosClip.z + offsetForDepth) / log(constantForDepth * farDistance + offsetForDepth));
-	fragColor = vec4(fragNormal, 1.0);
+	fragColor = vec4(fragNormal, 0.5);
 }
 
 )glsl";
@@ -437,8 +437,11 @@ struct Triangle {
 		edges[1] = pedges[1];
 		edges[2] = pedges[2];
 		assert(edges[0]->verts[0] == verts[0] || edges[0]->verts[1] == verts[0]);
+		assert(edges[0]->verts[0] == verts[1] || edges[0]->verts[1] == verts[1]);
 		assert(edges[1]->verts[0] == verts[1] || edges[1]->verts[1] == verts[1]);
+		assert(edges[1]->verts[0] == verts[2] || edges[1]->verts[1] == verts[2]);
 		assert(edges[2]->verts[0] == verts[2] || edges[2]->verts[1] == verts[2]);
+		assert(edges[2]->verts[0] == verts[0] || edges[2]->verts[1] == verts[0]);
 		faceIndex = pfaceIndex;
 	}
 };
@@ -491,13 +494,6 @@ Vertex vertex_interpolate(Vertex* a, Vertex* b, float c) {
 	return Vertex(vlerp(a->position, b->position, c), glm::normalize(vlerp(a->normal, b->normal, c)), vlerp(a->light, b->light, c), a->flags & b->flags);
 }
 
-Vertex avgOf3Verts(Vertex *verts[3]) {
-	return Vertex(avgOf3(verts[0]->position, verts[1]->position, verts[2]->position),
-				  glm::normalize(avgOf3(verts[0]->normal, verts[1]->normal, verts[2]->normal)),
-				  avgOf3(verts[0]->light, verts[1]->light, verts[2]->light),
-				  verts[0]->flags & verts[1]->flags & verts[2]->flags);
-}
-
 // Loop subdivision that doesn't create duplicate edges/vertices, runs in linear time
 Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 	GLuint numVerts = original->numEdges + original->numVerts;
@@ -521,10 +517,7 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 		verts[vertIndex] = vertex_interpolate(&verts[edge->verts[0]], &verts[edge->verts[1]], 0.5f);
 		verts[vertIndex].flags = 0;
 		edge->verts[2] = vertIndex;
-		//if(iteration == 0) {
-			// encode the distance between the two corners in the middle vertex
-			//verts[vertIndex].normal *= glm::distance(verts[edge->verts[0]].position, verts[edge->verts[1]].position);
-		//}
+		verts[vertIndex].light = glm::vec3(1.0f, glm::distance(verts[edge->verts[0]].position, verts[edge->verts[1]].position), 0.0f);
 		edges[i * 2] = Edge(edge->verts[0], edge->verts[2]);
 		edges[i * 2 + 1] = Edge(edge->verts[1], edge->verts[2]);
 		edge->subdivisions[0] = &edges[i * 2];
@@ -555,6 +548,8 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 			edgeIndex++;
 		}
 		for(int j = 0; j < 3; j++) {
+			// this shit. The reult looks fine after 1 level of tessellation but after 2 it's messed up.
+			// I bet the problem is somewhere around here..
 			GLuint vertTemp[3] = {tri->verts[j], newVertices[j], newVertices[(j + 2) % 3]};
 			Edge *edgeTemp[3] = {edgeEdges[(j * 2) % 6], centreEdges[j], edgeEdges[(j * 2 + 5) % 6]};
 			tris[triIndex] = Triangle(vertTemp, edgeTemp, tri->faceIndex);
@@ -572,16 +567,21 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 		}
 		for(int j = 0; j < 3; j++) {
 			//if(iteration == 0) {
-			//	if(verts[newVertices[j]].flags == 0) {
+			if(verts[newVertices[j]].flags == 0) {
 					// should discriminate between these two but we'll just add them together for now
 					float curvature = box->curvature[tri->faceIndex * 2] + box->curvature[tri->faceIndex * 2 + 1];
+					glm::vec3 light = verts[newVertices[j]].light;
+					float magnitude = curvature * light.y * sqrt(1.0f - light.x * light.x);
 					//float magnitude = glm::length(verts[newVertices[j]].normal) * curvature / 4.0f;
-					//glm::vec3 offset = original->faceNormals[tri->faceIndex] * magnitude;
-					verts[newVertices[j]].position += (verts[newVertices[j]].normal * 0.25f);
-					//verts[newVertices[j]].position += offset;
+					glm::vec3 offset = original->faceNormals[tri->faceIndex] * magnitude;
+					//glm::vec3 offset = (verts[newVertices[j]].normal * 0.25f);
+					verts[newVertices[j]].position += offset;
 					verts[newVertices[j]].flags |= VERT_SHIFTED;
-			//	}
-			//}
+			}
+			glm::vec3 p[3] = {verts[newVertices[j]].position,
+				verts[newVertices[(j + 1) % 3]].position,
+				verts[newVertices[(j + 2) % 3]].position};
+			verts[newVertices[j]].normal = glm::normalize(glm::cross(p[0] - p[1], p[0] - p[2]));
 		}
 	}
 	printf("1 mesh subdivided. %d verts, %d tris, %d edges, %d indices\n", numVerts, numTris, numEdges, numIndices);
@@ -609,8 +609,8 @@ Mesh boxoidToMesh(Boxoid box) {
 	for(int i = 0; i < 8; i++) {
 		verts[i] = Vertex(corners[i],
 			glm::normalize(corners[i] - centre),
-			glm::vec3(5.0f, 20.0f, 10.0f),
-			//vectorize(sharedData.renderMisc.materials[box.material_idx].emissive),
+			glm::vec3(0.0f),
+			//corners[i],// temporarily abuse the light value to store radius at this point of the unit spheroid
 			VERT_ORIGINAL);
 	}
 	for(int i = 0; i < 12; i++) {
