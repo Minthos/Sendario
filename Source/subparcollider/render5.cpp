@@ -259,15 +259,15 @@ void main()
 		float lambertian = max(dot(fragNormal, lightDirection), 0.0);
 		accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
 	}
-	vec3 radiance = (fragLight + materialEmissive) * 0.079577 + accumulatedLight;
+	vec3 radiance = materialEmissive * 0.079577 + accumulatedLight;
 	float darkness = 3.0 / (3.0 + exposure + radiance.r + radiance.g + radiance.b);
 	radiance = radiance * darkness;
-	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
+	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 0.25) + vec4(fragNormal, 0.25);
 	const float constantForDepth = 1.0;
 	const float farDistance = 3e18;
 	const float offsetForDepth = 1.0;
 	gl_FragDepth = (log(constantForDepth * vertexPosClip.z + offsetForDepth) / log(constantForDepth * farDistance + offsetForDepth));
-	fragColor = vec4(fragNormal, 0.5);
+	//fragColor = vec4(fragNormal, 0.5);
 }
 
 )glsl";
@@ -336,13 +336,13 @@ GLuint sphereIndices[] = {
 	4, 5, 6,
 	4, 6, 7,
 	0, 1, 5,
-	0, 4, 5,
+	5, 0, 4,
 	3, 2, 6,
 	3, 6, 7,
 	0, 3, 7,
-	0, 4, 7,
+	7, 0, 4,
 	1, 2, 6,
-	1, 5, 6
+	6, 1, 5
 };
 
 // right - bottom rear - left -- left - top rear - right // rear plate
@@ -437,11 +437,11 @@ struct Triangle {
 		edges[1] = pedges[1];
 		edges[2] = pedges[2];
 		assert(edges[0]->verts[0] == verts[0] || edges[0]->verts[1] == verts[0]);
-		assert(edges[0]->verts[0] == verts[1] || edges[0]->verts[1] == verts[1]);
+		//assert(edges[0]->verts[0] == verts[1] || edges[0]->verts[1] == verts[1]);
 		assert(edges[1]->verts[0] == verts[1] || edges[1]->verts[1] == verts[1]);
-		assert(edges[1]->verts[0] == verts[2] || edges[1]->verts[1] == verts[2]);
+		//assert(edges[1]->verts[0] == verts[2] || edges[1]->verts[1] == verts[2]);
 		assert(edges[2]->verts[0] == verts[2] || edges[2]->verts[1] == verts[2]);
-		assert(edges[2]->verts[0] == verts[0] || edges[2]->verts[1] == verts[0]);
+		//assert(edges[2]->verts[0] == verts[0] || edges[2]->verts[1] == verts[0]);
 		faceIndex = pfaceIndex;
 	}
 };
@@ -517,7 +517,9 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 		verts[vertIndex] = vertex_interpolate(&verts[edge->verts[0]], &verts[edge->verts[1]], 0.5f);
 		verts[vertIndex].flags = 0;
 		edge->verts[2] = vertIndex;
-		verts[vertIndex].light = glm::vec3(1.0f, glm::distance(verts[edge->verts[0]].position, verts[edge->verts[1]].position), 0.0f);
+		if(iteration == 0) { // the light value isn't being used for light yet so we'll use it for this instead
+			verts[vertIndex].light = glm::vec3(1.0f, glm::distance(verts[edge->verts[0]].position, verts[edge->verts[1]].position), 0.0f);
+		}
 		edges[i * 2] = Edge(edge->verts[0], edge->verts[2]);
 		edges[i * 2 + 1] = Edge(edge->verts[1], edge->verts[2]);
 		edge->subdivisions[0] = &edges[i * 2];
@@ -566,18 +568,14 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 			//printf("indices: %d %d %d\n", indices[i * 9 + j * 3], indices[i * 9 + j * 3 + 1], indices[i * 9 + j * 3 + 2]);
 		}
 		for(int j = 0; j < 3; j++) {
-			//if(iteration == 0) {
-			if(verts[newVertices[j]].flags == 0) {
-					// should discriminate between these two but we'll just add them together for now
-					float curvature = box->curvature[tri->faceIndex * 2] + box->curvature[tri->faceIndex * 2 + 1];
-					glm::vec3 light = verts[newVertices[j]].light;
-					float magnitude = curvature * light.y * sqrt(1.0f - light.x * light.x);
-					//float magnitude = glm::length(verts[newVertices[j]].normal) * curvature / 4.0f;
-					glm::vec3 offset = original->faceNormals[tri->faceIndex] * magnitude;
-					//glm::vec3 offset = (verts[newVertices[j]].normal * 0.25f);
-					verts[newVertices[j]].position += offset;
-					verts[newVertices[j]].flags |= VERT_SHIFTED;
-			}
+			// should discriminate between these two but we'll just add them together for now
+			float curvature = box->curvature[tri->faceIndex * 2] + box->curvature[tri->faceIndex * 2 + 1];
+			// light is a misnomer. this is heavy. it's also repurposing the "light" variable to store temporary values for the curvature calculation, which is the whole reason we are tessellating this mesh in the first place
+			glm::vec3 light = verts[newVertices[j]].light;
+			float magnitude = 0.025f * curvature * light.y * sqrt(1.0f - (1.0f - light.x) * (1.0f - light.x));
+			glm::vec3 offset = original->faceNormals[tri->faceIndex] * magnitude;
+			verts[newVertices[j]].position += offset;
+			verts[newVertices[j]].flags |= VERT_SHIFTED;
 			glm::vec3 p[3] = {verts[newVertices[j]].position,
 				verts[newVertices[(j + 1) % 3]].position,
 				verts[newVertices[(j + 2) % 3]].position};
@@ -610,7 +608,6 @@ Mesh boxoidToMesh(Boxoid box) {
 		verts[i] = Vertex(corners[i],
 			glm::normalize(corners[i] - centre),
 			glm::vec3(0.0f),
-			//corners[i],// temporarily abuse the light value to store radius at this point of the unit spheroid
 			VERT_ORIGINAL);
 	}
 	for(int i = 0; i < 12; i++) {
@@ -628,9 +625,9 @@ Mesh boxoidToMesh(Boxoid box) {
 			e += 3;
 			tris[t++] = Triangle(tmpVerts, tmpEdges, i / 2);
 		}
-		if(i & 0x1 == 0){
+		if((i % 2) == 0){
 			faceCentres[i / 2] = (corners[sphereIndices[i * 3]] + corners[sphereIndices[i * 3 + 1]] +
-								  corners[sphereIndices[i * 3 + 2]] + corners[sphereIndices[i * 3 + 4]]) * 0.25f;
+								  corners[sphereIndices[i * 3 + 2]] + corners[sphereIndices[i * 3 + 5]]) * 0.25f;
 			faceNormals[i / 2] = glm::normalize(faceCentres[i / 2] - centre);
 		}
 	}
