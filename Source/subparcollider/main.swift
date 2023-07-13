@@ -57,6 +57,7 @@ var camera = SphericalCow(id: -1,
 var lights = [sun]
 var allTheThings = [sun, mercury, venus, earth, moon, player1]
 var actions: [Action] = []
+var buttonPresses: Int32 = 0
 
 let totalTime = 1e12
 var dt = 0.0001
@@ -148,6 +149,8 @@ func main() {
                                 dt *= 10.0
                             } else if event.cbutton.button == SDL_CONTROLLER_BUTTON_X.rawValue {
                                 dt *= 0.1
+                            } else if event.cbutton.button == SDL_CONTROLLER_BUTTON_B.rawValue {
+                                buttonPresses += 1;
                             }
                         case SDL_CONTROLLERBUTTONUP.rawValue:
                             if event.cbutton.button == SDL_CONTROLLER_BUTTON_START.rawValue {
@@ -260,6 +263,7 @@ func main() {
                                         radius: Float(player1.radius * pow(position.length * 0.01, 0.9)),
                                         material_idx: 6)
         }
+		renderMisc.buttonPresses = buttonPresses;
         render(sphereArray, allTheThings.count + trajectory.count, renderMisc)
         sphereArray.deallocate()
     }

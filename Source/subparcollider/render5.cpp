@@ -250,32 +250,24 @@ out vec4 fragColor;
 
 void main()
 {
-	// 0x4000 0000 = set
-	// 0x0040 0000 = set
-	// wtf?
-	//if((fragFlags & 0x40400000) == 0) {
-	if((fragFlags & VERT_OMIT) != 0) {
-		discard;
-	} else {
-		vec3 accumulatedLight = vec3(0.0, 0.0, 0.0);
-		for (int i = 0; i < MAX_LIGHTS; ++i) {
-			vec3 lightVector = lightPositions[i] - fragPos;
-			float squaredDistance = dot(lightVector, lightVector);
-			vec3 lightDirection = lightVector / sqrt(squaredDistance);
-			float attenuation = 1.0 / squaredDistance;
-			float lambertian = max(dot(fragNormal, lightDirection), 0.0);
-			accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
-		}
-		vec3 radiance = (fragLight + materialEmissive) * 0.079577 + accumulatedLight;
-		float darkness = 3.0 / (3.0 + exposure + radiance.r + radiance.g + radiance.b);
-		radiance = radiance * darkness;
-		fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
-		const float constantForDepth = 1.0;
-		const float farDistance = 3e18;
-		const float offsetForDepth = 1.0;
-		gl_FragDepth = (log(constantForDepth * vertexPosClip.z + offsetForDepth) / log(constantForDepth * farDistance + offsetForDepth));
+	vec3 accumulatedLight = vec3(0.0, 0.0, 0.0);
+	for (int i = 0; i < MAX_LIGHTS; ++i) {
+		vec3 lightVector = lightPositions[i] - fragPos;
+		float squaredDistance = dot(lightVector, lightVector);
+		vec3 lightDirection = lightVector / sqrt(squaredDistance);
+		float attenuation = 1.0 / squaredDistance;
+		float lambertian = max(dot(fragNormal, lightDirection), 0.0);
+		accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
 	}
-	//fragColor = vec4(fragNormal, 1.0);
+	vec3 radiance = (fragLight + materialEmissive) * 0.079577 + accumulatedLight;
+	float darkness = 3.0 / (3.0 + exposure + radiance.r + radiance.g + radiance.b);
+	radiance = radiance * darkness;
+	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
+	const float constantForDepth = 1.0;
+	const float farDistance = 3e18;
+	const float offsetForDepth = 1.0;
+	gl_FragDepth = (log(constantForDepth * vertexPosClip.z + offsetForDepth) / log(constantForDepth * farDistance + offsetForDepth));
+	fragColor = vec4(fragNormal, 1.0);
 }
 
 )glsl";
@@ -360,7 +352,7 @@ GLuint sphereIndices[] = {
 // right bottom rear - top -- right top front - bottom   // right plate
 // left bottom rear - front -- left top front - rear	 // left plate
 // this boxoid is spherical
-Boxoid exampleBoxoids[3] =
+Boxoid exampleBoxoids[2] =
 {
 	{{-1.0f,  1.0f, 1.0f,
 	-1.0f, -1.0f, 1.0f,
@@ -377,36 +369,21 @@ Boxoid exampleBoxoids[3] =
 	1.0, 1.0,
 	1.0, 1.0},
 	4, 0x03},
-	{{2.5, -1.8, 1.0,
-	-2.5, -1.8, 1.0,
-	2.5, -1.8, -1.3,
-	-2.5, -1.8, -1.3,
-	2.5, 1.8, 1.0,
-	-2.5, 1.8, 1.0,
-	2.5, 1.8, -1.3,
-	-2.5, 1.8, -1.3},
+	{{-1.0f,  1.0f, 1.0f,
+	-1.0f, -1.0f, 1.0f,
+	 1.0f, -1.0f, 1.0f,
+	 1.0f,  1.0f, 1.0f,
+	-1.0f,  1.0f, -1.0f,
+	-1.0f, -1.0f, -1.0f,
+	 1.0f, -1.0f, -1.0f,
+	 1.0f,  1.0f, -1.0f},
 	{1.0, 1.0,
 	1.0, 1.0,
 	1.0, 1.0,
 	1.0, 1.0,
 	1.0, 1.0,
 	1.0, 1.0},
-	3, 0},
-	{{2.5, 1.8, 3.0, // right bottom rear
-	-2.5, 1.8, 3.0, // left bottom rear
-	2.5, 1.8, 1.3, // right bottom front
-	-2.5, -1.8, 1.3, // left bottom front
-	2.5, 1.8, 3.0, // right top rear
-	-2.5, 1.8, 3.0, // left top rear
-	2.5, 1.8, 1.3, // right top front
-	-2.5, 1.8, 1.3}, // left top front
-	{0.0, 0.0,// "top" or "bottom" in simulation
-	0.0, 0.0,// "top" or "bottom" in simulation
-	1.0, 0.0,
-	1.0, 0.0,
-	1.0, 0.0,
-	1.0, 0.0},
-	3, 0}
+	4, 0x0}
 };
 
 
@@ -414,10 +391,8 @@ glm::vec3 vlerp(glm::vec3 a, glm::vec3 b, float f) {
 	return (a * f) + (b * (1.0f - f));
 }
 
-//enum VertFlags {
-GLuint VERT_CORNER = 1; // this variable is out of service
-GLuint VERT_OMIT = 2; // this variable is out of service
-//};
+GLuint VERT_ORIGINAL = 1;
+GLuint VERT_SHIFTED = 2;
 
 struct Vertex {
 	glm::vec3 position;
@@ -513,12 +488,12 @@ glm::vec3 avgOf3(glm::vec3 a, glm::vec3 b, glm::vec3 c) {
 }
 
 Vertex vertex_interpolate(Vertex* a, Vertex* b, float c) {
-	return Vertex(vlerp(a->position, b->position, c), vlerp(a->normal, b->normal, c), vlerp(a->light, b->light, c), a->flags & b->flags);
+	return Vertex(vlerp(a->position, b->position, c), glm::normalize(vlerp(a->normal, b->normal, c)), vlerp(a->light, b->light, c), a->flags & b->flags);
 }
 
 Vertex avgOf3Verts(Vertex *verts[3]) {
 	return Vertex(avgOf3(verts[0]->position, verts[1]->position, verts[2]->position),
-				  avgOf3(verts[0]->normal, verts[1]->normal, verts[2]->normal),
+				  glm::normalize(avgOf3(verts[0]->normal, verts[1]->normal, verts[2]->normal)),
 				  avgOf3(verts[0]->light, verts[1]->light, verts[2]->light),
 				  verts[0]->flags & verts[1]->flags & verts[2]->flags);
 }
@@ -544,7 +519,12 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 	for(int i = 0; i < original->numEdges; i++) {
 		Edge* edge = &(original->edges[i]);
 		verts[vertIndex] = vertex_interpolate(&verts[edge->verts[0]], &verts[edge->verts[1]], 0.5f);
+		verts[vertIndex].flags = 0;
 		edge->verts[2] = vertIndex;
+		//if(iteration == 0) {
+			// encode the distance between the two corners in the middle vertex
+			//verts[vertIndex].normal *= glm::distance(verts[edge->verts[0]].position, verts[edge->verts[1]].position);
+		//}
 		edges[i * 2] = Edge(edge->verts[0], edge->verts[2]);
 		edges[i * 2 + 1] = Edge(edge->verts[1], edge->verts[2]);
 		edge->subdivisions[0] = &edges[i * 2];
@@ -590,6 +570,19 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 			indices[indexIndex++] = newTris[j]->verts[2];
 			//printf("indices: %d %d %d\n", indices[i * 9 + j * 3], indices[i * 9 + j * 3 + 1], indices[i * 9 + j * 3 + 2]);
 		}
+		for(int j = 0; j < 3; j++) {
+			//if(iteration == 0) {
+			//	if(verts[newVertices[j]].flags == 0) {
+					// should discriminate between these two but we'll just add them together for now
+					float curvature = box->curvature[tri->faceIndex * 2] + box->curvature[tri->faceIndex * 2 + 1];
+					//float magnitude = glm::length(verts[newVertices[j]].normal) * curvature / 4.0f;
+					//glm::vec3 offset = original->faceNormals[tri->faceIndex] * magnitude;
+					verts[newVertices[j]].position += (verts[newVertices[j]].normal * 0.25f);
+					//verts[newVertices[j]].position += offset;
+					verts[newVertices[j]].flags |= VERT_SHIFTED;
+			//	}
+			//}
+		}
 	}
 	printf("1 mesh subdivided. %d verts, %d tris, %d edges, %d indices\n", numVerts, numTris, numEdges, numIndices);
 	return Mesh(original->centre, original->faceNormals, original->faceCentres, verts, numVerts, tris, numTris, edges, numEdges, indices, numIndices);
@@ -618,7 +611,7 @@ Mesh boxoidToMesh(Boxoid box) {
 			glm::normalize(corners[i] - centre),
 			glm::vec3(5.0f, 20.0f, 10.0f),
 			//vectorize(sharedData.renderMisc.materials[box.material_idx].emissive),
-			0x00000000 | VERT_CORNER);
+			VERT_ORIGINAL);
 	}
 	for(int i = 0; i < 12; i++) {
 		if(box.missing_faces & (0x1 << (i/2))) {
@@ -949,18 +942,18 @@ void *rendererThread(void *arg) {
 			static int numIndices = 0;
 			// can use a better algorithm to dynamically update meshes when the geometry changes and in response to LOD
 			// considerations
-			if(numIndices == 0) {
 				Mesh meshes[7];
+			
+			if(numIndices == 0) {
 				meshes[0] = boxoidToMesh(exampleBoxoids[0]);
 				meshes[1] = boxoidToMesh(exampleBoxoids[1]);
-				meshes[2] = boxoidToMesh(exampleBoxoids[2]);
-				meshes[3] = tessellateMesh(&meshes[0], 0, &exampleBoxoids[0]);
-				meshes[4] = tessellateMesh(&meshes[3], 1, &exampleBoxoids[0]);
-				meshes[5] = tessellateMesh(&meshes[4], 2, &exampleBoxoids[0]);
-				meshes[6] = tessellateMesh(&meshes[5], 3, &exampleBoxoids[0]);
-				numIndices = uploadMeshes(&meshes[6], 1, boxoidVAO, boxoidVBO, boxoidEBO);
-				deleteMeshes(meshes, 7);
+				meshes[2] = tessellateMesh(&meshes[0], 0, &exampleBoxoids[0]);
+				meshes[3] = tessellateMesh(&meshes[1], 0, &exampleBoxoids[1]);
+				meshes[4] = tessellateMesh(&meshes[2], 1, &exampleBoxoids[0]);
+				meshes[5] = tessellateMesh(&meshes[3], 1, &exampleBoxoids[1]);
+				meshes[6] = tessellateMesh(&meshes[4], 2, &exampleBoxoids[0]);
 			}
+			numIndices = uploadMeshes(&meshes[sharedData.renderMisc.buttonPresses % 7], 1, boxoidVAO, boxoidVBO, boxoidEBO);
 			renderMeshes(numIndices, boxoidVAO, boxoidVBO, boxoidEBO);
 		}
 		else {

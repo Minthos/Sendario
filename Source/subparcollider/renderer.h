@@ -88,6 +88,7 @@ typedef struct {
     float fov;
     light_source lights[MAX_LIGHTS];
     material* materials;
+	int buttonPresses;
 } render_misc;
 
 void startRenderer();
