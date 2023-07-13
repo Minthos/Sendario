@@ -516,7 +516,7 @@ Vertex avgOf3Verts(Vertex *verts[3]) {
 }
 
 // Loop subdivision that doesn't create duplicate edges/vertices, runs in linear time
-Mesh tessellateMesh(Mesh* original) {
+Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 	GLuint numVerts = original->numEdges + original->numVerts;
 	GLuint numTris = original->numTris * 4;
 	GLuint numEdges = original->numEdges * 2 + original->numTris * 3;
@@ -525,12 +525,10 @@ Mesh tessellateMesh(Mesh* original) {
 	Triangle* tris = malloc(numTris * sizeof(Triangle));
 	Edge* edges = malloc(numEdges * sizeof(Edge));
 	GLuint* indices = malloc(numIndices * sizeof(GLuint));
-	
 	GLuint edgeIndex = 0;
 	GLuint vertIndex = 0;
 	GLuint triIndex = 0;
 	GLuint indexIndex = 0;
-
 	memcpy(verts, original->verts, original->numVerts * sizeof(Vertex));
 	vertIndex += original->numVerts;
 
@@ -547,7 +545,7 @@ Mesh tessellateMesh(Mesh* original) {
 		edgeIndex += 2;
 	}
 
-	// for each triangle, create 3 new edges and 4 new triangles
+	// for each triangle create 3 new edges and 4 new triangles
 	for(int i = 0; i < original->numTris; i++) {
 		Triangle *tri = &original->tris[i];
 		GLuint newVertices[3];
@@ -568,9 +566,6 @@ Mesh tessellateMesh(Mesh* original) {
 			newVertices[j] = tri->edges[j]->verts[2];
 			edgeIndex++;
 		}
-		// edges have been created and registered, vertices have been registered
-
-		// have to think about this some more, make sure the edges and vertices match up
 		for(int j = 0; j < 3; j++) {
 			GLuint vertTemp[3] = {tri->verts[j], newVertices[j], newVertices[(j + 2) % 3]};
 			Edge *edgeTemp[3] = {edgeEdges[(j * 2) % 6], centreEdges[j], edgeEdges[(j * 2 + 5) % 6]};
@@ -938,18 +933,21 @@ void *rendererThread(void *arg) {
 			glUniform3fv(boxoidEmissiveLoc, 1, glm::value_ptr(emissiveComponent));
 		  
 			// TODO: meshes and the buffers should be cached and reused between frames. Use LOD to determine how refined meshes should be (up to a low limit).
-			Mesh meshes[4];
+			Mesh meshes[7];
 			meshes[0] = boxoidToMesh(exampleBoxoids[0]);
 			meshes[1] = boxoidToMesh(exampleBoxoids[1]);
 			meshes[2] = boxoidToMesh(exampleBoxoids[2]);
-			meshes[3] = tessellateMesh(&meshes[0]);
+			meshes[3] = tessellateMesh(&meshes[0], 0, &exampleBoxoids[0]);
+			meshes[4] = tessellateMesh(&meshes[3], 1, &exampleBoxoids[0]);
+			meshes[5] = tessellateMesh(&meshes[4], 2, &exampleBoxoids[0]);
+			meshes[6] = tessellateMesh(&meshes[5], 3, &exampleBoxoids[0]);
 			//meshes[4] = tessellateMesh(&meshes[1]);
 			//meshes[5] = tessellateMesh(&meshes[2]);
 			//meshes[6] = tessellateMesh(&meshes[3]);
 			//meshes[7] = tessellateMesh(&meshes[4]);
 			//meshes[8] = tessellateMesh(&meshes[5]);
-			renderMeshes(&meshes[3], 1, boxoidVAO, boxoidVBO, boxoidEBO);
-			deleteMeshes(meshes, 4);
+			renderMeshes(&meshes[6], 1, boxoidVAO, boxoidVBO, boxoidEBO);
+			deleteMeshes(meshes, 7);
 		}
 		else {
 			printf("numSpheres: %d\n", sharedData.numSpheres);
