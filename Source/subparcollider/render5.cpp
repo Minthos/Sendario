@@ -498,6 +498,10 @@ Vertex vertex_interpolate(Vertex* a, Vertex* b, float c) {
 	return Vertex(vlerp(a->position, b->position, c), glm::normalize(vlerp(a->normal, b->normal, c)), vlerp(a->light, b->light, c), a->flags & b->flags);
 }
 
+// Q is origin, P0 is a point on the plane, N is the plane normal. Returns the vector to the nearest point on the plane from the origin
+glm::vec3 nearestPointOnPlane(glm::vec3 Q, glm::vec3 P0, glm::vec3 N) {
+    return P0 + glm::dot(Q - P0, N) * N;
+}
 // Loop subdivision that doesn't create duplicate edges/vertices, runs in linear time
 Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 	GLuint numVerts = original->numEdges + original->numVerts;
@@ -575,8 +579,20 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 				float curvature = box->curvature[tri->faceIndex * 2] + box->curvature[tri->faceIndex * 2 + 1];
 				// light is a misnomer. this is heavy. it's also repurposing the "light" variable to store temporary values for the curvature calculation, which is the whole reason we are tessellating this mesh in the first place
 				glm::vec3 light = verts[newVertices[j]].light;
-				float magnitude = 0.1f * curvature * light.y * sqrt(1.0f - (1.0f - light.x) * (1.0f - light.x)) / (iteration * iteration + 1.0f);
-				glm::vec3 offset = original->faceNormals[tri->faceIndex] * magnitude;
+				float unitcurve = sqrt(1.0f - (1.0f - light.x) * (1.0f - light.x));
+				glm::vec3 faceClosestPoint = nearestPointOnPlane(verts[newVertices[j]].position, original->faceCentres[tri->faceIndex],
+					original->faceNormals[tri->faceIndex]);
+				//glm::vec3 ptp = verts[newVertices[j]].position - original->faceCentres[tri->faceIndex];
+				//glm::vec3 projected = glm::dot(ptp, original->faceNormals[tri->faceIndex]) * original->faceNormals[tri->faceIndex];
+				glm::vec3 fromFaceToHere = faceClosestPoint - verts[newVertices[j]].position;
+				//float distance = fromFaceToHere.length();
+				float distance = glm::dot((verts[newVertices[j]].position - original->faceCentres[tri->faceIndex]), original->faceNormals[tri->faceIndex]);
+				float target = unitcurve * curvature * 0.25;
+				float adjustment = target - distance;
+			
+				//glm::vec3 offset = fromFaceToHere * (adjustment / distance);
+				glm::vec3 offset = original->faceNormals[tri->faceIndex] * adjustment;
+				//verts[newVertices[j]].position = faceClosestPoint;
 				verts[newVertices[j]].position += offset;
 				verts[newVertices[j]].flags |= VERT_SHIFTED;
 				glm::vec3 p[3] = {verts[newVertices[j]].position,

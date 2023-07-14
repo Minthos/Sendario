@@ -1,7 +1,7 @@
 ## Near term TODO:
 
 * spaceship with a shape other than a sphere
- - boxoid rendering
+ - boxoid rendering <-- whooo boy that took me down some rabbit holes..
  - the shader
  - the vertex buffer
  - moving the data from swift to cpp
