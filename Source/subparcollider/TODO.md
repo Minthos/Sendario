@@ -1,12 +1,10 @@
 ## Near term TODO:
 
 * spaceship with a shape other than a sphere
- - boxoid rendering <-- whooo boy that took me down some rabbit holes..
- - the shader
- - the vertex buffer
+ - user interface for editing boxoids
+ - codable boxoids, composites, spheres
  - moving the data from swift to cpp
  - reading the data from json into swift
- - cleaning up and improving the rendering code, more generality and less hardcoded stuff
 
 * render exhaust plumes
 * replace the skybox with "snow" that's aligned to the world coordinate space
@@ -18,6 +16,8 @@
 
 ## Recently done:
 
+ - boxoid rendering <-- whooo boy that took me down some rabbit holes..
+ - cleaning up and improving the rendering code, more generality and less hardcoded stuff
 * spaceship attitude control
 * fix the rendering bug when camera is near/inside an object
 * basic camera control with gamepad
@@ -35,12 +35,29 @@
 * "eliminated" physics bugs (partly by commenting out the drag and magnus force)
 * installed valgrind from source because fuck ubuntu (it was easy and it works, 10/10 with rice)
 
+## High priority right now
+
+We can start coding an interface for building a spaceship using boxoids. Will have to get some json going. Swift is appropriate for that.
+After we have multiple boxoids and multiple composites we can do something about rendering cpu efficiency, not before.
+Use thumbsticks and throttle to elongate and adjust curvature in any direction.
+Press cam button to switch between moving the camera and editing the shape.
+3d crosshairs should intersect at the camera's target, aligned to world space or object space axis depending on context.
+
+lt and rt buttons to cycle between shapes
+a: save, edit, new, accept
+x: cancel, undo
+b: context-aware menu. Anything immediately useful easily accessible and more stuff in subtrees, user configurable with scripting "support" (i.e. we have documented where in the source code you can hardcode your own menu options into the menu).
+y: repeat last action, redo
+
 
 ## Medium term TODO:
 
 * Make a basic space exploration prototype
  - A solar system with the sun, some planets, a circular "spaceship" with a gaslight drive
 * w-space
+* deprioritized tasks
+ - the shader
+ - the vertex buffer
 
 
 ## Even further out:

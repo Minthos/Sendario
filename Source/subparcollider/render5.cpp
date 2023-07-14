@@ -944,24 +944,15 @@ void *rendererThread(void *arg) {
 			static int numIndices = 0;
 			// can use a better algorithm to dynamically update meshes when the geometry changes and in response to LOD
 			// considerations
-			Mesh meshes[9];
-			if(numIndices == 0) {
-				meshes[0] = boxoidToMesh(exampleBoxoids[0]);
-				//meshes[1] = boxoidToMesh(exampleBoxoids[1]);
-				meshes[1] = tessellateMesh(&meshes[0], 0, &exampleBoxoids[0]);
-				meshes[2] = tessellateMesh(&meshes[1], 1, &exampleBoxoids[0]);
-				//meshes[3] = tessellateMesh(&meshes[1], 0, &exampleBoxoids[1]);
-				meshes[3] = tessellateMesh(&meshes[2], 2, &exampleBoxoids[0]);
-				meshes[4] = tessellateMesh(&meshes[3], 3, &exampleBoxoids[0]);
-				meshes[5] = tessellateMesh(&meshes[4], 4, &exampleBoxoids[0]);
-				meshes[6] = tessellateMesh(&meshes[5], 5, &exampleBoxoids[0]);
-				meshes[7] = tessellateMesh(&meshes[6], 6, &exampleBoxoids[0]);
-				//meshes[5] = tessellateMesh(&meshes[3], 1, &exampleBoxoids[1]);
-				//meshes[7] = tessellateMesh(&meshes[5], 2, &exampleBoxoids[1]);
-				meshes[8] = tessellateMesh(&meshes[7], 7, &exampleBoxoids[0]);
+			int numMeshes = 4;
+			Mesh meshes[numMeshes];
+			meshes[0] = boxoidToMesh(exampleBoxoids[0]);
+			for(int i = 0; i+1 < numMeshes; i++) {
+				meshes[i+1] = tessellateMesh(&meshes[i], i, &exampleBoxoids[0]);
 			}
-			numIndices = uploadMeshes(&meshes[sharedData.renderMisc.buttonPresses % 8], 1, boxoidVAO, boxoidVBO, boxoidEBO);
+			numIndices = uploadMeshes(&meshes[(3 + sharedData.renderMisc.buttonPresses) % numMeshes], 1, boxoidVAO, boxoidVBO, boxoidEBO);
 			renderMeshes(numIndices, boxoidVAO, boxoidVBO, boxoidEBO);
+			deleteMeshes(meshes, numMeshes);
 		}
 		else {
 			printf("numSpheres: %d\n", sharedData.numSpheres);
