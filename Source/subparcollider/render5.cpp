@@ -523,10 +523,10 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 	for(int i = 0; i < original->numEdges; i++) {
 		Edge* edge = &(original->edges[i]);
 		verts[vertIndex] = vertex_interpolate(&verts[edge->verts[0]], &verts[edge->verts[1]], 0.5f);
-		verts[vertIndex].flags = 0;
+		verts[vertIndex].flags &= ~VERT_ORIGINAL;
 		edge->verts[2] = vertIndex;
 		if(iteration == 0) { // the light value isn't being used for light yet so we'll use it for this instead
-			verts[vertIndex].light = glm::vec3(1.0f, glm::distance(verts[edge->verts[0]].position, verts[edge->verts[1]].position), 0.0f);
+			verts[vertIndex].light.x = 1.0f;
 		}
 		edges[i * 2] = Edge(edge->verts[0], edge->verts[2]);
 		edges[i * 2 + 1] = Edge(edge->verts[1], edge->verts[2]);
@@ -574,32 +574,44 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 			//printf("indices: %d %d %d\n", indices[i * 9 + j * 3], indices[i * 9 + j * 3 + 1], indices[i * 9 + j * 3 + 2]);
 		}
 		for(int j = 0; j < 3; j++) {
-			if((verts[newVertices[j]].flags & VERT_SHIFTED) == 0) {
+			//if((verts[newVertices[j]].flags & VERT_SHIFTED) == 0) {
 				// should discriminate between these two but we'll just add them together for now
 				float curvature = box->curvature[tri->faceIndex * 2] + box->curvature[tri->faceIndex * 2 + 1];
 				// light is a misnomer. this is heavy. it's also repurposing the "light" variable to store temporary values for the curvature calculation, which is the whole reason we are tessellating this mesh in the first place
 				glm::vec3 light = verts[newVertices[j]].light;
+
 				float unitcurve = sqrt(1.0f - (1.0f - light.x) * (1.0f - light.x));
-				glm::vec3 faceClosestPoint = nearestPointOnPlane(verts[newVertices[j]].position, original->faceCentres[tri->faceIndex],
-					original->faceNormals[tri->faceIndex]);
+				
+
+				// crap
+				//glm::vec3 faceClosestPoint = nearestPointOnPlane(verts[newVertices[j]].position, original->faceCentres[tri->faceIndex],
+				//	original->faceNormals[tri->faceIndex]);
 				//glm::vec3 ptp = verts[newVertices[j]].position - original->faceCentres[tri->faceIndex];
 				//glm::vec3 projected = glm::dot(ptp, original->faceNormals[tri->faceIndex]) * original->faceNormals[tri->faceIndex];
-				glm::vec3 fromFaceToHere = faceClosestPoint - verts[newVertices[j]].position;
-				//float distance = fromFaceToHere.length();
-				float distance = glm::dot((verts[newVertices[j]].position - original->faceCentres[tri->faceIndex]), original->faceNormals[tri->faceIndex]);
-				float target = unitcurve * curvature * 0.25;
+				//glm::vec3 fromFaceToHere = faceClosestPoint - verts[newVertices[j]].position;
+				//float distance = glm::length(fromFaceToHere);
+				
+
+				// pretty good but not perfect
+				//float distance = glm::dot((verts[newVertices[j]].position - original->faceCentres[tri->faceIndex]), original->faceNormals[tri->faceIndex]);
+				//float target = unitcurve * curvature * 0.25;
+
+				// new attempt
+				glm::vec3 fromCentre = verts[newVertices[j]].position - original->centre;
+				float distance = glm::length(fromCentre);
+				float target = light.y + unitcurve * 0.25;
 				float adjustment = target - distance;
 			
 				//glm::vec3 offset = fromFaceToHere * (adjustment / distance);
-				glm::vec3 offset = original->faceNormals[tri->faceIndex] * adjustment;
+				glm::vec3 offset = verts[newVertices[j]].normal * adjustment;
 				//verts[newVertices[j]].position = faceClosestPoint;
 				verts[newVertices[j]].position += offset;
 				verts[newVertices[j]].flags |= VERT_SHIFTED;
-				glm::vec3 p[3] = {verts[newVertices[j]].position,
-					verts[newVertices[(j + 1) % 3]].position,
-					verts[newVertices[(j + 2) % 3]].position};
-				verts[newVertices[j]].normal = glm::normalize(glm::cross(p[0] - p[1], p[0] - p[2]));
-			}
+				//glm::vec3 p[3] = {verts[newVertices[j]].position,
+				//	verts[newVertices[(j + 1) % 3]].position,
+				//	verts[newVertices[(j + 2) % 3]].position};
+				//verts[newVertices[j]].normal = glm::normalize(glm::cross(p[0] - p[1], p[0] - p[2]));
+			//}
 		}
 	}
 	printf("1 mesh subdivided. %d verts, %d tris, %d edges, %d indices\n", numVerts, numTris, numEdges, numIndices);
@@ -627,7 +639,7 @@ Mesh boxoidToMesh(Boxoid box) {
 	for(int i = 0; i < 8; i++) {
 		verts[i] = Vertex(corners[i],
 			glm::normalize(corners[i] - centre),
-			glm::vec3(0.0f),
+			glm::vec3(0.0f, glm::length(corners[i] - centre), 0.0f),
 			VERT_ORIGINAL);
 	}
 	for(int i = 0; i < 12; i++) {
@@ -962,16 +974,20 @@ void *rendererThread(void *arg) {
 			Mesh meshes[9];
 			if(numIndices == 0) {
 				meshes[0] = boxoidToMesh(exampleBoxoids[0]);
-				meshes[1] = boxoidToMesh(exampleBoxoids[1]);
-				meshes[2] = tessellateMesh(&meshes[0], 0, &exampleBoxoids[0]);
-				meshes[3] = tessellateMesh(&meshes[1], 0, &exampleBoxoids[1]);
-				meshes[4] = tessellateMesh(&meshes[2], 1, &exampleBoxoids[0]);
-				meshes[5] = tessellateMesh(&meshes[3], 1, &exampleBoxoids[1]);
-				meshes[6] = tessellateMesh(&meshes[4], 2, &exampleBoxoids[0]);
-				meshes[7] = tessellateMesh(&meshes[5], 2, &exampleBoxoids[1]);
-				meshes[8] = tessellateMesh(&meshes[6], 3, &exampleBoxoids[0]);
+				//meshes[1] = boxoidToMesh(exampleBoxoids[1]);
+				meshes[1] = tessellateMesh(&meshes[0], 0, &exampleBoxoids[0]);
+				meshes[2] = tessellateMesh(&meshes[1], 1, &exampleBoxoids[0]);
+				//meshes[3] = tessellateMesh(&meshes[1], 0, &exampleBoxoids[1]);
+				meshes[3] = tessellateMesh(&meshes[2], 2, &exampleBoxoids[0]);
+				meshes[4] = tessellateMesh(&meshes[3], 3, &exampleBoxoids[0]);
+				meshes[5] = tessellateMesh(&meshes[4], 4, &exampleBoxoids[0]);
+				meshes[6] = tessellateMesh(&meshes[5], 5, &exampleBoxoids[0]);
+				meshes[7] = tessellateMesh(&meshes[6], 6, &exampleBoxoids[0]);
+				//meshes[5] = tessellateMesh(&meshes[3], 1, &exampleBoxoids[1]);
+				//meshes[7] = tessellateMesh(&meshes[5], 2, &exampleBoxoids[1]);
+				meshes[8] = tessellateMesh(&meshes[7], 7, &exampleBoxoids[0]);
 			}
-			numIndices = uploadMeshes(&meshes[sharedData.renderMisc.buttonPresses % 9], 1, boxoidVAO, boxoidVBO, boxoidEBO);
+			numIndices = uploadMeshes(&meshes[sharedData.renderMisc.buttonPresses % 8], 1, boxoidVAO, boxoidVBO, boxoidEBO);
 			renderMeshes(numIndices, boxoidVAO, boxoidVBO, boxoidEBO);
 		}
 		else {
