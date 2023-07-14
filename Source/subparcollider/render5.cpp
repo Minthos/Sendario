@@ -574,44 +574,19 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 			//printf("indices: %d %d %d\n", indices[i * 9 + j * 3], indices[i * 9 + j * 3 + 1], indices[i * 9 + j * 3 + 2]);
 		}
 		for(int j = 0; j < 3; j++) {
-			//if((verts[newVertices[j]].flags & VERT_SHIFTED) == 0) {
-				// should discriminate between these two but we'll just add them together for now
-				float curvature = box->curvature[tri->faceIndex * 2] + box->curvature[tri->faceIndex * 2 + 1];
-				// light is a misnomer. this is heavy. it's also repurposing the "light" variable to store temporary values for the curvature calculation, which is the whole reason we are tessellating this mesh in the first place
-				glm::vec3 light = verts[newVertices[j]].light;
+			// should discriminate between these two but we'll just add them together for now
+			float curvature = box->curvature[tri->faceIndex * 2] + box->curvature[tri->faceIndex * 2 + 1];
+			// light is a misnomer. this is heavy. it's also repurposing the "light" variable to store temporary values for the curvature calculation, which is the whole reason we are tessellating this mesh in the first place
+			glm::vec3 light = verts[newVertices[j]].light;
 
-				float unitcurve = sqrt(1.0f - (1.0f - light.x) * (1.0f - light.x));
-				
-
-				// crap
-				//glm::vec3 faceClosestPoint = nearestPointOnPlane(verts[newVertices[j]].position, original->faceCentres[tri->faceIndex],
-				//	original->faceNormals[tri->faceIndex]);
-				//glm::vec3 ptp = verts[newVertices[j]].position - original->faceCentres[tri->faceIndex];
-				//glm::vec3 projected = glm::dot(ptp, original->faceNormals[tri->faceIndex]) * original->faceNormals[tri->faceIndex];
-				//glm::vec3 fromFaceToHere = faceClosestPoint - verts[newVertices[j]].position;
-				//float distance = glm::length(fromFaceToHere);
-				
-
-				// pretty good but not perfect
-				//float distance = glm::dot((verts[newVertices[j]].position - original->faceCentres[tri->faceIndex]), original->faceNormals[tri->faceIndex]);
-				//float target = unitcurve * curvature * 0.25;
-
-				// new attempt
-				glm::vec3 fromCentre = verts[newVertices[j]].position - original->centre;
-				float distance = glm::length(fromCentre);
-				float target = light.y + unitcurve * 0.25;
-				float adjustment = target - distance;
-			
-				//glm::vec3 offset = fromFaceToHere * (adjustment / distance);
-				glm::vec3 offset = verts[newVertices[j]].normal * adjustment;
-				//verts[newVertices[j]].position = faceClosestPoint;
-				verts[newVertices[j]].position += offset;
-				verts[newVertices[j]].flags |= VERT_SHIFTED;
-				//glm::vec3 p[3] = {verts[newVertices[j]].position,
-				//	verts[newVertices[(j + 1) % 3]].position,
-				//	verts[newVertices[(j + 2) % 3]].position};
-				//verts[newVertices[j]].normal = glm::normalize(glm::cross(p[0] - p[1], p[0] - p[2]));
-			//}
+			float unitcurve = sqrt(1.0f - (1.0f - light.x) * (1.0f - light.x));
+			float target = light.y;
+			glm::vec3 fromCentre = verts[newVertices[j]].position - original->centre;
+			float distance = glm::length(fromCentre);
+			float adjustment = target - distance;
+			glm::vec3 offset = verts[newVertices[j]].normal * adjustment;
+			verts[newVertices[j]].position += offset;
+			verts[newVertices[j]].flags |= VERT_SHIFTED;
 		}
 	}
 	printf("1 mesh subdivided. %d verts, %d tris, %d edges, %d indices\n", numVerts, numTris, numEdges, numIndices);
