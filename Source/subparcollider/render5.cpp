@@ -365,9 +365,9 @@ Boxoid exampleBoxoids[2] =
 	{1.0, 1.0,
 	1.0, 1.0,
 	1.0, 1.0,
-	1.0, 1.0,
-	1.0, 1.0,
-	1.0, 1.0},
+	-1.0, -1.0,
+	1.0, 0.0,
+	0.0, 3.0},
 	4, 0x03},
 	{{-1.0f,  1.0f, 1.0f,
 	-1.0f, -1.0f, 1.0f,
@@ -581,31 +581,10 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 			float ownDistance = glm::length(toCentre);
 			glm::vec3 onSpheroid = v->position * (light.y / ownDistance);
 			glm::vec3 onBox = (toCentre * (1.0f / light.z)) + original->centre;
-
-			float curvature = box->curvature[fi * 2] + box->curvature[fi * 2 + 1];
+			float curvature = (box->curvature[fi * 2] + box->curvature[fi * 2 + 1]) * 0.5;
 			v->position = vlerp(onBox, onSpheroid, curvature);
 			v->flags |= VERT_SHIFTED;
-			
-			//verts[newVertices[j]].light.z = light.y / ownDistance;
 			v->light.z = glm::length(v->position - original->centre) / glm::length(onBox - original->centre);
-		
-			// this is not correct. the shape defined by this function is not a box.	
-			//glm::vec3 onBox = nearestPointOnPlane(v->position, original->faceCentres[fi], original->faceNormals[fi]);
-			
-			//float curvature = box->curvature[fi * 2] + box->curvature[fi * 2 + 1];
-			//float unitcurve = sqrt(1.0f - (1.0f - light.x) * (1.0f - light.x));
-			//glm::vec3 fromCentre = v->position - original->centre;
-			//float distance = glm::length(fromCentre);
-			//float faceDistanceToCentre = glm::length(onFace - original->centre);
-			//float target = lerp(light.y, faceDistanceToCentre, curvature * 0.25f);
-			//float target = faceDistanceToCentre;
-			//float target = light.y;
-			//float adjustment = target - distance;
-			//glm::vec3 offset = verts[newVertices[j]].normal * adjustment;
-
-			//verts[newVertices[j]].position += offset;
-			//verts[newVertices[j]].light.z += adjustment;
-			//verts[newVertices[j]].normal = original->faceNormals[tri->faceIndex];
 		}
 	}
 	printf("1 mesh subdivided. %d verts, %d tris, %d edges, %d indices\n", numVerts, numTris, numEdges, numIndices);
