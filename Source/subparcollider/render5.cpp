@@ -267,7 +267,7 @@ void main()
 	vec3 radiance = materialEmissive * 0.079577 + accumulatedLight;
 	float darkness = 3.0 / (3.0 + exposure + radiance.r + radiance.g + radiance.b);
 	radiance = radiance * darkness;
-	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);// * 0.75 + invNormals * 0.25;
+	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0) * 0.75 + invNormals * 0.25;
 	const float constantForDepth = 1.0;
 	const float farDistance = 3e18;
 	const float offsetForDepth = 1.0;
@@ -577,11 +577,11 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 	for(int i = 0; i < original->numEdges; i++) {
 		Edge* edge = &(original->edges[i]);
 		verts[vertIndex] = vertex_interpolate_half(&verts[edge->verts[0]], &verts[edge->verts[1]]);
-		verts[vertIndex].flags &= ~VERT_ORIGINAL;
+		verts[vertIndex].flags &= ~(VERT_ORIGINAL | VERT_SHIFTED);
 		if(edge->tris[1] == nullptr){
 			verts[vertIndex].normal = edge->tris[0]->normal;
 		} else {
-			verts[vertIndex].normal = glm::normalize(verts[vertIndex].normal * 2.0f + edge->tris[0]->normal + edge->tris[1]->normal);
+			verts[vertIndex].normal = glm::normalize(verts[vertIndex].normal * 4.0f + edge->tris[0]->normal + edge->tris[1]->normal);
 		}
 		edge->verts[2] = vertIndex;
 		edges[i * 2] = Edge(edge->verts[0], edge->verts[2]);
@@ -632,33 +632,38 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 		}
 		for(int j = 0; j < 3; j++) {
 			Vertex* v = &verts[newVertices[j]];
-			GLuint fi = tri->faceIndex;
-			glm::vec3 toCentre = v->position - original->centre;
-			float offset = float(v->flags & 0xFFFFFF00) / float(0x1 << 24);
-			glm::vec3 onBox = (toCentre * (1.0f / offset)) + original->centre;
-			float ucurve = 0.0f;
-			float vcurve = 0.0f;
-			if(fi == 0 || fi ==1 ) {
-				ucurve = v->tex.x;
-				vcurve = v->tex.y;
-			} else if(fi == 2 || fi == 3) {
-				ucurve = v->tex.z;
-				vcurve = v->tex.y;
-			} else if(fi == 4 || fi == 5) {
-				ucurve = v->tex.z;
-				vcurve = v->tex.x;
+			if((v->flags & VERT_SHIFTED) == 0) {
+				GLuint fi = tri->faceIndex;
+				glm::vec3 toCentre = v->position - original->centre;
+				float offset = float(v->flags & 0xFFFFFF00) / float(0x1 << 24);
+				glm::vec3 onBox = (toCentre * (1.0f / offset)) + original->centre;
+				float ucurve = 0.0f;
+				float vcurve = 0.0f;
+				if(fi == 0 || fi ==1 ) {
+					ucurve = v->tex.x;
+					vcurve = v->tex.y;
+				} else if(fi == 2 || fi == 3) {
+					ucurve = v->tex.z;
+					vcurve = v->tex.y;
+				} else if(fi == 4 || fi == 5) {
+					ucurve = v->tex.z;
+					vcurve = v->tex.x;
+				}
+				float ubulge = box->curvature[fi * 2] * (cos(ucurve * M_PI/4.0f) - 0.7071067811865476f);
+				float vbulge = box->curvature[fi * 2 + 1] * (cos(vcurve * M_PI/4.0f) - 0.7071067811865476f);
+				float curvature = ubulge + vbulge;
+				v->position = onBox * (1.0f + curvature);
+				if(iteration > 2) {
+					v->normal = glm::normalize(vlerp(original->faceNormals[fi], v->normal, 0.7));
+				}
+				v->flags |= VERT_SHIFTED;
+				offset = glm::length(v->position - original->centre) / glm::length(onBox - original->centre);
+				offset *= float(0x1 << 24);
+				v->flags = (((GLuint)offset) & 0xFFFFFF00) | (v->flags & 0x000000FF);
 			}
-			float ubulge = box->curvature[fi * 2] * (cos(ucurve * M_PI/4.0f) - 0.7071067811865476f);
-			float vbulge = box->curvature[fi * 2 + 1] * (cos(vcurve * M_PI/4.0f) - 0.7071067811865476f);
-			float curvature = ubulge + vbulge;
-			v->position = onBox * (1.0f + curvature);
-			v->flags |= VERT_SHIFTED;
-			offset = glm::length(v->position - original->centre) / glm::length(onBox - original->centre);
-			offset *= float(0x1 << 24);
-			v->flags = (((GLuint)offset) & 0xFFFFFF00) | (v->flags & 0x000000FF);
 		}
 	}
-	// do some smoothing to counteract numeric instability
+	// do some smoothing to counteract numeric instability, algo has some drawbacks and improvements are welcome
 	if(iteration > 3){
 		for(int i = 0; i < numTris; i++) {
 			Vertex avgVert;
@@ -738,13 +743,19 @@ Mesh boxoidToMesh(Boxoid box) {
 			e += 3;
 			tris[t] = Triangle(tmpVerts, tmpEdges, i / 2, verts, centre);
 			setEdgePtrs(&tris[t]);
+			faceNormals[i / 2] = tris[t].normal;
 			t++;
 		}
 		if((i % 2) == 0){
 			faceCentres[i / 2] = (corners[sphereIndices[i * 3]] + corners[sphereIndices[i * 3 + 1]] +
 								  corners[sphereIndices[i * 3 + 2]] + corners[sphereIndices[i * 3 + 5]]) * 0.25f;
-			// this is wrong - but we don't use them anyway
-			faceNormals[i / 2] = glm::normalize(faceCentres[i / 2] - centre);
+			//faceNormals[i / 2] = glm::vec3(0.0f, 0.0f, 0.0f);
+			// faceNormals[i / 2] = glm::normalize(glm::cross(corners[sphereIndices[i * 3]] - corners[sphereIndices[i * 3 + 2]],
+			//					  corners[sphereIndices[i * 3 + 1]] - corners[sphereIndices[i * 3 + 5]]));
+			//float dotProduct = glm::dot(faceNormals[i / 2], faceCentres[i / 2] - centre);
+			//if(dotProduct < 0.0f) {
+			//	faceNormals[i / 2] = -faceNormals[i / 2];
+			//}
 		}
 	}
 	// remove duplicate edges
