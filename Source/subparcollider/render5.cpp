@@ -254,18 +254,20 @@ out vec4 fragColor;
 void main()
 {
 	vec3 accumulatedLight = vec3(0.0, 0.0, 0.0);
+	vec4 invNormals = (vec4(1.0f) - vec4(fragNormal, 0.0));
 	for (int i = 0; i < MAX_LIGHTS; ++i) {
 		vec3 lightVector = lightPositions[i] - fragPos;
 		float squaredDistance = dot(lightVector, lightVector);
 		vec3 lightDirection = lightVector / sqrt(squaredDistance);
 		float attenuation = 1.0 / squaredDistance;
 		float lambertian = max(dot(fragNormal, lightDirection), 0.0);
-		accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
+		//accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
+		accumulatedLight += attenuation * invNormals.xyz * lightColors[i] * lambertian;
 	}
 	vec3 radiance = materialEmissive * 0.079577 + accumulatedLight;
 	float darkness = 3.0 / (3.0 + exposure + radiance.r + radiance.g + radiance.b);
 	radiance = radiance * darkness;
-	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0) * 0.75 + vec4(fragNormal, 1.0) * 0.25;
+	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);// * 0.75 + invNormals * 0.25;
 	const float constantForDepth = 1.0;
 	const float farDistance = 3e18;
 	const float offsetForDepth = 1.0;
@@ -393,7 +395,7 @@ float ilerpHalf(GLuint a, GLuint b) {
 	return ((a + b) >> 1) & 0xFFFFFF00 | (a & b & 0x000000FF);
 }
 
-float ilerp(GLuint a, GLuint b, float f) {
+GLuint ilerp(GLuint a, GLuint b, float f) {
 	return (GLuint((((float)b) * f) + (((float)a) * (1.0f - f))) & 0xFFFFFF00) | (a & b & 0x000000FF);
 }
 
@@ -429,9 +431,13 @@ struct Vertex {
 	}
 };
 
+struct Triangle;
+
 struct Edge {
 	GLuint verts[3];
 	Edge* subdivisions[2];
+	Triangle* tris[2];
+	glm::vec3 normal;
 	
 	Edge() {}
 	Edge(GLuint vert0, GLuint vert1) {
@@ -440,16 +446,19 @@ struct Edge {
 		verts[2] = -1;
 		subdivisions[0] = nullptr;
 		subdivisions[1] = nullptr;
+		tris[0] = nullptr;
+		tris[1] = nullptr;
 	}
 };
 
 struct Triangle {
 	GLuint verts[3];
 	Edge *edges[3];
+	glm::vec3 normal;
 	GLuint faceIndex;
 
 	Triangle() {}
-	Triangle(GLuint pverts[3], Edge *pedges[3], GLuint pfaceIndex) {
+	Triangle(GLuint pverts[3], Edge *pedges[3], GLuint pfaceIndex, Vertex* vertData, glm::vec3 centre) {
 		verts[0] = pverts[0];
 		verts[1] = pverts[1];
 		verts[2] = pverts[2];
@@ -467,8 +476,23 @@ struct Triangle {
 		assert(edges[2]->verts[0] == verts[2] || edges[2]->verts[1] == verts[2]);
 		assert(edges[2]->verts[0] == verts[0] || edges[2]->verts[1] == verts[0]);
 		faceIndex = pfaceIndex;
+		normal = glm::normalize(glm::cross((vertData[verts[0]].position - vertData[verts[1]].position), (vertData[verts[0]].position - vertData[verts[2]].position)));
+		float dotProduct = glm::dot(normal, vertData[verts[0]].position - centre);
+		if(dotProduct < 0.0f){
+			normal = -normal;
+		}
 	}
 };
+
+void setEdgePtrs(Triangle* tri) {
+	for(int i = 0; i < 3; i++) {
+		if(tri->edges[i]->tris[0] == nullptr) {
+			tri->edges[i]->tris[0] = tri;
+		} else {
+			tri->edges[i]->tris[1] = tri;
+		}
+	}
+}
 
 struct Mesh {
 	glm::vec3 centre;
@@ -514,6 +538,10 @@ glm::vec3 avgOf3(glm::vec3 a, glm::vec3 b, glm::vec3 c) {
 	return (a + b + c) * (1.0f / 3.0f);
 }
 
+Vertex avgOf3(Vertex* a, Vertex* b, Vertex* c) {
+	return Vertex(avgOf3(a->position, b->position, c->position), glm::normalize(avgOf3(a->normal, b->normal, c->normal)), avgOf3(a->light, b->light, c->light), avgOf3(a->tex, b->tex, c->tex), ((a->flags & 0xFFFFFF00 + b->flags & 0xFFFFFF00 + c->flags & 0xFFFFFF00 / 3) & 0xFFFFFF00) | ((a->flags & b->flags & c->flags) & 0xFF));
+}
+
 Vertex vertex_interpolate_half(Vertex* a, Vertex* b) {
 	return Vertex(vlerpHalf(a->position, b->position), glm::normalize(vlerpHalf(a->normal, b->normal)), vlerpHalf(a->light, b->light), vlerpHalf(a->tex, b->tex), ilerpHalf(a->flags, b->flags));
 }
@@ -528,6 +556,7 @@ glm::vec3 nearestPointOnPlane(glm::vec3 origin, glm::vec3 onPlane, glm::vec3 nor
 }
 
 // Loop subdivision that doesn't create duplicate edges/vertices, runs in linear time
+// it looks like the mesh needs a little bit smoothing at iterations 3 and above.
 Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 	GLuint numVerts = original->numEdges + original->numVerts;
 	GLuint numTris = original->numTris * 4;
@@ -549,6 +578,11 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 		Edge* edge = &(original->edges[i]);
 		verts[vertIndex] = vertex_interpolate_half(&verts[edge->verts[0]], &verts[edge->verts[1]]);
 		verts[vertIndex].flags &= ~VERT_ORIGINAL;
+		if(edge->tris[1] == nullptr){
+			verts[vertIndex].normal = edge->tris[0]->normal;
+		} else {
+			verts[vertIndex].normal = glm::normalize(verts[vertIndex].normal * 2.0f + edge->tris[0]->normal + edge->tris[1]->normal);
+		}
 		edge->verts[2] = vertIndex;
 		edges[i * 2] = Edge(edge->verts[0], edge->verts[2]);
 		edges[i * 2 + 1] = Edge(edge->verts[1], edge->verts[2]);
@@ -582,48 +616,24 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 		for(int j = 0; j < 3; j++) {
 			GLuint vertTemp[3] = {tri->verts[j], newVertices[j], newVertices[(j + 2) % 3]};
 			Edge *edgeTemp[3] = {edgeEdges[(j * 2) % 6], centreEdges[(j + 2) % 3], edgeEdges[(j * 2 + 5) % 6]};
-			tris[triIndex] = Triangle(vertTemp, edgeTemp, tri->faceIndex);
+			tris[triIndex] = Triangle(vertTemp, edgeTemp, tri->faceIndex, verts, original->centre);
 			newTris[j] = &tris[triIndex];
+			setEdgePtrs(newTris[j]);
 			triIndex++;
 		}
-		tris[triIndex] = Triangle(newVertices, centreEdges, tri->faceIndex);
+		tris[triIndex] = Triangle(newVertices, centreEdges, tri->faceIndex, verts, original->centre);
 		newTris[3] = &tris[triIndex];
+		setEdgePtrs(newTris[3]);
 		triIndex++;
 		for(int j = 0; j < 4; j++) {
 			indices[indexIndex++] = newTris[j]->verts[0];
 			indices[indexIndex++] = newTris[j]->verts[1];
 			indices[indexIndex++] = newTris[j]->verts[2];
-			//printf("indices: %d %d %d\n", indices[i * 9 + j * 3], indices[i * 9 + j * 3 + 1], indices[i * 9 + j * 3 + 2]);
 		}
-/*
-	-1.0f,  1.0f, 1.0f,
-	-1.0f, -1.0f, 1.0f,
-	 1.0f, -1.0f, 1.0f,
-	 1.0f,  1.0f, 1.0f,
-	-1.0f,  1.0f, -1.0f,
-	-1.0f, -1.0f, -1.0f,
-	 1.0f, -1.0f, -1.0f,
-	 1.0f,  1.0f, -1.0f
-	0, 1, 2,
-	0, 2, 3, // face 0: z ignore
-	4, 5, 6,
-	4, 6, 7, // face 1: z ignore
-	5, 0, 1,
-	5, 0, 4, // face 2: x ignore
-	3, 2, 6,
-	3, 6, 7, // face 3: x ignore
-	7, 0, 3,
-	7, 0, 4, // face 4: y ignore
-	6, 1, 2, 
-	6, 1, 5 // face 5: y ignore
-*/
 		for(int j = 0; j < 3; j++) {
 			Vertex* v = &verts[newVertices[j]];
-			glm::vec3 light = v->light;
 			GLuint fi = tri->faceIndex;
 			glm::vec3 toCentre = v->position - original->centre;
-			//float ownDistance = glm::length(toCentre);
-			//glm::vec3 onSpheroid = v->position * (light.y / ownDistance);
 			float offset = float(v->flags & 0xFFFFFF00) / float(0x1 << 24);
 			glm::vec3 onBox = (toCentre * (1.0f / offset)) + original->centre;
 			float ucurve = 0.0f;
@@ -641,15 +651,47 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 			float ubulge = box->curvature[fi * 2] * (cos(ucurve * M_PI/4.0f) - 0.7071067811865476f);
 			float vbulge = box->curvature[fi * 2 + 1] * (cos(vcurve * M_PI/4.0f) - 0.7071067811865476f);
 			float curvature = ubulge + vbulge;
-			
 			v->position = onBox * (1.0f + curvature);
-			//v->position = vlerp(onBox, onSpheroid, curvature * 0.5f);
-			//v->position = vlerp(original->centre, onBox, 1.0f + curvature * 0.5f);
-			//v->position = onBox + (original->faceNormals[fi] * (curvature * 0.5f));
 			v->flags |= VERT_SHIFTED;
 			offset = glm::length(v->position - original->centre) / glm::length(onBox - original->centre);
 			offset *= float(0x1 << 24);
 			v->flags = (((GLuint)offset) & 0xFFFFFF00) | (v->flags & 0x000000FF);
+		}
+	}
+	// do some smoothing to counteract numeric instability
+	if(iteration > 3){
+		for(int i = 0; i < numTris; i++) {
+			Vertex avgVert;
+			float smoothingMagnitude = 0.2f * (iteration - 3);
+			float deviance = 0.0f;
+			Triangle* t = &tris[i];
+			Triangle* neighbors[3];
+			for(int j = 0; j < 3; j++) {
+				neighbors[j] = (Triangle*) ((size_t)t->edges[j]->tris[0] + (size_t)t->edges[j]->tris[1] - (size_t)t);
+				if(neighbors[j] == nullptr){
+					goto neeext;
+				}
+			}
+			GLuint opposites[3];
+			for(int j = 0; j < 3; j++) {
+				for(int k = 0; k < 3; k++) {
+					GLuint v = neighbors[j]->verts[k];
+					if(v != t->verts[0] && v != t->verts[1] && v != t->verts[2]){
+						opposites[j] = v;
+					}
+				}
+			}
+			for(int j = 0; j < 3; j++) {
+				deviance += glm::length(neighbors[j]->normal - neighbors[(j + 1) %3 ]->normal);
+			}
+			avgVert = avgOf3(&verts[opposites[0]], &verts[opposites[1]], &verts[opposites[2]]);
+			for(int j = 0; j < 3; j++) {
+				Vertex* v = &verts[tris[i].verts[j]];
+				v->position = vlerp(v->position, avgVert.position, smoothingMagnitude / (1.0f + deviance));
+				v->normal = vlerp(v->normal, avgVert.normal, smoothingMagnitude);
+			}
+neeext:
+			;
 		}
 	}
 	printf("1 mesh subdivided. %d verts, %d tris, %d edges, %d indices\n", numVerts, numTris, numEdges, numIndices);
@@ -694,11 +736,14 @@ Mesh boxoidToMesh(Boxoid box) {
 			edges[e + 2] = Edge(tmpVerts[2], tmpVerts[0]);
 			Edge* tmpEdges[3] = {&edges[e], &edges[e + 1], &edges[e + 2]};
 			e += 3;
-			tris[t++] = Triangle(tmpVerts, tmpEdges, i / 2);
+			tris[t] = Triangle(tmpVerts, tmpEdges, i / 2, verts, centre);
+			setEdgePtrs(&tris[t]);
+			t++;
 		}
 		if((i % 2) == 0){
 			faceCentres[i / 2] = (corners[sphereIndices[i * 3]] + corners[sphereIndices[i * 3 + 1]] +
 								  corners[sphereIndices[i * 3 + 2]] + corners[sphereIndices[i * 3 + 5]]) * 0.25f;
+			// this is wrong - but we don't use them anyway
 			faceNormals[i / 2] = glm::normalize(faceCentres[i / 2] - centre);
 		}
 	}
