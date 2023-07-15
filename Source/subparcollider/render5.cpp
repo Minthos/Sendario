@@ -386,8 +386,20 @@ Boxoid exampleBoxoids[2] =
 	4, 0x0}
 };
 
+float ilerpHalf(GLuint a, GLuint b) {
+	return ((a + b) >> 1) & 0xFFFFFF00 | (a & b & 0x000000FF);
+}
+
+float ilerp(GLuint a, GLuint b, float f) {
+	return (GLuint((((float)b) * f) + (((float)a) * (1.0f - f))) & 0xFFFFFF00) | (a & b & 0x000000FF);
+}
+
 float lerp(float a, float b, float f) {
 	return (b * f) + (a * (1.0f - f));
+}
+
+glm::vec3 vlerpHalf(glm::vec3 a, glm::vec3 b) {
+	return (b + a) * 0.5f;
 }
 
 glm::vec3 vlerp(glm::vec3 a, glm::vec3 b, float f) {
@@ -497,8 +509,13 @@ glm::vec3 avgOf3(glm::vec3 a, glm::vec3 b, glm::vec3 c) {
 	return (a + b + c) * (1.0f / 3.0f);
 }
 
+Vertex vertex_interpolate_half(Vertex* a, Vertex* b) {
+	return Vertex(vlerpHalf(a->position, b->position), glm::normalize(vlerpHalf(a->normal, b->normal)), vlerpHalf(a->light, b->light), ilerpHalf(a->flags, b->flags));
+}
+
 Vertex vertex_interpolate(Vertex* a, Vertex* b, float c) {
-	return Vertex(vlerp(a->position, b->position, c), glm::normalize(vlerp(a->normal, b->normal, c)), vlerp(a->light, b->light, c), a->flags & b->flags);
+	//return Vertex(vlerp(a->position, b->position, c), glm::normalize(vlerp(a->normal, b->normal, c)), vlerp(a->light, b->light, c), a->flags & b->flags);
+	return Vertex(vlerp(a->position, b->position, c), glm::normalize(vlerp(a->normal, b->normal, c)), vlerp(a->light, b->light, c), ilerp(a->flags, b->flags, c));
 }
 
 glm::vec3 nearestPointOnPlane(glm::vec3 origin, glm::vec3 onPlane, glm::vec3 normal) {
@@ -525,7 +542,7 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 	// for each edge create a vertex and 2 new edges
 	for(int i = 0; i < original->numEdges; i++) {
 		Edge* edge = &(original->edges[i]);
-		verts[vertIndex] = vertex_interpolate(&verts[edge->verts[0]], &verts[edge->verts[1]], 0.5f);
+		verts[vertIndex] = vertex_interpolate_half(&verts[edge->verts[0]], &verts[edge->verts[1]]);
 		verts[vertIndex].flags &= ~VERT_ORIGINAL;
 		edge->verts[2] = vertIndex;
 		edges[i * 2] = Edge(edge->verts[0], edge->verts[2]);
@@ -580,11 +597,17 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 			glm::vec3 toCentre = v->position - original->centre;
 			float ownDistance = glm::length(toCentre);
 			glm::vec3 onSpheroid = v->position * (light.y / ownDistance);
-			glm::vec3 onBox = (toCentre * (1.0f / light.z)) + original->centre;
+			float offset = float(v->flags & 0xFFFFFF00) / float(0x1 << 24);
+			//float offset = float(v->flags) / float(0x1 << 24);
+			glm::vec3 onBox = (toCentre * (1.0f / offset)) + original->centre;
+			//glm::vec3 onBox = (toCentre * (1.0f / light.z)) + original->centre;
 			float curvature = (box->curvature[fi * 2] + box->curvature[fi * 2 + 1]) * 0.5;
 			v->position = vlerp(onBox, onSpheroid, curvature);
 			v->flags |= VERT_SHIFTED;
-			v->light.z = glm::length(v->position - original->centre) / glm::length(onBox - original->centre);
+			//v->light.z = 
+			offset = glm::length(v->position - original->centre) / glm::length(onBox - original->centre);
+			offset *= float(0x1 << 24);
+			v->flags = (((GLuint)offset) & 0xFFFFFF00) | (v->flags & 0x000000FF);
 		}
 	}
 	printf("1 mesh subdivided. %d verts, %d tris, %d edges, %d indices\n", numVerts, numTris, numEdges, numIndices);
@@ -613,7 +636,8 @@ Mesh boxoidToMesh(Boxoid box) {
 		verts[i] = Vertex(corners[i],
 			glm::normalize(corners[i] - centre),
 			glm::vec3(0.0f, glm::length(corners[i] - centre), 1.0f),
-			VERT_ORIGINAL);
+			VERT_ORIGINAL | (0x1 << 24));
+			//(0x1 << 24));
 	}
 	for(int i = 0; i < 12; i++) {
 		if(box.missing_faces & (0x1 << (i/2))) {
@@ -941,18 +965,19 @@ void *rendererThread(void *arg) {
 			glUniform3fv(boxoidDiffuseLoc, 1, glm::value_ptr(diffuseComponent));
 			glUniform3fv(boxoidEmissiveLoc, 1, glm::value_ptr(emissiveComponent));
 		  
-			static int numIndices = 0;
 			// can use a better algorithm to dynamically update meshes when the geometry changes and in response to LOD
 			// considerations
-			int numMeshes = 4;
+			int numMeshes = 7;
+			int refinementLevel = (3 + sharedData.renderMisc.buttonPresses) % (numMeshes - 1);
 			Mesh meshes[numMeshes];
 			meshes[0] = boxoidToMesh(exampleBoxoids[0]);
-			for(int i = 0; i+1 < numMeshes; i++) {
+			for(int i = 0; i < refinementLevel; i++) {
 				meshes[i+1] = tessellateMesh(&meshes[i], i, &exampleBoxoids[0]);
 			}
-			numIndices = uploadMeshes(&meshes[(3 + sharedData.renderMisc.buttonPresses) % numMeshes], 1, boxoidVAO, boxoidVBO, boxoidEBO);
+			static int numIndices = 0;
+			numIndices = uploadMeshes(&meshes[refinementLevel], 1, boxoidVAO, boxoidVBO, boxoidEBO);
 			renderMeshes(numIndices, boxoidVAO, boxoidVBO, boxoidEBO);
-			deleteMeshes(meshes, numMeshes);
+			deleteMeshes(meshes, refinementLevel + 1);
 		}
 		else {
 			printf("numSpheres: %d\n", sharedData.numSpheres);
