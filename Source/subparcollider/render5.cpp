@@ -365,7 +365,7 @@ Boxoid exampleBoxoids[2] =
 	{1.0, 1.0,
 	1.0, 1.0,
 	1.0, 1.0,
-	-1.0, -1.0,
+	-2.0, -2.0,
 	1.0, 0.0,
 	0.0, 3.0},
 	4, 0x03},
@@ -598,13 +598,10 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 			float ownDistance = glm::length(toCentre);
 			glm::vec3 onSpheroid = v->position * (light.y / ownDistance);
 			float offset = float(v->flags & 0xFFFFFF00) / float(0x1 << 24);
-			//float offset = float(v->flags) / float(0x1 << 24);
 			glm::vec3 onBox = (toCentre * (1.0f / offset)) + original->centre;
-			//glm::vec3 onBox = (toCentre * (1.0f / light.z)) + original->centre;
 			float curvature = (box->curvature[fi * 2] + box->curvature[fi * 2 + 1]) * 0.5;
 			v->position = vlerp(onBox, onSpheroid, curvature);
 			v->flags |= VERT_SHIFTED;
-			//v->light.z = 
 			offset = glm::length(v->position - original->centre) / glm::length(onBox - original->centre);
 			offset *= float(0x1 << 24);
 			v->flags = (((GLuint)offset) & 0xFFFFFF00) | (v->flags & 0x000000FF);
@@ -956,7 +953,9 @@ void *rendererThread(void *arg) {
 			glUniformMatrix4fv(boxoidModelLoc, 1, GL_FALSE, glm::value_ptr(model));
 			glUniform3f(boxoidCenterLoc, center[0], center[1], center[2]);
 			// separate rotation from translation so we can rotate normals in the vertex shader
-			glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), 3.14f * sin(time / 10.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+			//glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), 3.14f * sin(time / 10.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+			glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), 3.14f * 0.5f, glm::vec3(1.0f, 1.0f, 0.0f));
+			rotation = rotation * glm::rotate(glm::mat4(1.0f), 3.14f * 0.5f * (1.0f + sin(time / 10.0f)), glm::vec3(0.0f, 0.0f, 1.0f));
 			glUniformMatrix4fv(boxoidRotationLoc, 1, GL_FALSE, glm::value_ptr(rotation));
 			glm::vec3 diffuseComponent = vectorize(sharedData.renderMisc.materials[exampleBoxoids[0].material_idx].diffuse);
 			glm::vec3 emissiveComponent = vectorize(sharedData.renderMisc.materials[exampleBoxoids[0].material_idx].emissive);
