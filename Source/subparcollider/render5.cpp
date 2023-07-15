@@ -193,6 +193,7 @@ const char *boxoidVertSource = R"glsl(
 layout (location = 0) in vec3 position;
 layout (location = 1) in vec3 normal;
 layout (location = 2) in vec3 light;
+layout (location = 2) in vec3 tex;
 layout (location = 3) in int flags;
 
 uniform mat4 rotation;
@@ -204,6 +205,7 @@ out vec3 fragPos;
 out vec3 fragNormal;
 out vec4 vertexPosClip;
 out vec3 fragLight;
+out vec3 fragTex;
 flat out int fragFlags;
 
 void main()
@@ -211,6 +213,7 @@ void main()
 	fragPos = vec3(model * rotation * vec4(position, 1.0)); // transform vertex from object space to world space
 	fragNormal = vec3(rotation * vec4(normal, 1.0));
 	fragLight = light;
+	fragTex = tex;
 	vec4 posClip = projection * view * vec4(fragPos, 1.0); // transform vertex from world space to clip space
 	vertexPosClip = posClip;  // Pass the clip space position to the fragment shader
 	gl_Position = posClip;
@@ -365,9 +368,9 @@ Boxoid exampleBoxoids[2] =
 	{1.0, 1.0,
 	1.0, 1.0,
 	1.0, 1.0,
-	-2.0, -2.0,
+	0.0, -1.0,
 	1.0, 0.0,
-	0.0, 3.0},
+	0.0, 2.0},
 	4, 0x03},
 	{{-1.0f,  1.0f, 1.0f,
 	-1.0f, -1.0f, 1.0f,
@@ -413,13 +416,15 @@ struct Vertex {
 	glm::vec3 position;
 	glm::vec3 normal;
 	glm::vec3 light;
+	glm::vec3 tex;
 	GLuint flags;
 
 	Vertex() {}
-	Vertex(glm::vec3 pposition, glm::vec3 pnormal, glm::vec3 plight, GLuint pflags) {
+	Vertex(glm::vec3 pposition, glm::vec3 pnormal, glm::vec3 plight, glm::vec3 ptex, GLuint pflags) {
 		position=pposition;
 		normal=pnormal;
 		light=plight;
+		tex=ptex;
 		flags=pflags;
 	}
 };
@@ -510,14 +515,14 @@ glm::vec3 avgOf3(glm::vec3 a, glm::vec3 b, glm::vec3 c) {
 }
 
 Vertex vertex_interpolate_half(Vertex* a, Vertex* b) {
-	return Vertex(vlerpHalf(a->position, b->position), glm::normalize(vlerpHalf(a->normal, b->normal)), vlerpHalf(a->light, b->light), ilerpHalf(a->flags, b->flags));
+	return Vertex(vlerpHalf(a->position, b->position), glm::normalize(vlerpHalf(a->normal, b->normal)), vlerpHalf(a->light, b->light), vlerpHalf(a->tex, b->tex), ilerpHalf(a->flags, b->flags));
 }
-
+/*
 Vertex vertex_interpolate(Vertex* a, Vertex* b, float c) {
 	//return Vertex(vlerp(a->position, b->position, c), glm::normalize(vlerp(a->normal, b->normal, c)), vlerp(a->light, b->light, c), a->flags & b->flags);
 	return Vertex(vlerp(a->position, b->position, c), glm::normalize(vlerp(a->normal, b->normal, c)), vlerp(a->light, b->light, c), ilerp(a->flags, b->flags, c));
 }
-
+*/
 glm::vec3 nearestPointOnPlane(glm::vec3 origin, glm::vec3 onPlane, glm::vec3 normal) {
     return onPlane + glm::dot(origin - onPlane, normal) * normal;
 }
@@ -590,17 +595,57 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 			indices[indexIndex++] = newTris[j]->verts[2];
 			//printf("indices: %d %d %d\n", indices[i * 9 + j * 3], indices[i * 9 + j * 3 + 1], indices[i * 9 + j * 3 + 2]);
 		}
+/*
+	-1.0f,  1.0f, 1.0f,
+	-1.0f, -1.0f, 1.0f,
+	 1.0f, -1.0f, 1.0f,
+	 1.0f,  1.0f, 1.0f,
+	-1.0f,  1.0f, -1.0f,
+	-1.0f, -1.0f, -1.0f,
+	 1.0f, -1.0f, -1.0f,
+	 1.0f,  1.0f, -1.0f
+	0, 1, 2,
+	0, 2, 3, // face 0: z ignore
+	4, 5, 6,
+	4, 6, 7, // face 1: z ignore
+	5, 0, 1,
+	5, 0, 4, // face 2: x ignore
+	3, 2, 6,
+	3, 6, 7, // face 3: x ignore
+	7, 0, 3,
+	7, 0, 4, // face 4: y ignore
+	6, 1, 2, 
+	6, 1, 5 // face 5: y ignore
+*/
 		for(int j = 0; j < 3; j++) {
 			Vertex* v = &verts[newVertices[j]];
 			glm::vec3 light = v->light;
 			GLuint fi = tri->faceIndex;
 			glm::vec3 toCentre = v->position - original->centre;
-			float ownDistance = glm::length(toCentre);
-			glm::vec3 onSpheroid = v->position * (light.y / ownDistance);
+			//float ownDistance = glm::length(toCentre);
+			//glm::vec3 onSpheroid = v->position * (light.y / ownDistance);
 			float offset = float(v->flags & 0xFFFFFF00) / float(0x1 << 24);
 			glm::vec3 onBox = (toCentre * (1.0f / offset)) + original->centre;
-			float curvature = (box->curvature[fi * 2] + box->curvature[fi * 2 + 1]) * 0.5;
-			v->position = vlerp(onBox, onSpheroid, curvature);
+			float ucurve = 0.0f;
+			float vcurve = 0.0f;
+			if(fi == 0 || fi ==1 ) {
+				ucurve = v->tex.x;
+				vcurve = v->tex.y;
+			} else if(fi == 2 || fi == 3) {
+				ucurve = v->tex.z;
+				vcurve = v->tex.y;
+			} else if(fi == 4 || fi == 5) {
+				ucurve = v->tex.z;
+				vcurve = v->tex.x;
+			}
+			float ubulge = box->curvature[fi * 2] * (cos(ucurve * M_PI/4.0f) - 0.7071067811865476f);
+			float vbulge = box->curvature[fi * 2 + 1] * (cos(vcurve * M_PI/4.0f) - 0.7071067811865476f);
+			float curvature = ubulge + vbulge;
+			
+			v->position = onBox * (1.0f + curvature);
+			//v->position = vlerp(onBox, onSpheroid, curvature * 0.5f);
+			//v->position = vlerp(original->centre, onBox, 1.0f + curvature * 0.5f);
+			//v->position = onBox + (original->faceNormals[fi] * (curvature * 0.5f));
 			v->flags |= VERT_SHIFTED;
 			offset = glm::length(v->position - original->centre) / glm::length(onBox - original->centre);
 			offset *= float(0x1 << 24);
@@ -633,8 +678,8 @@ Mesh boxoidToMesh(Boxoid box) {
 		verts[i] = Vertex(corners[i],
 			glm::normalize(corners[i] - centre),
 			glm::vec3(0.0f, glm::length(corners[i] - centre), 1.0f),
+			glm::vec3(sphereVertices[i * 3], sphereVertices[i * 3 + 1], sphereVertices[i * 3 + 2]),
 			VERT_ORIGINAL | (0x1 << 24));
-			//(0x1 << 24));
 	}
 	for(int i = 0; i < 12; i++) {
 		if(box.missing_faces & (0x1 << (i/2))) {
@@ -721,11 +766,13 @@ int uploadMeshes(const Mesh* meshes, int numMeshes, GLuint meshVAO, GLuint meshV
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, position));
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, normal));
 	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, light));
-	glVertexAttribPointer(3, 1, GL_UNSIGNED_INT, GL_FALSE, stride, (void*)offsetof(Vertex, flags));
+	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, tex));
+	glVertexAttribPointer(4, 1, GL_UNSIGNED_INT, GL_FALSE, stride, (void*)offsetof(Vertex, flags));
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
 	glEnableVertexAttribArray(2);
 	glEnableVertexAttribArray(3);
+	glEnableVertexAttribArray(4);
 	return totalNumIndices;
 }
 
@@ -738,11 +785,13 @@ void renderMeshes(int numIndices, GLuint meshVAO, GLuint meshVBO, GLuint meshEBO
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, position));
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, normal));
 	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, light));
-	glVertexAttribPointer(3, 1, GL_UNSIGNED_INT, GL_FALSE, stride, (void*)offsetof(Vertex, flags));
+	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, tex));
+	glVertexAttribPointer(4, 1, GL_UNSIGNED_INT, GL_FALSE, stride, (void*)offsetof(Vertex, flags));
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
 	glEnableVertexAttribArray(2);
 	glEnableVertexAttribArray(3);
+	glEnableVertexAttribArray(4);
 	glDrawElements(GL_TRIANGLES, numIndices, GL_UNSIGNED_INT, nullptr);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -954,8 +1003,8 @@ void *rendererThread(void *arg) {
 			glUniform3f(boxoidCenterLoc, center[0], center[1], center[2]);
 			// separate rotation from translation so we can rotate normals in the vertex shader
 			//glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), 3.14f * sin(time / 10.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-			glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), 3.14f * 0.5f, glm::vec3(1.0f, 1.0f, 0.0f));
-			rotation = rotation * glm::rotate(glm::mat4(1.0f), 3.14f * 0.5f * (1.0f + sin(time / 10.0f)), glm::vec3(0.0f, 0.0f, 1.0f));
+			glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), time, glm::vec3(1.0f, 1.0f, 0.0f));
+			rotation = rotation * glm::rotate(glm::mat4(1.0f), 3.14f * (1.0f + sin(time / 10.0f)), glm::vec3(0.0f, 0.0f, 1.0f));
 			glUniformMatrix4fv(boxoidRotationLoc, 1, GL_FALSE, glm::value_ptr(rotation));
 			glm::vec3 diffuseComponent = vectorize(sharedData.renderMisc.materials[exampleBoxoids[0].material_idx].diffuse);
 			glm::vec3 emissiveComponent = vectorize(sharedData.renderMisc.materials[exampleBoxoids[0].material_idx].emissive);
@@ -968,10 +1017,11 @@ void *rendererThread(void *arg) {
 			// considerations
 			int numMeshes = 7;
 			int refinementLevel = (3 + sharedData.renderMisc.buttonPresses) % (numMeshes - 1);
+			int boxoidVariant = ((3 + sharedData.renderMisc.buttonPresses) / (numMeshes - 1)) % 2;
 			Mesh meshes[numMeshes];
-			meshes[0] = boxoidToMesh(exampleBoxoids[0]);
+			meshes[0] = boxoidToMesh(exampleBoxoids[boxoidVariant]);
 			for(int i = 0; i < refinementLevel; i++) {
-				meshes[i+1] = tessellateMesh(&meshes[i], i, &exampleBoxoids[0]);
+				meshes[i+1] = tessellateMesh(&meshes[i], i, &exampleBoxoids[boxoidVariant]);
 			}
 			static int numIndices = 0;
 			numIndices = uploadMeshes(&meshes[refinementLevel], 1, boxoidVAO, boxoidVBO, boxoidEBO);
