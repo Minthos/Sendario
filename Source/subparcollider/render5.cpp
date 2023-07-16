@@ -613,10 +613,10 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 	GLuint numTris = original->numTris * 4;
 	GLuint numEdges = original->numEdges * 2 + original->numTris * 3;
 	GLuint numIndices = numTris * 3;
-	Vertex* verts = malloc(numVerts * sizeof(Vertex));
-	Triangle* tris = malloc(numTris * sizeof(Triangle));
-	Edge* edges = malloc(numEdges * sizeof(Edge));
-	GLuint* indices = malloc(numIndices * sizeof(GLuint));
+	Vertex* verts = static_cast<Vertex*>(malloc(numVerts * sizeof(Vertex)));
+	Triangle* tris = static_cast<Triangle*>(malloc(numTris * sizeof(Triangle)));
+	Edge* edges = static_cast<Edge*>(malloc(numEdges * sizeof(Edge)));
+	GLuint* indices = static_cast<GLuint*>(malloc(numIndices * sizeof(GLuint)));
 	GLuint edgeIndex = 0;
 	GLuint vertIndex = 0;
 	GLuint triIndex = 0;
@@ -769,18 +769,18 @@ neeext:
 			;
 		}
 	}
-	printf("1 mesh subdivided. %d verts, %d tris, %d edges, %d indices\n", numVerts, numTris, numEdges, numIndices);
+	//printf("1 mesh subdivided. %d verts, %d tris, %d edges, %d indices\n", numVerts, numTris, numEdges, numIndices);
 	return Mesh(original->centre, original->faceNormals, original->faceCentres, verts, numVerts, tris, numTris, edges, numEdges, indices, numIndices);
 }
 
 Mesh boxoidToMesh(Boxoid box) {
-	Vertex *verts = malloc(8 * sizeof(Vertex));
-	Triangle *tris = malloc(12 * sizeof(Triangle));
+	Vertex * verts = static_cast<Vertex *>(malloc(8 * sizeof(Vertex)));
+	Triangle * tris = static_cast<Triangle *>(malloc(12 * sizeof(Triangle)));
 	int t = 0;
 	int e = 0;
 	int indexIndex = 0;
-	Edge *edges = malloc(36 * sizeof(Edge));
-	GLuint *indices = malloc(36 * sizeof(GLuint));
+	Edge * edges = static_cast<Edge *>(malloc(36 * sizeof(Edge)));
+	GLuint * indices = static_cast<GLuint *>(malloc(36 * sizeof(GLuint)));
 	glm::vec3 faceNormals[6];
 	glm::vec3 faceCentres[6];
 	
@@ -822,7 +822,7 @@ Mesh boxoidToMesh(Boxoid box) {
 		}
 	}
 	// remove duplicate edges
-	Edge* realEdges = malloc(18 * sizeof(Edge));
+	Edge* realEdges = static_cast<Edge*>(malloc(18 * sizeof(Edge)));
 	int r = 0;
 	for(int i = 0; i < e; i++) {
 		Edge* a = &edges[i];
@@ -850,7 +850,7 @@ neeext:
 		}
 	}
 	free(edges);
-	printf("1 mesh generated. 8 verts, %d tris, %d edges, %d indices\n", t, r, indexIndex);
+	//printf("1 mesh generated. 8 verts, %d tris, %d edges, %d indices\n", t, r, indexIndex);
 	return Mesh(centre, faceNormals, faceCentres, verts, 8, tris, t, realEdges, r, indices, indexIndex);
 }
 

@@ -91,12 +91,22 @@ enum CommandType {
     case dpaddn // select weapon/module 4
     case dpadl // select weapon/module 1
     case dpadr // select weapon/module 3
-    case toggleAutopilot // left stick button: toggle autopilot (if target locked, match velocity with locked target)
-    case toggleCameraDefault // right stick button: set camera direction to prograde / set camera direction to ship's forward direction
+    case toggleAutopilot // left stick button: toggle autopilot
+    case toggleCameraDefault // right stick button: set camera direction to ship's forward direction
     case forwardThrust // right throttle
     case backwardThrust // left throttle
     case thrustVector // left stick
     case cameraVector // right stick
+}
+
+enum InterfaceMode {
+	case mainMenu
+	case physicsSim
+	case shipEditor
+	case combat
+	case travel
+	case mining
+	case rts
 }
 
 func main() {
@@ -126,6 +136,7 @@ func main() {
     startRenderer()
     SDL_Init(SDL_INIT_GAMECONTROLLER)
     var controller: OpaquePointer? = nil
+	var interfaceMode: InterfaceMode = .physicsSim
     var shouldExit = false
     var rcsIsEnabled = false
     //let worldUpVector = Vector(x: 0, y: 1, z:0)
@@ -134,7 +145,10 @@ func main() {
     
     // main game loop. handle input, do a physics tick, send results to renderer
     while( !shouldExit ) {
-        // poll for inputs, generate actions
+        // take a nap first, don't want to work too hard
+		usleep(1000)
+        
+		// poll for inputs, generate actions
         for i in 0..<SDL_NumJoysticks() {
             if isGameController(i) {
                 controller = SDL_GameControllerOpen(i)
@@ -144,16 +158,20 @@ func main() {
                     while SDL_PollEvent(&event) != 0 {
                         switch event.type {
                         case SDL_CONTROLLERBUTTONDOWN.rawValue:
-                            print("\(String(cString: getStringForButton(event.cbutton.button)!)) pressed")
-                            if        event.cbutton.button == SDL_CONTROLLER_BUTTON_Y.rawValue {
-                                dt *= 10.0
-                            } else if event.cbutton.button == SDL_CONTROLLER_BUTTON_X.rawValue {
-                                dt *= 0.1
-                            } else if event.cbutton.button == SDL_CONTROLLER_BUTTON_B.rawValue {
-                                buttonPresses += 1;
-                            } else if event.cbutton.button == SDL_CONTROLLER_BUTTON_A.rawValue {
-                                buttonPresses -= 1;
-                            }
+							if(interfaceMode == .physicsSim) {
+								print("\(String(cString: getStringForButton(event.cbutton.button)!)) pressed")
+								if        event.cbutton.button == SDL_CONTROLLER_BUTTON_Y.rawValue {
+									dt *= 10.0
+								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_X.rawValue {
+									dt *= 0.1
+								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_B.rawValue {
+									buttonPresses += 1;
+								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_A.rawValue {
+									buttonPresses -= 1;
+								}
+							} else if interfaceMode == .shipEditor {
+								// put stuff here
+							}
                         case SDL_CONTROLLERBUTTONUP.rawValue:
                             if event.cbutton.button == SDL_CONTROLLER_BUTTON_START.rawValue {
                                 shouldExit = true
@@ -184,14 +202,17 @@ func main() {
                 }
             }
         }
-        if(rcsIsEnabled) {
-            actions = [Action(object: player1, force: thrustVector * 10000.0 / dt, torque: Vector(x: cameraSpherical.phi, y: 0, z: cameraSpherical.theta) * -1000.0)]
-        } else {
-            actions = [Action(object: player1, force: thrustVector * 10000.0 / dt, torque: Vector(x: 0, y: 0, z: 0))]
-        }
-        tick(actions: actions, movingObjects: &allTheThings, t: t, dt: dt)
-        t += dt
-        usleep(1000)
+
+		// update game state
+		if interfaceMode == .physicsSim {
+			if(rcsIsEnabled && interfaceMode == .physicsSim) {
+				actions = [Action(object: player1, force: thrustVector * 10000.0 / dt, torque: Vector(x: cameraSpherical.phi, y: 0, z: cameraSpherical.theta) * -1000.0)]
+			} else {
+				actions = [Action(object: player1, force: thrustVector * 10000.0 / dt, torque: Vector(x: 0, y: 0, z: 0))]
+			}
+			tick(actions: actions, movingObjects: &allTheThings, t: t, dt: dt)
+			t += dt
+		}
 
         // camera and rendering
         var renderMisc = render_misc()
