@@ -12,6 +12,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/intersect.hpp>
 
 extern "C" {
 	#include "renderer.h"
@@ -689,8 +690,16 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 				glm::vec3 toCentre = v->position - original->centre;
 				glm::vec3 centreDirection = glm::normalize(toCentre);
 				glm::vec3 onSpheroid = centreDirection * v->light.y;
+				
 				double offset = double(v->flags & 0xFFFFFF00) / double(0x1 << 24);
-				glm::vec3 onBox = (toCentre * (float)(1.0 / offset)) + original->centre;
+				glm::vec3 intersectionPoint = (toCentre * (float)(1.0 / offset)) + original->centre;
+				float intersectionDistance;
+				bool success = glm::intersectRayPlane(v->position, -tri->normal, original->faceCentres[fi], original->faceNormals[fi], intersectionDistance);
+				if(success) {
+					intersectionPoint = (intersectionPoint + v->position + (-tri->normal * intersectionDistance)) * 0.5f;
+				}
+
+				glm::vec3 onBox = intersectionPoint;
 				float ucurve = 0.0f;
 				float vcurve = 0.0f;
 				if(fi == 0 || fi ==1 ) {
@@ -703,19 +712,20 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 					ucurve = v->tex.z;
 					vcurve = v->tex.x;
 				}
+				// this is the magic that makes cylindres, domes, boxes etc somewhat smoothly interpolate. transitions are rough.
 				float ubulge = box->curvature[fi * 2] * (cos(ucurve * M_PI/4.0f) - 0.7071067811865476f);
 				float vbulge = box->curvature[fi * 2 + 1] * (cos(vcurve * M_PI/4.0f) - 0.7071067811865476f);
 				float curvature = ubulge + vbulge;
-				v->position = onBox * (1.0f + curvature);
+				v->position = onBox + (tri->normal + centreDirection) * (curvature * 0.5f);
+				
+				// this makes spherical surfaces really smooth and flat surfaces really flat but doesn't do much to surfaces that
+				// have curvature not close to 0 and 1 on both axes
 				float curviness = max(0.0f, min(1.0f, box->curvature[fi * 2] * box->curvature[fi * 2 + 1]));
 				v->position = vlerp(v->position, onSpheroid, curviness);
 				float flatness = 1.0f / (1.0 + abs(box->curvature[fi * 2]) + abs(box->curvature[fi * 2 + 1]));
-
 				v->normal = glm::normalize(vlerp(v->normal, original->faceNormals[fi], flatness));
 				v->normal = glm::normalize(vlerp(v->normal, centreDirection, curviness));
-				//if(iteration > 1 && (v->flags & VERT_CORNER) == 0) {
-				//	v->normal = glm::normalize(vlerp(original->faceNormals[fi], v->normal, 0.5));
-				//}
+				
 				v->flags |= VERT_SHIFTED;
 				offset = (double)glm::length(v->position - original->centre) / (double)glm::length(onBox - original->centre);
 				offset *= double(0x1 << 24);
@@ -724,9 +734,7 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 		}
 	}
 	// do some smoothing to counteract numeric instability, algo has some drawbacks and improvements are welcome
-	//if(iteration > 3){
-	// actually the smoothing makes it less smooth in some cases, dropping it for now
-	if(false){
+	if(iteration > 3){
 		for(int i = 0; i < numTris; i++) {
 			Vertex avgVert;
 			float smoothingMagnitude = 0.2f * (iteration - 3);
@@ -755,8 +763,7 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 			for(int j = 0; j < 3; j++) {
 				Vertex* v = &verts[tris[i].verts[j]];
 				v->position = vlerp(v->position, avgVert.position, smoothingMagnitude / (1.0f + deviance));
-				//v->normal = glm::normalize(avgVert.normal + v->normal);
-				//v->normal = vlerp(v->normal, avgVert.normal, smoothingMagnitude);
+				v->normal = glm::normalize(avgVert.normal + v->normal);
 			}
 neeext:
 			;

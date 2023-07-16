@@ -10,8 +10,37 @@ Everything is subject to change without notice.
 Licence to be determined (open source).
 
 ---
+### the *ahem* "physics" "engine"
+The so-called physics engine is a lo-fi approximation inspired by real world physics. Most of the features are missing
+and will likely stay missing.
 
-### description of the gameplay:
+### rendering
+The renderer is made with c++, opengl, glut and glm. It's meant to be low on features so I can focus on the gameplay. Of course it offers a tempting outlet for my urge to tinker.
+
+The most interesting feature is the ability to render "boxoids" which are paremeterized geometric primitives that can have a range of useful and interesting shapes. I intend to let the user assemble boxoids into more complex shapes like spaceships, factories, vehicles, space stations and so on. The plan was to do the boxoid geometry transformation in a shader but I ended up doing it withtessellation because I'm too dumb to figure out how to do it in a shader. It looks a bit ugly when the detail level goes up so for now staying at 2 to 3 levels of tessellation looks best. Good for the cpu too to keep the detail level low. There are some obvious performance enhancements I will do to the renderer later when I have more of the gameplay implemented.
+
+It can also render spheres as a special case, though currently without texturing. It's used to render planets, moons and stars. This is done completely in the fragment shader with no tessellation.
+
+There are no shadows, the lighting calculation is extremely simple lambertian but with physically-based values for light intensity. Currently only one light source is supported but I plan to upgrade the lighting at some point. I have some ideas I want to try.
+
+### controls
+Currently the only input supported is gamepad. At some point mouse and keyboard support should also be addded but it's low priority for me personally. Pull requests welcome.
+
+### windows support
+Not implemented. Pull requests welcome.
+
+### ios/android/mac support
+Not implemented. Pull requests welcome.
+
+## Gameplay
+
+### State of gameplay implementation
+
+First I have to build a ui for designing a spaceship..
+
+Some of the gameplay is handled by the physics engine but there's a lot of work to be done.
+
+### intended gameplay
 
 Be an ai.
 Start on a planet with established industry.
@@ -33,3 +62,5 @@ Remotely controlling bases needs a more strategy game like interface.
 Designing hardware should also be a significant part of the game.
 PVP combat, trade and politics should be as emergent as possible.
 PVE can be designed for singleplayer, small and large groups.
+
+
