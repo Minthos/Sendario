@@ -357,8 +357,26 @@ GLuint sphereIndices[] = {
 // right bottom rear - top -- right top front - bottom   // right plate
 // left bottom rear - front -- left top front - rear	 // left plate
 // this boxoid is spherical
-Boxoid exampleBoxoids[2] =
+int numExampleBoxoids = 4;
+Boxoid exampleBoxoids[4] =
 {
+	// cylinder
+	{{-1.0f,  1.0f, 3.0f,
+	-1.0f, -1.0f, 3.0f,
+	 1.0f, -1.0f, 3.0f,
+	 1.0f,  1.0f, 3.0f,
+	-1.0f,  1.0f, -3.0f,
+	-1.0f, -1.0f, -3.0f,
+	 1.0f, -1.0f, -3.0f,
+	 1.0f,  1.0f, -3.0f},
+	{0.0, 0.0, // omitted
+	0.0, 0.0, // omitted
+	0.0, 1.0,
+	0.0, 1.0,
+	0.0, 1.0,
+	0.0, 2.0},
+	4, 0x03},
+	// sled-like shape
 	{{-2.0f,  1.0f, 1.0f,
 	-2.0f, -1.0f, 1.0f,
 	 2.0f, -1.0f, 1.0f,
@@ -374,6 +392,7 @@ Boxoid exampleBoxoids[2] =
 	1.0, 0.0,
 	0.0, 2.0},
 	4, 0x03},
+	// ball that's supposed to be round but isn't because our tessellation is wrong
 	{{-1.0f,  1.0f, 1.0f,
 	-1.0f, -1.0f, 1.0f,
 	 1.0f, -1.0f, 1.0f,
@@ -388,8 +407,38 @@ Boxoid exampleBoxoids[2] =
 	1.0, 1.0,
 	1.0, 1.0,
 	1.0, 1.0},
+	4, 0x0},
+	// box with 1 slanted face
+	{{-2.0f,  1.0f, 1.0f,
+	-2.0f, -1.0f, 1.0f,
+	 2.0f, -1.0f, 1.0f,
+	 2.0f,  1.0f, 1.0f,
+	-2.0f,  0.7f, -1.0f,
+	-2.0f, -0.7f, -1.0f,
+	 2.0f, -1.0f, -1.0f,
+	 2.0f,  1.0f, -1.0f},
+	{0.0, 0.0,
+	0.0, 0.0,
+	0.0, 0.0,
+	0.0, 0.0,
+	0.0, 0.0,
+	0.0, 0.0},
 	4, 0x0}
 };
+
+float min(float a, float b) {
+	if(a < b) {
+		return a;
+	}
+	return b;
+}
+
+float max(float a, float b) {
+	if(a > b) {
+		return a;
+	}
+	return b;
+}
 
 float ilerpHalf(GLuint a, GLuint b) {
 	return ((a + b) >> 1) & 0xFFFFFF00 | (a & b & 0x000000FF);
@@ -412,7 +461,8 @@ glm::vec3 vlerp(glm::vec3 a, glm::vec3 b, float f) {
 }
 
 GLuint VERT_ORIGINAL = 1;
-GLuint VERT_SHIFTED = 2;
+GLuint VERT_CORNER = 2;
+GLuint VERT_SHIFTED = 3;
 
 struct Vertex {
 	glm::vec3 position;
@@ -581,7 +631,8 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 		if(edge->tris[1] == nullptr){
 			verts[vertIndex].normal = edge->tris[0]->normal;
 		} else {
-			verts[vertIndex].normal = glm::normalize(verts[vertIndex].normal * 4.0f + edge->tris[0]->normal + edge->tris[1]->normal);
+			verts[vertIndex].flags &= ~VERT_CORNER;
+			verts[vertIndex].normal = glm::normalize(edge->tris[0]->normal + edge->tris[1]->normal);
 		}
 		edge->verts[2] = vertIndex;
 		edges[i * 2] = Edge(edge->verts[0], edge->verts[2]);
@@ -630,13 +681,16 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 			indices[indexIndex++] = newTris[j]->verts[1];
 			indices[indexIndex++] = newTris[j]->verts[2];
 		}
+		// adjust vertex positions outwards to reflect each face's curvature in u,v dimensions
 		for(int j = 0; j < 3; j++) {
 			Vertex* v = &verts[newVertices[j]];
 			if((v->flags & VERT_SHIFTED) == 0) {
 				GLuint fi = tri->faceIndex;
 				glm::vec3 toCentre = v->position - original->centre;
-				float offset = float(v->flags & 0xFFFFFF00) / float(0x1 << 24);
-				glm::vec3 onBox = (toCentre * (1.0f / offset)) + original->centre;
+				glm::vec3 centreDirection = glm::normalize(toCentre);
+				glm::vec3 onSpheroid = centreDirection * v->light.y;
+				double offset = double(v->flags & 0xFFFFFF00) / double(0x1 << 24);
+				glm::vec3 onBox = (toCentre * (float)(1.0 / offset)) + original->centre;
 				float ucurve = 0.0f;
 				float vcurve = 0.0f;
 				if(fi == 0 || fi ==1 ) {
@@ -653,18 +707,26 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 				float vbulge = box->curvature[fi * 2 + 1] * (cos(vcurve * M_PI/4.0f) - 0.7071067811865476f);
 				float curvature = ubulge + vbulge;
 				v->position = onBox * (1.0f + curvature);
-				if(iteration > 2) {
-					v->normal = glm::normalize(vlerp(original->faceNormals[fi], v->normal, 0.7));
-				}
+				float curviness = max(0.0f, min(1.0f, box->curvature[fi * 2] * box->curvature[fi * 2 + 1]));
+				v->position = vlerp(v->position, onSpheroid, curviness);
+				float flatness = 1.0f / (1.0 + abs(box->curvature[fi * 2]) + abs(box->curvature[fi * 2 + 1]));
+
+				v->normal = glm::normalize(vlerp(v->normal, original->faceNormals[fi], flatness));
+				v->normal = glm::normalize(vlerp(v->normal, centreDirection, curviness));
+				//if(iteration > 1 && (v->flags & VERT_CORNER) == 0) {
+				//	v->normal = glm::normalize(vlerp(original->faceNormals[fi], v->normal, 0.5));
+				//}
 				v->flags |= VERT_SHIFTED;
-				offset = glm::length(v->position - original->centre) / glm::length(onBox - original->centre);
-				offset *= float(0x1 << 24);
+				offset = (double)glm::length(v->position - original->centre) / (double)glm::length(onBox - original->centre);
+				offset *= double(0x1 << 24);
 				v->flags = (((GLuint)offset) & 0xFFFFFF00) | (v->flags & 0x000000FF);
 			}
 		}
 	}
 	// do some smoothing to counteract numeric instability, algo has some drawbacks and improvements are welcome
-	if(iteration > 3){
+	//if(iteration > 3){
+	// actually the smoothing makes it less smooth in some cases, dropping it for now
+	if(false){
 		for(int i = 0; i < numTris; i++) {
 			Vertex avgVert;
 			float smoothingMagnitude = 0.2f * (iteration - 3);
@@ -693,7 +755,8 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 			for(int j = 0; j < 3; j++) {
 				Vertex* v = &verts[tris[i].verts[j]];
 				v->position = vlerp(v->position, avgVert.position, smoothingMagnitude / (1.0f + deviance));
-				v->normal = vlerp(v->normal, avgVert.normal, smoothingMagnitude);
+				//v->normal = glm::normalize(avgVert.normal + v->normal);
+				//v->normal = vlerp(v->normal, avgVert.normal, smoothingMagnitude);
 			}
 neeext:
 			;
@@ -726,7 +789,7 @@ Mesh boxoidToMesh(Boxoid box) {
 			glm::normalize(corners[i] - centre),
 			glm::vec3(0.0f, glm::length(corners[i] - centre), 1.0f),
 			glm::vec3(sphereVertices[i * 3], sphereVertices[i * 3 + 1], sphereVertices[i * 3 + 2]),
-			VERT_ORIGINAL | (0x1 << 24));
+			VERT_ORIGINAL | VERT_CORNER | (0x1 << 24));
 	}
 	for(int i = 0; i < 12; i++) {
 		if(box.missing_faces & (0x1 << (i/2))) {
@@ -749,13 +812,6 @@ Mesh boxoidToMesh(Boxoid box) {
 		if((i % 2) == 0){
 			faceCentres[i / 2] = (corners[sphereIndices[i * 3]] + corners[sphereIndices[i * 3 + 1]] +
 								  corners[sphereIndices[i * 3 + 2]] + corners[sphereIndices[i * 3 + 5]]) * 0.25f;
-			//faceNormals[i / 2] = glm::vec3(0.0f, 0.0f, 0.0f);
-			// faceNormals[i / 2] = glm::normalize(glm::cross(corners[sphereIndices[i * 3]] - corners[sphereIndices[i * 3 + 2]],
-			//					  corners[sphereIndices[i * 3 + 1]] - corners[sphereIndices[i * 3 + 5]]));
-			//float dotProduct = glm::dot(faceNormals[i / 2], faceCentres[i / 2] - centre);
-			//if(dotProduct < 0.0f) {
-			//	faceNormals[i / 2] = -faceNormals[i / 2];
-			//}
 		}
 	}
 	// remove duplicate edges
@@ -1069,11 +1125,11 @@ void *rendererThread(void *arg) {
 			glUniform3fv(boxoidDiffuseLoc, 1, glm::value_ptr(diffuseComponent));
 			glUniform3fv(boxoidEmissiveLoc, 1, glm::value_ptr(emissiveComponent));
 		  
-			// can use a better algorithm to dynamically update meshes when the geometry changes and in response to LOD
-			// considerations
+			// can use a better algorithm to dynamically update meshes when the geometry changes and later also in response
+			// to LOD considerations
 			int numMeshes = 7;
 			int refinementLevel = (3 + sharedData.renderMisc.buttonPresses) % (numMeshes - 1);
-			int boxoidVariant = ((3 + sharedData.renderMisc.buttonPresses) / (numMeshes - 1)) % 2;
+			int boxoidVariant = ((3 + sharedData.renderMisc.buttonPresses) / (numMeshes - 1)) % numExampleBoxoids;
 			Mesh meshes[numMeshes];
 			meshes[0] = boxoidToMesh(exampleBoxoids[boxoidVariant]);
 			for(int i = 0; i < refinementLevel; i++) {
