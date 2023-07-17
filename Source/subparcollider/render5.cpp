@@ -292,6 +292,36 @@ typedef struct {
 
 SharedData sharedData;
 
+struct BufferObject {
+	GLuint VAO;
+	GLuint VBO;
+	GLuint EBO;
+	
+	BufferObject() {
+		glGenVertexArrays(1, &VAO);
+		glGenBuffers(1, &VBO);
+		glGenBuffers(1, &EBO);
+	}
+
+	void bind() {
+		glBindVertexArray(VAO);
+		glBindBuffer(GL_ARRAY_BUFFER, VBO);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	}
+
+	void unbind() {
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	}
+
+	void destroy() {
+		glDeleteVertexArrays(1, &VAO);
+		glDeleteBuffers(1, &VBO);
+		glDeleteBuffers(1, &EBO);
+	}
+}
+
 glm::vec3 vectorize(float in[3]) {
 	return glm::vec3(in[0], in[1], in[2]);
 }
@@ -585,6 +615,27 @@ void deleteMeshes(Mesh *meshes, size_t numMeshes) {
 	}
 }
 
+struct RenderObject {
+	ObjRef ref;
+	BufferObject bo;
+	Mesh* meshes;
+	size_t numMeshes;
+	
+	RenderObject(ObjRef pref) {
+		ref = pref;
+		bo = BufferObject();
+		meshes = nullptr;
+		numMeshes = 0;
+	}
+	
+	void destroy() {
+		bo.destroy();
+		deleteMeshes(meshes, numMeshes);
+		meshes = nullptr;
+		numMeshes = 0;
+	}
+}
+
 glm::vec3 avgOf3(glm::vec3 a, glm::vec3 b, glm::vec3 c) {
 	return (a + b + c) * (1.0f / 3.0f);
 }
@@ -858,6 +909,8 @@ neeext:
 	return Mesh(centre, faceNormals, faceCentres, verts, 8, tris, t, realEdges, r, indices, indexIndex);
 }
 
+// you want to have a vao/vbo/ebo for each composite.
+// can put several LODs in one buffer.
 
 int uploadMeshes(const Mesh* meshes, int numMeshes, GLuint meshVAO, GLuint meshVBO, GLuint meshEBO)
 {
