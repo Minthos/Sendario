@@ -719,10 +719,13 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 				v->position = onBox + (tri->normal + centreDirection) * (curvature * 0.5f);
 				
 				// this makes spherical surfaces really smooth and flat surfaces really flat but doesn't do much to surfaces that
-				// have curvature not close to 0 and 1 on both axes
+				// have curvature not close to 0 and 1 on both axes (now tries to do something with negatively curved surfaces, wish it luck)
 				float curviness = max(0.0f, min(1.0f, box->curvature[fi * 2] * box->curvature[fi * 2 + 1]));
+				if(box->curvature[fi * 2] < 0.0f && box->curvature[fi * 2 + 1] < 0.0f) {
+					curviness = -curviness;
+				}
 				v->position = vlerp(v->position, onSpheroid, curviness);
-				float flatness = 1.0f / (1.0 + abs(box->curvature[fi * 2]) + abs(box->curvature[fi * 2 + 1]));
+				float flatness = -0.5f + 1.5f / (1.5 + 5 * (abs(box->curvature[fi * 2]) + abs(box->curvature[fi * 2 + 1])));
 				v->normal = glm::normalize(vlerp(v->normal, original->faceNormals[fi], flatness));
 				v->normal = glm::normalize(vlerp(v->normal, centreDirection, curviness));
 				
@@ -734,40 +737,41 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 		}
 	}
 	// do some smoothing to counteract numeric instability, algo has some drawbacks and improvements are welcome
-	if(iteration > 3){
-		for(int i = 0; i < numTris; i++) {
-			Vertex avgVert;
-			float smoothingMagnitude = 0.2f * (iteration - 3);
-			float deviance = 0.0f;
-			Triangle* t = &tris[i];
-			Triangle* neighbors[3];
-			for(int j = 0; j < 3; j++) {
-				neighbors[j] = (Triangle*) ((size_t)t->edges[j]->tris[0] + (size_t)t->edges[j]->tris[1] - (size_t)t);
-				if(neighbors[j] == nullptr){
-					goto neeext;
-				}
+	for(int i = 0; i < numTris; i++) {
+		Vertex avgVert;
+		float smoothingMagnitude = 0.2f * (iteration - 3);
+		float deviance = 0.0f;
+		Triangle* t = &tris[i];
+		Triangle* neighbors[3];
+		for(int j = 0; j < 3; j++) {
+			neighbors[j] = (Triangle*) ((size_t)t->edges[j]->tris[0] + (size_t)t->edges[j]->tris[1] - (size_t)t);
+			if(neighbors[j] == nullptr){
+				goto neeext;
 			}
-			GLuint opposites[3];
-			for(int j = 0; j < 3; j++) {
-				for(int k = 0; k < 3; k++) {
-					GLuint v = neighbors[j]->verts[k];
-					if(v != t->verts[0] && v != t->verts[1] && v != t->verts[2]){
-						opposites[j] = v;
-					}
-				}
-			}
-			for(int j = 0; j < 3; j++) {
-				deviance += glm::length(neighbors[j]->normal - neighbors[(j + 1) %3 ]->normal);
-			}
-			avgVert = avgOf3(&verts[opposites[0]], &verts[opposites[1]], &verts[opposites[2]]);
-			for(int j = 0; j < 3; j++) {
-				Vertex* v = &verts[tris[i].verts[j]];
-				v->position = vlerp(v->position, avgVert.position, smoothingMagnitude / (1.0f + deviance));
-				v->normal = glm::normalize(avgVert.normal + v->normal);
-			}
-neeext:
-			;
 		}
+		GLuint opposites[3];
+		for(int j = 0; j < 3; j++) {
+			for(int k = 0; k < 3; k++) {
+				GLuint v = neighbors[j]->verts[k];
+				if(v != t->verts[0] && v != t->verts[1] && v != t->verts[2]){
+					opposites[j] = v;
+				}
+			}
+		}
+		for(int j = 0; j < 3; j++) {
+			deviance += glm::length(neighbors[j]->normal - neighbors[(j + 1) %3 ]->normal);
+		}
+		avgVert = avgOf3(&verts[opposites[0]], &verts[opposites[1]], &verts[opposites[2]]);
+		for(int j = 0; j < 3; j++) {
+			Vertex* v = &verts[tris[i].verts[j]];
+			if(iteration > 3){
+				v->position = vlerp(v->position, avgVert.position, smoothingMagnitude / (1.0f + deviance));
+			}
+			v->normal = avgVert.normal;
+			//v->normal = glm::normalize(avgVert.normal + v->normal);
+		}
+neeext:
+		;
 	}
 	//printf("1 mesh subdivided. %d verts, %d tris, %d edges, %d indices\n", numVerts, numTris, numEdges, numIndices);
 	return Mesh(original->centre, original->faceNormals, original->faceCentres, verts, numVerts, tris, numTris, edges, numEdges, indices, numIndices);
