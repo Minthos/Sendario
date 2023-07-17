@@ -143,7 +143,7 @@ func main() {
 	materialsArray[6].emissive = (50.0, 0.0, 0.0)
 
 	startRenderer()
-	SDL_Init(SDL_INIT_GAMECONTROLLER)
+	SDL_Init(SDL_INIT_GAMECONTROLLER | SDL_INIT_VIDEO)
    
 	// main game loop. handle input, do a physics tick, send results to renderer
 	while( !shouldExit ) {
@@ -194,6 +194,51 @@ func main() {
 							} else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_RIGHTY.rawValue) {
 								cameraSpherical.phi = Double(event.caxis.value) / TMAX
 							}
+						// FIXME use glfw
+/*
+// Callback functions for key and mouse button events
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (key == GLFW_KEY_W && action == GLFW_PRESS)
+        dt *= 10.0;
+    // And so on for other keys...
+}
+
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
+{
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+        // Handle left mouse button press...
+}
+
+// In your initialization code:
+glfwSetKeyCallback(window, key_callback);
+glfwSetMouseButtonCallback(window, mouse_button_callback);
+*/
+						case SDL_KEYDOWN.rawValue:
+							let key = event.key.keysym.sym
+							if interfaceMode == .physicsSim {
+								if key == SDLK_w.rawValue { // Y button
+									dt *= 10.0
+								} else if key == SDLK_a.rawValue { // X button
+									dt *= 0.1 
+								} else if key == SDLK_s.rawValue { // B button
+									buttonPresses += 1;
+								} else if key == SDLK_d.rawValue { // A button
+									buttonPresses -= 1;
+								}
+							} else if interfaceMode == .shipEditor {
+								// put stuff here
+							}
+						case SDL_KEYUP.rawValue:
+							let key = event.key.keysym.sym
+							if key == SDLK_ESCAPE.rawValue { // START button
+								shouldExit = true
+							} else if key == SDLK_BACKSPACE.rawValue { // BACK button
+								rcsIsEnabled = !rcsIsEnabled
+							}
+						case SDL_MOUSEMOTION.rawValue:
+							let mouseX = Double(event.motion.x)
+							thrustVector.x = mouseX / 1920.0 // adjust for your window width
 						default:
 							break
 						}
