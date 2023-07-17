@@ -618,11 +618,13 @@ void deleteMeshes(Mesh *meshes, size_t numMeshes) {
 struct RenderObject {
 	ObjRef ref;
 	BufferObject bo;
+	shape_wrapper* shape;
 	Mesh* meshes;
 	size_t numMeshes;
 	
-	RenderObject(ObjRef pref) {
+	RenderObject(ObjRef pref, shape_wrapper* pshape) {
 		ref = pref;
+		shape = pshape;
 		bo = BufferObject();
 		meshes = nullptr;
 		numMeshes = 0;
@@ -1224,12 +1226,24 @@ void *rendererThread(void *arg) {
 
 
 extern "C" Objref submitObject(shape_wrapper* shape) {
-	if(shape->type 
+	// create buffer object
+	// tessellate geometry
+	// upload to gpu
+	// grab mutex
+	// add object to registry and get a reference
+	// release mutex
+	// return reference to caller
+	// when caller puts the reference in the list of stuff to render, the vertices and indices are already in gpu memory
 }
 
 // pass nullptr to delete
 extern "C" void updateObject(Objref obj, shape_wrapper* shape) {
-
+	// create buffer object
+	// tessellate geometry
+	// upload to gpu
+	// grab mutex
+	// put buffer object in list of buffer objects to replace before the next rendering pass
+	// release mutex
 }
 
 // thread safe entry point copies all the data to keep things dumb.
