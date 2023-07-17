@@ -10,6 +10,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/intersect.hpp>
@@ -339,6 +340,11 @@ struct BufferObject {
 		num_indices = 0;
 	}
 };
+
+glm::quat quaternize(float in[4]) {
+	// convert from hamilton WXYZ convention to JPL XYZW convention
+	return glm::quat(-in[1], -in[2], -in[3], in[0]);
+}
 
 glm::vec3 vectorize(float in[3]) {
 	return glm::vec3(in[0], in[1], in[2]);
@@ -931,19 +937,19 @@ struct CompositeRenderObject {
 	void destroy() {
 		for(int i = 0; i <= MAX_LOD; i++) {
 			bo[i].destroy();
-			deleteMeshes(meshes[i], c->nb);
+			deleteMeshes(meshes[i], c.nb);
 			meshes[i] = nullptr;
 		}
 	}
 
 	void tessellate() {
 		for(int i = 0; i <= MAX_LOD; i++) {
-			meshes[i] = malloc(c->nb * sizeof(Mesh));
-			for(int j = 0; j < c->nb; j++) {
+			meshes[i] = (Mesh*)malloc(c.nb * sizeof(Mesh));
+			for(int j = 0; j < c.nb; j++) {
 				if(i == 0) {
-					meshes[i][j] = boxoidToMesh(c->b[j]);
+					meshes[i][j] = boxoidToMesh(c.b[j]);
 				} else {
-					meshes[i][j] = tessellateMesh(&meshes[i-1][j], i, &c->b[j]);
+					meshes[i][j] = tessellateMesh(&meshes[i-1][j], i, &c.b[j]);
 				}
 			}
 		}
@@ -951,11 +957,18 @@ struct CompositeRenderObject {
 
 	void syncState(CompositeRenderObject *latest) {
 		for(int i = 0; i <= MAX_LOD; i++) {
-			deleteMeshes(meshes[i], c->nb);
+			deleteMeshes(meshes[i], c.nb);
 			free(meshes[i]);
 			meshes[i] = latest->meshes[i];
 		}
 		update = latest->c;
+	}
+	
+	void createBuffers() {
+		assert(sharedData.renderer_tid == pthread_self());
+		for(int i = 0; i <= MAX_LOD; i++) {
+			bo[i] = BufferObject();
+		}
 	}
 
 	void copyToBuffers() {
@@ -975,7 +988,7 @@ struct CompositeRenderObject {
 
 void uploadMeshes(const Mesh* meshes, int numMeshes, BufferObject* bo)
 {
-	bo->use();
+	bo->bind();
 	GLuint totalNumVerts = 0;
 	GLuint totalNumIndices = 0;
 	for (size_t i = 0; i < numMeshes; i++) {
@@ -1011,12 +1024,12 @@ void uploadMeshes(const Mesh* meshes, int numMeshes, BufferObject* bo)
 	glEnableVertexAttribArray(2);
 	glEnableVertexAttribArray(3);
 	glEnableVertexAttribArray(4);*/
-	bo->numIndices = totalNumIndices;
+	bo->num_indices = totalNumIndices;
 }
 
 void renderMeshes(BufferObject* bo)
 {
-	bo->use();
+	bo->bind();
 	GLsizei stride = sizeof(Vertex);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, position));
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, normal));
@@ -1028,7 +1041,7 @@ void renderMeshes(BufferObject* bo)
 	glEnableVertexAttribArray(2);
 	glEnableVertexAttribArray(3);
 	glEnableVertexAttribArray(4);
-	glDrawElements(GL_TRIANGLES, numIndices, GL_UNSIGNED_INT, nullptr);
+	glDrawElements(GL_TRIANGLES, bo->num_indices, GL_UNSIGNED_INT, nullptr);
 }
 
 void *rendererThread(void *arg) {
@@ -1153,7 +1166,7 @@ void *rendererThread(void *arg) {
 		}
 
 		while(sd->pendingCreate != NULL) {
-			sd->pendingCreate->BufferObject();
+			sd->pendingCreate->createBuffers();
 			sd->pendingUpdate->copyToBuffers();
 			sd->pendingCreate = sd->pendingCreate->next;
 		}
@@ -1258,18 +1271,16 @@ void *rendererThread(void *arg) {
 			glUniform3f(boxoidCenterLoc, center[0], center[1], center[2]);
 			// separate rotation from translation so we can rotate normals in the vertex shader
 			//glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), 3.14f * sin(time / 10.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-			glUniformMatrix4fv(boxoidRotationLoc, 1, GL_FALSE, glm::value_ptr(cro->c.orientation));
+			glm::mat4 rotation = glm::mat4(quaternize(cro->c.orientation));
+			glUniformMatrix4fv(boxoidRotationLoc, 1, GL_FALSE, glm::value_ptr(rotation));
 			glm::vec3 diffuseComponent = vectorize(sharedData.renderMisc.materials[cro->c.b[0].material_idx].diffuse);
 			glm::vec3 emissiveComponent = vectorize(sharedData.renderMisc.materials[cro->c.b[0].material_idx].emissive);
 			float vibe = 3.0;
 			diffuseComponent = glm::vec3(std::pow(diffuseComponent.r, vibe), std::pow(diffuseComponent.g, vibe), std::pow(diffuseComponent.b, vibe));
 			glUniform3fv(boxoidDiffuseLoc, 1, glm::value_ptr(diffuseComponent));
 			glUniform3fv(boxoidEmissiveLoc, 1, glm::value_ptr(emissiveComponent));
-		    int lod = sd->buttonPresses % MAX_LOD;
-			renderMeshes(&cro->bo[lod];
-		}
-		else {
-			printf("numSpheres: %d\n", sharedData.numSpheres);
+		    int lod = sd->renderMisc.buttonPresses % MAX_LOD;
+			renderMeshes(&cro->bo[lod]);
 		}
 		glBindVertexArray(0);
 		glfwSwapBuffers(sharedData.window);
@@ -1290,14 +1301,16 @@ extern "C" Objref submitComposite(Composite* c) {
 	if(sd->ncro == 0) {
 		sd->cro = (CompositeRenderObject*)malloc(64 * sizeof(CompositeRenderObject));
 	} else if ((sd->ncro % 64) == 0) {
-		CompositeRenderingObject* biggerBuffer = (CompositeRenderObject*)malloc(ncro + 64 * sizeof(CompositeRenderObject));
-		memcpy(biggerBuffer, sd->cro, ncro);
+		CompositeRenderObject* biggerBuffer = (CompositeRenderObject*)malloc((sd->ncro + 64) * sizeof(CompositeRenderObject));
+		memcpy(biggerBuffer, sd->cro, sd->ncro);
 		free(sd->cro);
 		sd->cro = biggerBuffer;
 	}
 	// create CompositeRenderObject
 	sd->cro[sd->ncro] = CompositeRenderObject(c, nullptr);
-	ObjRef oref = ObjRef(sd->ncro, COMPOSITE);
+	Objref oref = Objref();
+	oref.id = sd->ncro;
+	oref.type = COMPOSITE;
 	sd->ncro++;
 	pthread_mutex_unlock(&sharedData.mutex);
 	
@@ -1306,8 +1319,8 @@ extern "C" Objref submitComposite(Composite* c) {
 
 	// send to render thread for buffering
 	pthread_mutex_lock(&sharedData.mutex);
-	sd->cro[oref.id].next = sd->pending;
-	sd->pending = &sd->cro[oref.id];
+	sd->cro[oref.id].next = sd->pendingCreate;
+	sd->pendingCreate = &sd->cro[oref.id];
 	pthread_mutex_unlock(&sharedData.mutex);
 	
 	return oref;
@@ -1317,22 +1330,22 @@ extern "C" Objref submitComposite(Composite* c) {
 extern "C" void updateComposite(Objref oref, Composite* c) {
 	// tessellate geometry on a copy of the renderobject
 	CompositeRenderObject cro = sd->cro[oref.id];
-	cro.updateComposite(c);
+	cro.c = *c;
 	cro.tessellate();
 	
 	// swap out some pointers
 	pthread_mutex_lock(&sharedData.mutex);	
-	sd->cro[oref.id].syncState(c);
+	sd->cro[oref.id].syncState(&cro);
 
 	// send to render thread for buffering
-	sd->cro[oref.id].next = sd->pending;
-	sd->pending = &sd->cro[oref.id];
+	sd->cro[oref.id].next = sd->pendingUpdate;
+	sd->pendingUpdate = &sd->cro[oref.id];
 	pthread_mutex_unlock(&sharedData.mutex);
 }
 
 // thread safe entry point copies all the data to keep things dumb.
 //extern "C" void render(Sphere* spheres, size_t sphereCount, render_misc renderMisc) {
-extern "C" void render(ObjRef* obj, size_t nobj, Sphere* spheres, size_t numSpheres, render_misc renderMisc) {
+extern "C" void render(Objref* oref, size_t nobj, Sphere* spheres, size_t numSpheres, render_misc renderMisc) {
 	pthread_mutex_lock(&sharedData.mutex);
 	if(sharedData.nextOrefs != NULL) {
 		free(sharedData.nextOrefs);
@@ -1340,11 +1353,11 @@ extern "C" void render(ObjRef* obj, size_t nobj, Sphere* spheres, size_t numSphe
 	if(sharedData.nextBatch != NULL) {
 		free(sharedData.nextBatch);
 	}
-	sharedData.nextOrefs = (ObjRef*)malloc(sizeof(ObjRef) * nobj);
+	sharedData.nextOrefs = (Objref*)malloc(sizeof(Objref) * nobj);
 	sharedData.nextBatch = (Sphere*)malloc(sizeof(Sphere) * numSpheres);
-	memcpy(sharedData.nextOrefs, obj, sizeof(ObjRef) * nobj);
-	memcpy(sharedData.nextBatch, obj, sizeof(Sphere) * numSpheres);
-	sharedData.nextNoref = nobj;
+	memcpy(sharedData.nextOrefs, oref, sizeof(Objref) * nobj);
+	memcpy(sharedData.nextBatch, spheres, sizeof(Sphere) * numSpheres);
+	sharedData.nextNorefs = nobj;
 	sharedData.nextNum = numSpheres;
 	sharedData.renderMisc = renderMisc;
 	pthread_mutex_unlock(&sharedData.mutex);

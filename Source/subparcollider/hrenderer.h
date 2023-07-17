@@ -99,9 +99,7 @@ typedef struct {
 void startRenderer();
 Objref submitObject(shape_wrapper* shape);
 void updateObject(Objref obj, shape_wrapper* shape);// pass nullptr to delete
-void render(Objref* obj, size_t nobj, Sphere* spheres, size_t numSpheres, render_misc renderMisc);
-//void render(Objref* obj, size_t nobj, render_misc renderMisc);
-//void render(Sphere* spheres, size_t sphereCount, render_misc renderMisc);
+void render(Objref* oref, size_t nobj, Sphere* spheres, size_t numSpheres, render_misc renderMisc);
 void stopRenderer();
 
 bool isGameController(int joystick_index);

@@ -334,7 +334,10 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 										material_idx: 6)
 		}
 		renderMisc.buttonPresses = abs(buttonPresses);
-		render(sphereArray, allTheThings.count + trajectory.count, renderMisc)
+		let compositeArray = UnsafeMutablePointer<Objref>.allocate(capacity: 0)
+		//render(sphereArray, allTheThings.count + trajectory.count, renderMisc)
+		render(compositeArray, 0, sphereArray, allTheThings.count + trajectory.count, renderMisc)
+
 		sphereArray.deallocate()
 	}
 	// end main game loop
