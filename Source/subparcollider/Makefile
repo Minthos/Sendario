@@ -1,3 +1,6 @@
+# clear && unbuffer make debug 2>&1 | head -n 40
+# make debug && valgrind --track-origins=yes ./subparcollider
+
 lintedrender5.cpp: render5.cpp lintcpp.py
 	cat render5.cpp | ./lintcpp.py > lintedrender5.cpp
 

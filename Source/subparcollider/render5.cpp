@@ -278,6 +278,8 @@ void main()
 
 )glsl";
 
+struct CompositeRenderObject;
+
 typedef struct {
 	Sphere *spheres;
 	int numSpheres;
@@ -303,7 +305,7 @@ typedef struct {
 } SharedData;
 
 SharedData sharedData;
-SharedData* sd = &sharedData;
+SharedData* sd;
 
 struct BufferObject {
 	GLuint VAO;
@@ -336,7 +338,7 @@ struct BufferObject {
 		glDeleteBuffers(1, &EBO);
 		num_indices = 0;
 	}
-}
+};
 
 glm::vec3 vectorize(float in[3]) {
 	return glm::vec3(in[0], in[1], in[2]);
@@ -904,6 +906,73 @@ neeext:
 	return Mesh(centre, faceNormals, faceCentres, verts, 8, tris, t, realEdges, r, indices, indexIndex);
 }
 
+void uploadMeshes(const Mesh* meshes, int numMeshes, BufferObject* bo);
+
+// opengl and multithreading: we create the BufferObjects on the rendering thread.
+// The tessellation can be done on any thread (main thread for now).
+// copying vertex and index data to the gpu is done on rendering thread.
+#define MAX_LOD 3
+struct CompositeRenderObject {
+	CompositeRenderObject* next;
+	Composite c;
+	Composite update;
+	BufferObject bo[MAX_LOD + 1];
+	Mesh* meshes[MAX_LOD + 1];
+	
+	CompositeRenderObject(Composite* pc, CompositeRenderObject* pnext) {
+		next = pnext;
+		c = *pc;
+		update = *pc;
+		for(int i = 0; i <= MAX_LOD; i++) {
+			meshes[i] = nullptr;
+		}
+	}
+
+	void destroy() {
+		for(int i = 0; i <= MAX_LOD; i++) {
+			bo[i].destroy();
+			deleteMeshes(meshes[i], c->nb);
+			meshes[i] = nullptr;
+		}
+	}
+
+	void tessellate() {
+		for(int i = 0; i <= MAX_LOD; i++) {
+			meshes[i] = malloc(c->nb * sizeof(Mesh));
+			for(int j = 0; j < c->nb; j++) {
+				if(i == 0) {
+					meshes[i][j] = boxoidToMesh(c->b[j]);
+				} else {
+					meshes[i][j] = tessellateMesh(&meshes[i-1][j], i, &c->b[j]);
+				}
+			}
+		}
+	}
+
+	void syncState(CompositeRenderObject *latest) {
+		for(int i = 0; i <= MAX_LOD; i++) {
+			deleteMeshes(meshes[i], c->nb);
+			free(meshes[i]);
+			meshes[i] = latest->meshes[i];
+		}
+		update = latest->c;
+	}
+
+	void copyToBuffers() {
+		// this function should only be called on the rendering thread
+		assert(sharedData.renderer_tid == pthread_self());
+		if(c.nb != update.nb) {
+			free(c.b);
+			c.b = update.b;
+			c.nb = update.nb;
+		}
+		for(int i = 0; i <= MAX_LOD; i++) {
+			uploadMeshes(meshes[i], c.nb, &bo[i]);
+		}
+	}
+};
+
+
 void uploadMeshes(const Mesh* meshes, int numMeshes, BufferObject* bo)
 {
 	bo->use();
@@ -1178,39 +1247,26 @@ void *rendererThread(void *arg) {
 		}
 
 		// Boxoids
-		if(sharedData.numSpheres >= 5) {
+		for(int i = 0; i < sd->norefs; i++) {
+			// for now correctly assuming all orefs are to composites
+			CompositeRenderObject* cro = &sd->cro[sd->orefs[i].id];
 			// uniforms
 			glUseProgram(boxoidProgram);
-			glm::vec3 center = glm::vec3(sharedData.spheres[5].position[0], sharedData.spheres[5].position[1], sharedData.spheres[5].position[2]);
+			glm::vec3 center = vectorize(cro->c.position);
 			model = glm::translate(glm::mat4(1.0f), center);
 			glUniformMatrix4fv(boxoidModelLoc, 1, GL_FALSE, glm::value_ptr(model));
 			glUniform3f(boxoidCenterLoc, center[0], center[1], center[2]);
 			// separate rotation from translation so we can rotate normals in the vertex shader
 			//glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), 3.14f * sin(time / 10.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-			glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), time, glm::vec3(1.0f, 1.0f, 0.0f));
-			rotation = rotation * glm::rotate(glm::mat4(1.0f), 3.14f * (1.0f + sin(time / 10.0f)), glm::vec3(0.0f, 0.0f, 1.0f));
-			glUniformMatrix4fv(boxoidRotationLoc, 1, GL_FALSE, glm::value_ptr(rotation));
-			glm::vec3 diffuseComponent = vectorize(sharedData.renderMisc.materials[exampleBoxoids[0].material_idx].diffuse);
-			glm::vec3 emissiveComponent = vectorize(sharedData.renderMisc.materials[exampleBoxoids[0].material_idx].emissive);
+			glUniformMatrix4fv(boxoidRotationLoc, 1, GL_FALSE, glm::value_ptr(cro->c.orientation));
+			glm::vec3 diffuseComponent = vectorize(sharedData.renderMisc.materials[cro->c.b[0].material_idx].diffuse);
+			glm::vec3 emissiveComponent = vectorize(sharedData.renderMisc.materials[cro->c.b[0].material_idx].emissive);
 			float vibe = 3.0;
 			diffuseComponent = glm::vec3(std::pow(diffuseComponent.r, vibe), std::pow(diffuseComponent.g, vibe), std::pow(diffuseComponent.b, vibe));
 			glUniform3fv(boxoidDiffuseLoc, 1, glm::value_ptr(diffuseComponent));
 			glUniform3fv(boxoidEmissiveLoc, 1, glm::value_ptr(emissiveComponent));
-		  
-			// can use a better algorithm to dynamically update meshes when the geometry changes and later also in response
-			// to LOD considerations
-			int numMeshes = 7;
-			int refinementLevel = (3 + sharedData.renderMisc.buttonPresses) % (numMeshes - 1);
-			int boxoidVariant = ((3 + sharedData.renderMisc.buttonPresses) / (numMeshes - 1)) % numExampleBoxoids;
-			Mesh meshes[numMeshes];
-			meshes[0] = boxoidToMesh(exampleBoxoids[boxoidVariant]);
-			for(int i = 0; i < refinementLevel; i++) {
-				meshes[i+1] = tessellateMesh(&meshes[i], i, &exampleBoxoids[boxoidVariant]);
-			}
-			static int numIndices = 0;
-			numIndices = uploadMeshes(&meshes[refinementLevel], 1, boxoidVAO, boxoidVBO, boxoidEBO);
-			renderMeshes(numIndices, boxoidVAO, boxoidVBO, boxoidEBO);
-			deleteMeshes(meshes, refinementLevel + 1);
+		    int lod = sd->buttonPresses % MAX_LOD;
+			renderMeshes(&cro->bo[lod];
 		}
 		else {
 			printf("numSpheres: %d\n", sharedData.numSpheres);
@@ -1225,71 +1281,6 @@ void *rendererThread(void *arg) {
 	glDeleteProgram(sphereProgram);
 	glfwTerminate();
 	return 0;
-}
-
-// opengl and multithreading: we create the BufferObjects on the rendering thread.
-// The tessellation can be done on any thread (main thread for now).
-// copying vertex and index data to the gpu is done on rendering thread.
-#define MAX_LOD 3
-struct CompositeRenderObject {
-	CompositeRenderObject* next;
-	Composite c;
-	Composite update;
-	BufferObject bo[MAX_LOD + 1];
-	Mesh* meshes[MAX_LOD + 1];
-	
-	CompositeRenderObject(Composite* pc, CompositeRenderObject* pnext) {
-		next = pnext
-		c = pc;
-		update = pc;
-		for(int i = 0; i <= MAX_LOD; i++) {
-			meshes[i] = nullptr;
-		}
-		LOD = 0;
-	}
-
-	void destroy() {
-		for(int i = 0; i <= MAX_LOD; i++) {
-			boi[i].destroy();
-			deleteMeshes(meshes[i], c->nb);
-			meshes[i] = nullptr;
-		}
-	}
-
-	void tessellate() {
-		for(int i = 0; i <= MAX_LOD; i++) {
-			meshes[i] = malloc(c->nb * sizeof(Mesh));
-			for(int j = 0; j < c->nb; j++) {
-				if(i == 0) {
-					meshes[i][j] = boxoidToMesh(c->b[j]);
-				} else {
-					meshes[i][j] = tessellateMesh(&meshes[i-1][j], i, &c->b[j]);
-				}
-			}
-		}
-	}
-
-	void syncState(CompositeRenderObject *latest) {
-		for(int i = 0; i <= MAX_LOD; i++) {
-			deleteMeshes(meshes[i], c->nb);
-			free(meshes[i]);
-			meshes[i] = latest->meshes[i];
-		}
-		update = latest->c;
-	}
-
-	void copyToBuffers() {
-		// this function should only be called on the rendering thread
-		assert(sharedData.renderer_tid == pthread_self());
-		if(c.nb != update.nb) {
-			free(c.b);
-			c.b = update.b;
-			c.nb = update.nb;
-		}
-		for(int i = 0; i <= MAX_LOD; i++) {
-			uploadMeshes(meshes[i], c.nb, &bo[i]);
-		}
-	}
 }
 
 // submit a composite to the 3d engine to prepare it for rendering
@@ -1360,6 +1351,7 @@ extern "C" void render(ObjRef* obj, size_t nobj, Sphere* spheres, size_t numSphe
 }
 
 extern "C" void startRenderer() {
+	sd = &sharedData;
 	bzero(sd, sizeof(sharedData));
 	pthread_mutex_init(&sharedData.mutex, NULL);
 	// start the rendering thread
