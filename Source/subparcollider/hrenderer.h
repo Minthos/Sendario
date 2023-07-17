@@ -58,7 +58,7 @@ typedef struct {
     float position[3]; // x,y,z coordinates in world space
     float scale; // default is 1
     size_t num_children; // how many boxoid shapes the object is composed of
-    Boxoid children[0];
+    Boxoid* children;
 } Composite;
 
 typedef struct {
@@ -70,6 +70,11 @@ typedef struct {
 	Composite composite;
     };
 } shape_wrapper;
+
+typedef struct {
+	size_t id;
+	shape_type type;
+} Objref;
 
 typedef struct {
     float position[3];
@@ -92,7 +97,10 @@ typedef struct {
 } render_misc;
 
 void startRenderer();
-void render(Sphere* spheres, size_t sphereCount, render_misc renderMisc);
+Objref submitObject(shape_wrapper* shape);
+void updateObject(Objref obj, shape_wrapper* shape);// pass nullptr to delete
+void render(Objref* obj, size_t nobj, render_misc renderMisc);
+//void render(Sphere* spheres, size_t sphereCount, render_misc renderMisc);
 void stopRenderer();
 
 bool isGameController(int joystick_index);

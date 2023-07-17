@@ -15,7 +15,7 @@
 #include <glm/gtx/intersect.hpp>
 
 extern "C" {
-	#include "renderer.h"
+	#include "hrenderer.h"
 }
 
 const char *skyboxVertSource = R"glsl(
@@ -1165,15 +1165,26 @@ void *rendererThread(void *arg) {
 	return 0;
 }
 
+
+extern "C" Objref submitObject(shape_wrapper* shape) {
+	if(shape->type 
+}
+
+// pass nullptr to delete
+extern "C" void updateObject(Objref obj, shape_wrapper* shape) {
+
+}
+
 // thread safe entry point copies all the data to keep things dumb.
-extern "C" void render(Sphere* spheres, size_t sphereCount, render_misc renderMisc) {
+//extern "C" void render(Sphere* spheres, size_t sphereCount, render_misc renderMisc) {
+extern "C" void render(Objref* obj, size_t nobj, render_misc renderMisc) {
 	pthread_mutex_lock(&sharedData.mutex);
 	if(sharedData.nextBatch != NULL) {
 		free(sharedData.nextBatch);
 	}
-	sharedData.nextBatch = (Sphere*)malloc(sizeof(Sphere) * sphereCount);
-	memcpy(sharedData.nextBatch, spheres, sizeof(Sphere) * sphereCount);
-	sharedData.nextNum = sphereCount;
+	sharedData.nextBatch = (size_t*)malloc(sizeof(size_t) * nobj);
+	memcpy(sharedData.nextBatch, obj, sizeof(size_t) * nobj);
+	sharedData.nextNum = nobj;
 	sharedData.renderMisc = renderMisc;
 	pthread_mutex_unlock(&sharedData.mutex);
 }

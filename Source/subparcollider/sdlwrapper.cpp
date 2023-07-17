@@ -1,5 +1,5 @@
 extern "C" {
-    #include "renderer.h"
+    #include "hrenderer.h"
 }
 
 bool isGameController(int joystick_index) {
