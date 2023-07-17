@@ -90,8 +90,115 @@ var camera = SphericalCow(id: -1,
 						  spin: Vector(x: 0, y: 0, z: 0),
 						  mass: 0, radius: 0, frictionCoefficient: 0.0)
 
+struct BoxoidCod: Codable {
+	var corners: [Vector]
+	var curvature: [Float]
+	var material_idx: Int = 0 // placeholder
+	var missing_faces: UInt = 0
+}
+
+func convertCToSwift(boxoid: inout Boxoid) -> BoxoidCod {
+    var corners: [Vector] = []
+    var curvature: [Float] = []
+
+    withUnsafePointer(to: &boxoid.corners) { ptr in
+        let baseAddress = ptr.withMemoryRebound(to: Float.self, capacity: 24) { $0 }
+        for i in 0..<8 {
+            let x = baseAddress[i*3]
+            let y = baseAddress[i*3+1]
+            let z = baseAddress[i*3+2]
+            corners.append(Vector(x: Double(x), y: Double(y), z: Double(z)))
+        }
+    }
+
+    withUnsafePointer(to: &boxoid.curvature) { ptr in
+        let baseAddress = ptr.withMemoryRebound(to: Float.self, capacity: 12) { $0 }
+        curvature = Array(UnsafeBufferPointer(start: baseAddress, count: 12))
+    }
+
+    return BoxoidCod(corners: corners, curvature: curvature, material_idx: Int(boxoid.material_idx), missing_faces: UInt(boxoid.missing_faces))
+}
+
+func convertSwiftToC(boxoidCod: BoxoidCod) -> Boxoid {
+    var boxoid = Boxoid()
+    withUnsafeMutablePointer(to: &boxoid.corners) { ptr in
+        let baseAddress = ptr.withMemoryRebound(to: Float.self, capacity: 24) { $0 }
+        for i in 0..<8 {
+            baseAddress[i*3] = Float(boxoidCod.corners[i].x)
+            baseAddress[i*3+1] = Float(boxoidCod.corners[i].y)
+            baseAddress[i*3+2] = Float(boxoidCod.corners[i].z)
+        }
+    }
+    withUnsafeMutablePointer(to: &boxoid.curvature) { ptr in
+        let baseAddress = ptr.withMemoryRebound(to: Float.self, capacity: 12) { $0 }
+        for i in 0..<12 {
+            baseAddress[i] = boxoidCod.curvature[i]
+        }
+    }
+    boxoid.material_idx = Int32(boxoidCod.material_idx)
+    boxoid.missing_faces = UInt32(boxoidCod.missing_faces)
+    return boxoid
+}
+
+struct CompositeCod: Codable {
+	var orientation: Quaternion
+	var position: Vector
+	var scale: Float
+	var nb: UInt64
+	var b: [BoxoidCod]
+}
+
+func convertCToSwift(composite: inout Composite) -> CompositeCod {
+    var boxoids: [BoxoidCod] = []
+    for i in 0..<composite.nb {
+        boxoids.append(convertCToSwift(boxoid: &composite.b[i]))
+    }
+    var orientation = Quaternion(w: 0, x: 0, y: 0, z: 0)
+    var position = Vector(x: 0, y: 0, z: 0)
+    withUnsafePointer(to: &composite.orientation) { ptr in
+        let baseAddress = ptr.withMemoryRebound(to: Float.self, capacity: 4) { $0 }
+        orientation = Quaternion(w: Double(baseAddress[0]), x: Double(baseAddress[1]), y: Double(baseAddress[2]), z: Double(baseAddress[3]))
+    }
+    withUnsafePointer(to: &composite.position) { ptr in
+        let baseAddress = ptr.withMemoryRebound(to: Float.self, capacity: 3) { $0 }
+        position = Vector(x: Double(baseAddress[0]), y: Double(baseAddress[1]), z: Double(baseAddress[2]))
+    }
+    return CompositeCod(orientation: orientation, position: position, scale: composite.scale, nb: UInt64(composite.nb), b: boxoids)
+}
+
+func convertSwiftToC(compositeCod: CompositeCod) -> Composite {
+    var composite = Composite()
+    composite.b = UnsafeMutablePointer<Boxoid>.allocate(capacity: Int(compositeCod.nb))
+    for i in 0..<compositeCod.nb {
+        composite.b[Int(i)] = convertSwiftToC(boxoidCod: compositeCod.b[Int(i)])
+    }
+    withUnsafeMutablePointer(to: &composite.orientation) { ptr in
+        let baseAddress = ptr.withMemoryRebound(to: Float.self, capacity: 4) { $0 }
+        baseAddress[0] = Float(compositeCod.orientation.w)
+        baseAddress[1] = Float(compositeCod.orientation.x)
+        baseAddress[2] = Float(compositeCod.orientation.y)
+        baseAddress[3] = Float(compositeCod.orientation.z)
+    }
+    withUnsafeMutablePointer(to: &composite.position) { ptr in
+        let baseAddress = ptr.withMemoryRebound(to: Float.self, capacity: 3) { $0 }
+        baseAddress[0] = Float(compositeCod.position.x)
+        baseAddress[1] = Float(compositeCod.position.y)
+        baseAddress[2] = Float(compositeCod.position.z)
+    }
+    composite.scale = Float(compositeCod.scale)
+    composite.nb = size_t(compositeCod.nb)
+    return composite
+}
+
+struct Spaceship: Codable {
+	var cow: SphericalCow
+	var c: CompositeCod
+	var b: [BoxoidCod]
+}
+
 var lights = [sun]
 var allTheThings = [sun, mercury, venus, earth, moon, player1]
+var composites: [Composite] = []
 var actions: [Action] = []
 var buttonPresses: Int32 = 0
 

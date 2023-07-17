@@ -2,7 +2,7 @@ import Foundation
 
 let G: Double = 6.67430e-11
 
-struct Vector {
+struct Vector: Codable {
     var x: Double
     var y: Double
     var z: Double
@@ -143,7 +143,7 @@ struct Vector {
     }
 }
 
-struct Quaternion {
+struct Quaternion: Codable {
     var w: Double
     var x: Double
     var y: Double
@@ -296,7 +296,7 @@ func atmosphericProperties(altitude: Double) -> (density: Double, pressure: Doub
 }
 
 
-struct Spherical {
+struct Spherical: Codable {
     var rho: Double
     var theta: Double
     var phi: Double
@@ -324,7 +324,7 @@ struct Spherical {
     }*/
 }
 
-class Celestial {
+class Celestial: Codable {
     var moo: SphericalCow
     var perigee: Spherical
     var apogee: Spherical
@@ -396,7 +396,7 @@ class Celestial {
 // 4. upgrade collisions to be not instantaneous and handle multiple bodies colliding. 1 ms default timestep
 // shorter timestep as needed during high acceleration such as collisions
 // longer timestep for planet trajectories, they rarely change anyway. Only the position changes every ms.
-class SphericalCow {
+class SphericalCow: Codable {
     let id: Int64
     var position: Vector
     var relativeTo: Celestial?
