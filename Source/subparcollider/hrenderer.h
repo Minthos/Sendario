@@ -57,8 +57,8 @@ typedef struct {
     float orientation[4]; // w,x,y,z quaternion specifying the object's rotation from object space to world space
     float position[3]; // x,y,z coordinates in world space
     float scale; // default is 1
-    size_t num_children; // how many boxoid shapes the object is composed of
-    Boxoid* children;
+    size_t nb; // how many boxoid shapes the object is composed of
+    Boxoid* b;
 } Composite;
 
 typedef struct {
@@ -99,7 +99,8 @@ typedef struct {
 void startRenderer();
 Objref submitObject(shape_wrapper* shape);
 void updateObject(Objref obj, shape_wrapper* shape);// pass nullptr to delete
-void render(Objref* obj, size_t nobj, render_misc renderMisc);
+void render(ObjRef* obj, size_t nobj, Sphere* spheres, size_t numSpheres, render_misc renderMisc);
+//void render(Objref* obj, size_t nobj, render_misc renderMisc);
 //void render(Sphere* spheres, size_t sphereCount, render_misc renderMisc);
 void stopRenderer();
 

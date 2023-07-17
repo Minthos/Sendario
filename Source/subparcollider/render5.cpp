@@ -283,6 +283,18 @@ typedef struct {
 	int numSpheres;
 	Sphere *nextBatch;
 	int nextNum;
+
+	Objref *orefs;
+    size_t norefs;
+	Objref *nextOrefs;
+    size_t nextNorefs;
+	
+	// samcro, ncro
+	CompositeRenderObject* cro;
+	size_t ncro;
+	CompositeRenderObject* pendingCreate;
+	CompositeRenderObject* pendingUpdate;
+
 	render_misc renderMisc;
 	pthread_t renderer_tid;
 	pthread_mutex_t mutex;
@@ -291,16 +303,19 @@ typedef struct {
 } SharedData;
 
 SharedData sharedData;
+SharedData* sd = &sharedData;
 
 struct BufferObject {
 	GLuint VAO;
 	GLuint VBO;
 	GLuint EBO;
+	GLuint num_indices;
 	
 	BufferObject() {
 		glGenVertexArrays(1, &VAO);
 		glGenBuffers(1, &VBO);
 		glGenBuffers(1, &EBO);
+		num_indices = 0;
 	}
 
 	void bind() {
@@ -319,6 +334,7 @@ struct BufferObject {
 		glDeleteVertexArrays(1, &VAO);
 		glDeleteBuffers(1, &VBO);
 		glDeleteBuffers(1, &EBO);
+		num_indices = 0;
 	}
 }
 
@@ -615,29 +631,6 @@ void deleteMeshes(Mesh *meshes, size_t numMeshes) {
 	}
 }
 
-struct RenderObject {
-	ObjRef ref;
-	BufferObject bo;
-	shape_wrapper* shape;
-	Mesh* meshes;
-	size_t numMeshes;
-	
-	RenderObject(ObjRef pref, shape_wrapper* pshape) {
-		ref = pref;
-		shape = pshape;
-		bo = BufferObject();
-		meshes = nullptr;
-		numMeshes = 0;
-	}
-	
-	void destroy() {
-		bo.destroy();
-		deleteMeshes(meshes, numMeshes);
-		meshes = nullptr;
-		numMeshes = 0;
-	}
-}
-
 glm::vec3 avgOf3(glm::vec3 a, glm::vec3 b, glm::vec3 c) {
 	return (a + b + c) * (1.0f / 3.0f);
 }
@@ -911,19 +904,15 @@ neeext:
 	return Mesh(centre, faceNormals, faceCentres, verts, 8, tris, t, realEdges, r, indices, indexIndex);
 }
 
-// you want to have a vao/vbo/ebo for each composite.
-// can put several LODs in one buffer.
-
-int uploadMeshes(const Mesh* meshes, int numMeshes, GLuint meshVAO, GLuint meshVBO, GLuint meshEBO)
+void uploadMeshes(const Mesh* meshes, int numMeshes, BufferObject* bo)
 {
-	glBindVertexArray(meshVAO);
+	bo->use();
 	GLuint totalNumVerts = 0;
 	GLuint totalNumIndices = 0;
 	for (size_t i = 0; i < numMeshes; i++) {
 		totalNumVerts += meshes[i].numVerts;
 		totalNumIndices += meshes[i].numIndices;
 	}
-	glBindBuffer(GL_ARRAY_BUFFER, meshVBO);
 	glBufferData(GL_ARRAY_BUFFER, totalNumVerts * sizeof(Vertex), nullptr, GL_STATIC_DRAW);
 	GLuint* adjustedIndices = (GLuint*)malloc(totalNumIndices * sizeof(GLuint));
 	GLuint indexOffset = 0;
@@ -937,9 +926,11 @@ int uploadMeshes(const Mesh* meshes, int numMeshes, GLuint meshVAO, GLuint meshV
 		indexOffset += mesh.numIndices;
 		vertexOffset += mesh.numVerts;
 	}
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, meshEBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, totalNumIndices * sizeof(GLuint), adjustedIndices, GL_STATIC_DRAW);
 	free(adjustedIndices);
+	
+	/*
+	// Probably don't need to do this here
 	GLsizei stride = sizeof(Vertex);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, position));
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, normal));
@@ -950,15 +941,13 @@ int uploadMeshes(const Mesh* meshes, int numMeshes, GLuint meshVAO, GLuint meshV
 	glEnableVertexAttribArray(1);
 	glEnableVertexAttribArray(2);
 	glEnableVertexAttribArray(3);
-	glEnableVertexAttribArray(4);
-	return totalNumIndices;
+	glEnableVertexAttribArray(4);*/
+	bo->numIndices = totalNumIndices;
 }
 
-void renderMeshes(int numIndices, GLuint meshVAO, GLuint meshVBO, GLuint meshEBO)
+void renderMeshes(BufferObject* bo)
 {
-	glBindVertexArray(meshVAO);
-	glBindBuffer(GL_ARRAY_BUFFER, meshVBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, meshEBO);
+	bo->use();
 	GLsizei stride = sizeof(Vertex);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, position));
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, normal));
@@ -971,9 +960,6 @@ void renderMeshes(int numIndices, GLuint meshVAO, GLuint meshVBO, GLuint meshEBO
 	glEnableVertexAttribArray(3);
 	glEnableVertexAttribArray(4);
 	glDrawElements(GL_TRIANGLES, numIndices, GL_UNSIGNED_INT, nullptr);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	glBindVertexArray(0);
 }
 
 void *rendererThread(void *arg) {
@@ -1008,11 +994,8 @@ void *rendererThread(void *arg) {
 	GLuint skyboxProgram = mkShader(skyboxVertSource, skyboxFragSource);
  
 	// buffers
-	GLuint boxoidVAO, boxoidVBO, boxoidEBO;
+	BufferObject boxoidBO = BufferObject();
 	GLuint sphereVAO, sphereVBO, sphereEBO;
-	glGenVertexArrays(1, &boxoidVAO);
-	glGenBuffers(1, &boxoidVBO);
-	glGenBuffers(1, &boxoidEBO);
 	glGenVertexArrays(1, &sphereVAO);
 	glGenBuffers(1, &sphereVBO);
 	glGenBuffers(1, &sphereEBO);
@@ -1076,10 +1059,21 @@ void *rendererThread(void *arg) {
 	while (!glfwWindowShouldClose(sharedData.window) && !sharedData.shouldExit) {
 		usleep(8000);
 		
-		// Swap pointers with the thread that copies the data
+		// Swap pointers and copy data between cpu and gpu
 		// This lets the rendering thread and physics simulation both run at full tilt
 		// without having to wait for each other
+		// currently we do tessellation on the physics thread, cpu usage is fairly low
 		pthread_mutex_lock(&sharedData.mutex);
+
+		if(sharedData.nextOrefs != NULL) {
+			if(sharedData.orefs != NULL) {
+				free(sharedData.orefs);
+			}
+			sharedData.orefs = sharedData.nextOrefs;
+			sharedData.norefs = sharedData.nextNorefs;
+			sharedData.nextOrefs = NULL;
+		}
+
 		if(sharedData.nextBatch != NULL) {
 			if(sharedData.spheres != NULL) {
 				free(sharedData.spheres);
@@ -1088,6 +1082,18 @@ void *rendererThread(void *arg) {
 			sharedData.numSpheres = sharedData.nextNum;
 			sharedData.nextBatch = NULL;
 		}
+
+		while(sd->pendingCreate != NULL) {
+			sd->pendingCreate->BufferObject();
+			sd->pendingUpdate->copyToBuffers();
+			sd->pendingCreate = sd->pendingCreate->next;
+		}
+
+		while(sd->pendingUpdate != NULL) {
+			sd->pendingUpdate->copyToBuffers();
+			sd->pendingUpdate = sd->pendingUpdate->next;
+		}
+
 		pthread_mutex_unlock(&sharedData.mutex);
 		
 		// Camera
@@ -1213,9 +1219,6 @@ void *rendererThread(void *arg) {
 		glfwSwapBuffers(sharedData.window);
 		glfwPollEvents();
 	}
-	glDeleteVertexArrays(1, &boxoidVAO);
-	glDeleteBuffers(1, &boxoidVBO);
-	glDeleteBuffers(1, &boxoidEBO);
 	glDeleteVertexArrays(1, &sphereVAO);
 	glDeleteBuffers(1, &sphereVBO);
 	glDeleteBuffers(1, &sphereEBO);
@@ -1224,49 +1227,140 @@ void *rendererThread(void *arg) {
 	return 0;
 }
 
+// opengl and multithreading: we create the BufferObjects on the rendering thread.
+// The tessellation can be done on any thread (main thread for now).
+// copying vertex and index data to the gpu is done on rendering thread.
+#define MAX_LOD 3
+struct CompositeRenderObject {
+	CompositeRenderObject* next;
+	Composite c;
+	Composite update;
+	BufferObject bo[MAX_LOD + 1];
+	Mesh* meshes[MAX_LOD + 1];
+	
+	CompositeRenderObject(Composite* pc, CompositeRenderObject* pnext) {
+		next = pnext
+		c = pc;
+		update = pc;
+		for(int i = 0; i <= MAX_LOD; i++) {
+			meshes[i] = nullptr;
+		}
+		LOD = 0;
+	}
 
-extern "C" Objref submitObject(shape_wrapper* shape) {
-	// create buffer object
-	// tessellate geometry
-	// upload to gpu
-	// grab mutex
-	// add object to registry and get a reference
-	// release mutex
-	// return reference to caller
-	// when caller puts the reference in the list of stuff to render, the vertices and indices are already in gpu memory
+	void destroy() {
+		for(int i = 0; i <= MAX_LOD; i++) {
+			boi[i].destroy();
+			deleteMeshes(meshes[i], c->nb);
+			meshes[i] = nullptr;
+		}
+	}
+
+	void tessellate() {
+		for(int i = 0; i <= MAX_LOD; i++) {
+			meshes[i] = malloc(c->nb * sizeof(Mesh));
+			for(int j = 0; j < c->nb; j++) {
+				if(i == 0) {
+					meshes[i][j] = boxoidToMesh(c->b[j]);
+				} else {
+					meshes[i][j] = tessellateMesh(&meshes[i-1][j], i, &c->b[j]);
+				}
+			}
+		}
+	}
+
+	void syncState(CompositeRenderObject *latest) {
+		for(int i = 0; i <= MAX_LOD; i++) {
+			deleteMeshes(meshes[i], c->nb);
+			free(meshes[i]);
+			meshes[i] = latest->meshes[i];
+		}
+		update = latest->c;
+	}
+
+	void copyToBuffers() {
+		// this function should only be called on the rendering thread
+		assert(sharedData.renderer_tid == pthread_self());
+		if(c.nb != update.nb) {
+			free(c.b);
+			c.b = update.b;
+			c.nb = update.nb;
+		}
+		for(int i = 0; i <= MAX_LOD; i++) {
+			uploadMeshes(meshes[i], c.nb, &bo[i]);
+		}
+	}
 }
 
-// pass nullptr to delete
-extern "C" void updateObject(Objref obj, shape_wrapper* shape) {
-	// create buffer object
-	// tessellate geometry
-	// upload to gpu
-	// grab mutex
-	// put buffer object in list of buffer objects to replace before the next rendering pass
-	// release mutex
+// submit a composite to the 3d engine to prepare it for rendering
+extern "C" Objref submitComposite(Composite* c) {
+	pthread_mutex_lock(&sharedData.mutex);
+	// don't run out of buffer space
+	if(sd->ncro == 0) {
+		sd->cro = (CompositeRenderObject*)malloc(64 * sizeof(CompositeRenderObject));
+	} else if ((sd->ncro % 64) == 0) {
+		CompositeRenderingObject* biggerBuffer = (CompositeRenderObject*)malloc(ncro + 64 * sizeof(CompositeRenderObject));
+		memcpy(biggerBuffer, sd->cro, ncro);
+		free(sd->cro);
+		sd->cro = biggerBuffer;
+	}
+	// create CompositeRenderObject
+	sd->cro[sd->ncro] = CompositeRenderObject(c, nullptr);
+	ObjRef oref = ObjRef(sd->ncro, COMPOSITE);
+	sd->ncro++;
+	pthread_mutex_unlock(&sharedData.mutex);
+	
+	// tessellate geometry without hogging the mutex
+	sd->cro[oref.id].tessellate();
+
+	// send to render thread for buffering
+	pthread_mutex_lock(&sharedData.mutex);
+	sd->cro[oref.id].next = sd->pending;
+	sd->pending = &sd->cro[oref.id];
+	pthread_mutex_unlock(&sharedData.mutex);
+	
+	return oref;
+}
+
+// update the geometry of an existing composite
+extern "C" void updateComposite(Objref oref, Composite* c) {
+	// tessellate geometry on a copy of the renderobject
+	CompositeRenderObject cro = sd->cro[oref.id];
+	cro.updateComposite(c);
+	cro.tessellate();
+	
+	// swap out some pointers
+	pthread_mutex_lock(&sharedData.mutex);	
+	sd->cro[oref.id].syncState(c);
+
+	// send to render thread for buffering
+	sd->cro[oref.id].next = sd->pending;
+	sd->pending = &sd->cro[oref.id];
+	pthread_mutex_unlock(&sharedData.mutex);
 }
 
 // thread safe entry point copies all the data to keep things dumb.
 //extern "C" void render(Sphere* spheres, size_t sphereCount, render_misc renderMisc) {
-extern "C" void render(Objref* obj, size_t nobj, render_misc renderMisc) {
+extern "C" void render(ObjRef* obj, size_t nobj, Sphere* spheres, size_t numSpheres, render_misc renderMisc) {
 	pthread_mutex_lock(&sharedData.mutex);
+	if(sharedData.nextOrefs != NULL) {
+		free(sharedData.nextOrefs);
+	}
 	if(sharedData.nextBatch != NULL) {
 		free(sharedData.nextBatch);
 	}
-	sharedData.nextBatch = (size_t*)malloc(sizeof(size_t) * nobj);
-	memcpy(sharedData.nextBatch, obj, sizeof(size_t) * nobj);
-	sharedData.nextNum = nobj;
+	sharedData.nextOrefs = (ObjRef*)malloc(sizeof(ObjRef) * nobj);
+	sharedData.nextBatch = (Sphere*)malloc(sizeof(Sphere) * numSpheres);
+	memcpy(sharedData.nextOrefs, obj, sizeof(ObjRef) * nobj);
+	memcpy(sharedData.nextBatch, obj, sizeof(Sphere) * numSpheres);
+	sharedData.nextNoref = nobj;
+	sharedData.nextNum = numSpheres;
 	sharedData.renderMisc = renderMisc;
 	pthread_mutex_unlock(&sharedData.mutex);
 }
 
 extern "C" void startRenderer() {
-	// set up shared data
-	sharedData.spheres = NULL;
-	sharedData.numSpheres = 0;
-	sharedData.nextBatch = NULL;
-	sharedData.nextNum = 0;
-	sharedData.shouldExit = false;
+	bzero(sd, sizeof(sharedData));
 	pthread_mutex_init(&sharedData.mutex, NULL);
 	// start the rendering thread
 	pthread_create(&sharedData.renderer_tid, NULL, rendererThread, &sharedData);
