@@ -64,3 +64,23 @@ PVP combat, trade and politics should be as emergent as possible.
 PVE can be designed for singleplayer, small and large groups.
 
 
+### monetization idea
+
+Initially the game can be free to play for everyone but if it becomes popular I can make a paid server and a free server, with the paid server getting priority on hosting resources and customer support.
+
+Another idea is to separate players into two tiers: Paying subscribers can build as many fusion reactors as their resources allow them to, free players can have max 1 fusion reactor and it can never be stolen but it can be destroyed by the environment or other players. If it's destroyed they get a new one for free including a new ship. The ship is made from bioplastic so while it can't be farmed for construction materials it can be incinerated for a tiny energy gain. Even though they can't have more than 1 fusion reactor they can have nuclear reactors, solar panels, antimatter reactors and such. Solar is cheap but heavy, suitable for bases, stations and satellites that are near the habitable zone of a star. Nuclear works everywhere and is the cheapest and most reliable alternative to fusion power on spaceships and remote outposts. Antimatter is lightweight and extremely powerful but can only be used for short durations because of the waste heat and because the fuel is very expensive.
+
+Should probably mandate that all ships, factories, refineries, habitats and such have an incinerator. Jettisoning waste is uncivilized.
+
+### what about concerns like griefing and bots ruining the game
+
+I think the universe will be so big that anyone can just disappear to some far away system where no one will find them to build up their strength unchallenged.
+Some problems will be discovered with play testing and solved with experimentation.
+
+
+
+
+
+
+
+
