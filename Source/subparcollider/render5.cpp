@@ -324,18 +324,21 @@ struct BufferObject {
 	}
 
 	void bind() {
+		assert(sharedData.renderer_tid == pthread_self());
 		glBindVertexArray(VAO);
 		glBindBuffer(GL_ARRAY_BUFFER, VBO);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 	}
 
 	void unbind() {
+		assert(sharedData.renderer_tid == pthread_self());
 		glBindVertexArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 	}
 
 	void destroy() {
+		assert(sharedData.renderer_tid == pthread_self());
 		glDeleteVertexArrays(1, &VAO);
 		glDeleteBuffers(1, &VBO);
 		glDeleteBuffers(1, &EBO);
@@ -1174,12 +1177,16 @@ void *rendererThread(void *arg) {
 		while(sd->pendingCreate != NULL) {
 			sd->pendingCreate->createBuffers();
 			sd->pendingCreate->copyToBuffers();
+			CompositeRenderObject* temp = sd->pendingCreate;
 			sd->pendingCreate = sd->pendingCreate->next;
+			temp->next = NULL;
 		}
 
 		while(sd->pendingUpdate != NULL) {
 			sd->pendingUpdate->copyToBuffers();
+			CompositeRenderObject* temp = sd->pendingUpdate;
 			sd->pendingUpdate = sd->pendingUpdate->next;
+			temp->next = NULL;
 		}
 
 		pthread_mutex_unlock(&sharedData.mutex);
@@ -1253,6 +1260,7 @@ void *rendererThread(void *arg) {
 				glm::vec3 emissiveComponent = glm::vec3(mat->emissive[0], mat->emissive[1], mat->emissive[2]); // W/m^2
 		
 				// colors looked washed out so I did a thing. not quite vibrance so I'll call it vibe. texture saturation? but we don't have textures.
+				// it should be user selectable on a scale from 0 to 11
 				float vibe = 3.0;
 				diffuseComponent = glm::vec3(std::pow(diffuseComponent.r, vibe), std::pow(diffuseComponent.g, vibe), std::pow(diffuseComponent.b, vibe));
 				glUniform3fv(sphereDiffuseLoc, 1, glm::value_ptr(diffuseComponent));
@@ -1267,7 +1275,6 @@ void *rendererThread(void *arg) {
 
 		// Boxoids
 		for(int i = 0; i < sd->norefs; i++) {
-			// for now correctly assuming all orefs are to composites
 			CompositeRenderObject* cro = &sd->cro[sd->orefs[i].id];
 			cro->c.position[0] = sd->orefs[i].position[0];
 			cro->c.position[1] = sd->orefs[i].position[1];
@@ -1277,13 +1284,12 @@ void *rendererThread(void *arg) {
 			cro->c.orientation[2] = sd->orefs[i].orientation[2];
 			cro->c.orientation[3] = sd->orefs[i].orientation[3];
 			glm::vec3 center = vectorize(cro->c.position);
-			// uniforms
+			// for now correctly assuming all orefs are to composites
 			glUseProgram(boxoidProgram);
 			model = glm::translate(glm::mat4(1.0f), center);
 			glUniformMatrix4fv(boxoidModelLoc, 1, GL_FALSE, glm::value_ptr(model));
 			glUniform3f(boxoidCenterLoc, center[0], center[1], center[2]);
 			// separate rotation from translation so we can rotate normals in the vertex shader
-			//glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), 3.14f * sin(time / 10.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 			glm::mat4 rotation = glm::mat4(quaternize(cro->c.orientation));
 			glUniformMatrix4fv(boxoidRotationLoc, 1, GL_FALSE, glm::value_ptr(rotation));
 			glm::vec3 diffuseComponent = vectorize(sharedData.renderMisc.materials[cro->c.b[0].material_idx].diffuse);
@@ -1343,10 +1349,11 @@ extern "C" Objref submitComposite(Composite c) {
 }
 
 // update the geometry of an existing composite
-extern "C" void updateComposite(Objref oref, Composite* c) {
+// TODO: enable deleting render objects that are no longer in use
+extern "C" void updateComposite(Objref oref, Composite c) {
 	// tessellate geometry on a copy of the renderobject
 	CompositeRenderObject cro = sd->cro[oref.id];
-	cro.c = *c;
+	cro.c = c;
 	cro.tessellate();
 	
 	// swap out some pointers

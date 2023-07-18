@@ -95,6 +95,21 @@ struct BoxoidCod: Codable {
 	var curvature: [Float]
 	var material_idx: Int = 0 // placeholder
 	var missing_faces: UInt = 0
+
+	func elongationFactor(_ x: Double) -> Double {
+		if(x > 0){
+			return 1.0 + x
+		} else {
+			return 1.0 / (1.0 - x)
+		}
+	}
+
+	mutating func elongate(_ v: Vector) {
+		let vx = Vector(x: elongationFactor(v.x), y: elongationFactor(v.y),  z: elongationFactor(v.z))
+		for i in 0..<8 {
+			corners[i] = corners[i] * vx
+		}
+	}
 }
 
 func convertCToSwift(boxoid: inout Boxoid) -> BoxoidCod {
@@ -200,10 +215,11 @@ var composites: [CompositeCod] = []
 var objrefs: [Objref] = []
 var actions: [Action] = []
 var buttonPresses: Int32 = 0
+var curbox: Int = 0 // current boxoid
 
 var controller: OpaquePointer? = nil
-var interfaceMode: InterfaceMode = .physicsSim
-//var interfaceMode: InterfaceMode = .shipEditor
+//var interfaceMode: InterfaceMode = .physicsSim
+var interfaceMode: InterfaceMode = .shipEditor
 var shouldExit = false
 var rcsIsEnabled = false
 let worldUpVector = Vector(x: 0, y: 1, z:0) // x is right, y is up, z is backward (right-handed coordinate system)
@@ -372,6 +388,14 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 		}
 
 		// update game state
+		if objrefs.count == 0 {
+			var ccod = composites[0]
+			ccod.position -= camera.position
+			let c = toC(ccod)
+			objrefs.append(submitComposite(c))
+			print("new object ", objrefs[0])
+		}
+		
 		if interfaceMode == .physicsSim {
 			if(rcsIsEnabled && interfaceMode == .physicsSim) {
 				actions = [Action(object: player1, force: thrustVector * 10000.0 / dt, torque: Vector(x: cameraSpherical.phi, y: 0, z: cameraSpherical.theta) * -1000.0)]
@@ -380,7 +404,18 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 			}
 			tick(actions: actions, movingObjects: &allTheThings, t: t, dt: dt)
 			t += dt
+		} else if interfaceMode == .shipEditor {
+			// Elongaaaate
+			if(thrustVector.length > 0.05) {
+				composites[0].b[curbox].elongate(thrustVector * 0.01)
+				updateComposite(objrefs[0], toC(composites[0]))
+				print("Elongate! ", thrustVector)
+
+				// TODO: grab bbox code from space-ai, make this awesome
+				player1.radius = composites[0].bbox.diagonal
+			}
 		}
+
 
 		// camera and rendering
 		var renderMisc = render_misc()
@@ -426,13 +461,6 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 			}
 		}
 	
-		if objrefs.count == 0 {
-			var ccod = composites[0]
-			ccod.position -= camera.position
-			let c = toC(ccod)
-			objrefs.append(submitComposite(c))
-			print("new object ", objrefs[0])
-		}
 
 		// we have to sort the things before we send them to the renderer, otherwise transparency breaks.
 		allTheThings.sort(by: { ($0.position - camera.position).lengthSquared > ($1.position - camera.position).lengthSquared })

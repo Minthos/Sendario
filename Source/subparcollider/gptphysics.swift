@@ -92,6 +92,10 @@ struct Vector: Codable {
         return rhs * lhs
     }
 
+    static func *(lhs: Vector, rhs: Vector) -> Vector {
+        return Vector(x: lhs.x * rhs.x, y: lhs.y * rhs.y, z: lhs.z * rhs.z)
+    }
+ 
     static func *(lhs: Vector, rhs: Double) -> Vector {
         assert(!rhs.isNaN)
         lhs.sanityCheck()
