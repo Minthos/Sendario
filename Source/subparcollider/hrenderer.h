@@ -97,8 +97,8 @@ typedef struct {
 } render_misc;
 
 void startRenderer();
-Objref submitObject(shape_wrapper* shape);
-void updateObject(Objref obj, shape_wrapper* shape);// pass nullptr to delete
+Objref submitComposite(Composite c);
+void updateObject(Objref obj, shape_wrapper* shape);
 void render(Objref* oref, size_t nobj, Sphere* spheres, size_t numSpheres, render_misc renderMisc);
 void stopRenderer();
 

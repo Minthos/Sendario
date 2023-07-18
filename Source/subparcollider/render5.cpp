@@ -925,10 +925,10 @@ struct CompositeRenderObject {
 	BufferObject bo[MAX_LOD + 1];
 	Mesh* meshes[MAX_LOD + 1];
 	
-	CompositeRenderObject(Composite* pc, CompositeRenderObject* pnext) {
+	CompositeRenderObject(Composite pc, CompositeRenderObject* pnext) {
 		next = pnext;
-		c = *pc;
-		update = *pc;
+		c = pc;
+		update = pc;
 		for(int i = 0; i <= MAX_LOD; i++) {
 			meshes[i] = nullptr;
 		}
@@ -1167,7 +1167,6 @@ void *rendererThread(void *arg) {
 
 		while(sd->pendingCreate != NULL) {
 			sd->pendingCreate->createBuffers();
-			sd->pendingUpdate->copyToBuffers();
 			sd->pendingCreate = sd->pendingCreate->next;
 		}
 
@@ -1295,7 +1294,7 @@ void *rendererThread(void *arg) {
 }
 
 // submit a composite to the 3d engine to prepare it for rendering
-extern "C" Objref submitComposite(Composite* c) {
+extern "C" Objref submitComposite(Composite c) {
 	pthread_mutex_lock(&sharedData.mutex);
 	// don't run out of buffer space
 	if(sd->ncro == 0) {
@@ -1307,7 +1306,7 @@ extern "C" Objref submitComposite(Composite* c) {
 		sd->cro = biggerBuffer;
 	}
 	// create CompositeRenderObject
-	sd->cro[sd->ncro] = CompositeRenderObject(c, nullptr);
+	sd->cro[sd->ncro] = CompositeRenderObject(c, NULL);
 	Objref oref = Objref();
 	oref.id = sd->ncro;
 	oref.type = COMPOSITE;

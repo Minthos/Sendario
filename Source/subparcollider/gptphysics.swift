@@ -7,6 +7,12 @@ struct Vector: Codable {
     var y: Double
     var z: Double
    
+    init(_ coords: (Double, Double, Double)) {
+		self.x = coords.0
+		self.y = coords.1
+		self.z = coords.2
+	}
+
     init(x: Double, y: Double, z: Double) {
         self.x = x
         self.y = y

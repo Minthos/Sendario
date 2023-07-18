@@ -132,7 +132,7 @@ func convertSwiftToC(boxoidCod: BoxoidCod) -> Boxoid {
     withUnsafeMutablePointer(to: &boxoid.curvature) { ptr in
         let baseAddress = ptr.withMemoryRebound(to: Float.self, capacity: 12) { $0 }
         for i in 0..<12 {
-            baseAddress[i] = boxoidCod.curvature[i]
+            baseAddress[i] = Float(boxoidCod.curvature[i])
         }
     }
     boxoid.material_idx = Int32(boxoidCod.material_idx)
@@ -144,11 +144,10 @@ struct CompositeCod: Codable {
 	var orientation: Quaternion
 	var position: Vector
 	var scale: Float
-	var nb: UInt64
 	var b: [BoxoidCod]
 }
 
-func convertCToSwift(composite: inout Composite) -> CompositeCod {
+func fromC(_ composite: inout Composite) -> CompositeCod {
     var boxoids: [BoxoidCod] = []
     for i in 0..<composite.nb {
         boxoids.append(convertCToSwift(boxoid: &composite.b[i]))
@@ -163,13 +162,13 @@ func convertCToSwift(composite: inout Composite) -> CompositeCod {
         let baseAddress = ptr.withMemoryRebound(to: Float.self, capacity: 3) { $0 }
         position = Vector(x: Double(baseAddress[0]), y: Double(baseAddress[1]), z: Double(baseAddress[2]))
     }
-    return CompositeCod(orientation: orientation, position: position, scale: composite.scale, nb: UInt64(composite.nb), b: boxoids)
+    return CompositeCod(orientation: orientation, position: position, scale: composite.scale, b: boxoids)
 }
 
-func convertSwiftToC(compositeCod: CompositeCod) -> Composite {
+func toC(_ compositeCod: CompositeCod) -> Composite {
     var composite = Composite()
-    composite.b = UnsafeMutablePointer<Boxoid>.allocate(capacity: Int(compositeCod.nb))
-    for i in 0..<compositeCod.nb {
+    composite.b = UnsafeMutablePointer<Boxoid>.allocate(capacity: Int(compositeCod.b.count))
+    for i in 0..<compositeCod.b.count {
         composite.b[Int(i)] = convertSwiftToC(boxoidCod: compositeCod.b[Int(i)])
     }
     withUnsafeMutablePointer(to: &composite.orientation) { ptr in
@@ -186,19 +185,19 @@ func convertSwiftToC(compositeCod: CompositeCod) -> Composite {
         baseAddress[2] = Float(compositeCod.position.z)
     }
     composite.scale = Float(compositeCod.scale)
-    composite.nb = size_t(compositeCod.nb)
+    composite.nb = size_t(compositeCod.b.count)
     return composite
 }
 
 struct Spaceship: Codable {
-	var cow: SphericalCow
+	var moo: SphericalCow
 	var c: CompositeCod
-	var b: [BoxoidCod]
 }
 
 var lights = [sun]
 var allTheThings = [sun, mercury, venus, earth, moon, player1]
-var composites: [Composite] = []
+var composites: [CompositeCod] = []
+var objrefs: [Objref] = []
 var actions: [Action] = []
 var buttonPresses: Int32 = 0
 
@@ -249,9 +248,24 @@ func main() {
 	materialsArray[6].diffuse = (0.0, 0.0, 0.0)
 	materialsArray[6].emissive = (50.0, 0.0, 0.0)
 
+	composites.append(CompositeCod(orientation: player1.orientation, position: player1.position, scale: 1.0, b:[
+		BoxoidCod(corners:[Vector((-1.0,  1.0, 1.0)),
+							Vector((-1.0, -1.0, 1.0)),
+							Vector((1.0, -1.0, 1.0)),
+							Vector((1.0,  1.0, 1.0)),
+							Vector((-1.0,  1.0, -1.0)),
+							Vector((-1.0, -1.0, -1.0)),
+							Vector((1.0, -1.0, -1.0)),
+							Vector((1.0,  1.0, -1.0))],
+				  curvature:[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+				  material_idx: 4, missing_faces: 0)]))
+	
+
 	startRenderer()
 	SDL_Init(SDL_INIT_GAMECONTROLLER | SDL_INIT_VIDEO)
    
+	objrefs.append(submitComposite(toC(composites[0])))
+
 	// main game loop. handle input, do a physics tick, send results to renderer
 	while( !shouldExit ) {
 		// take a nap first, don't want to work too hard
@@ -441,9 +455,12 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 										material_idx: 6)
 		}
 		renderMisc.buttonPresses = abs(buttonPresses);
-		let compositeArray = UnsafeMutablePointer<Objref>.allocate(capacity: 0)
-		//render(sphereArray, allTheThings.count + trajectory.count, renderMisc)
-		render(compositeArray, 0, sphereArray, allTheThings.count + trajectory.count, renderMisc)
+		let compositeArray = UnsafeMutablePointer<Objref>.allocate(capacity: objrefs.count)
+		for (index, object) in objrefs.enumerated() {
+			compositeArray[index] = object
+		}
+
+		render(compositeArray, objrefs.count, sphereArray, allTheThings.count + trajectory.count, renderMisc)
 
 		sphereArray.deallocate()
 	}
