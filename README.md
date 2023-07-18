@@ -72,6 +72,12 @@ Another idea is to separate players into two tiers: Paying subscribers can build
 
 Should probably mandate that all ships, factories, refineries, habitats and such have an incinerator. Jettisoning waste is uncivilized.
 
+###### Premium subscription
+$1 - 2 months
+$5 - 1 year
+$42 - 10 years
+
+
 ### what about concerns like griefing and bots ruining the game
 
 I think the universe will be so big that anyone can just disappear to some far away system where no one will find them to build up their strength unchallenged.
