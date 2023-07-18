@@ -82,7 +82,7 @@ var player1 = SphericalCow(id: 5,
 						 velocity: Vector(x: moon.velocity.x, y: moon.velocity.y + 1600.0, z: moon.velocity.z),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
 						 spin: moon.spin,
-						 mass: 10e3, radius:4.0, frictionCoefficient: 0.5)
+						 mass: 10e3, radius:1.0, frictionCoefficient: 0.5)
 var camera = SphericalCow(id: -1,
 						  position: Vector(x: earth.position.x, y: earth.position.y + earth.radius * 2.0, z: earth.position.z - earth.radius * 8.0),
 						  velocity: earth.velocity,
@@ -390,26 +390,23 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 		let relativeVelocity = cameraTarget.velocity - nearestCelestial.velocity
 		var prograde = relativeVelocity
 		if(relativeVelocity.lengthSquared == 0) {
-			camera.position = cameraTarget.position + Vector(x: 0, y: 0, z: -1.5 * cameraTarget.radius)
+			camera.position = cameraTarget.position + Vector(x: 0, y: 0, z: -4.5 * cameraTarget.radius)
 			prograde = cameraTarget.orientation * Vector(x: 0, y: 0, z: 1)
 		} else {
 			prograde = relativeVelocity.normalized()
-			camera.position = cameraTarget.position + relativeVelocity.normalized() * -1.5 * cameraTarget.radius
+			camera.position = cameraTarget.position + relativeVelocity.normalized() * -4.5 * cameraTarget.radius
 		}
 		var camFwd = (cameraTarget.position - camera.position).normalized()
 		var upVec = (cameraTarget.position - nearestCelestial.position).normalized()
 		let pitchAxis = camFwd.cross(upVec).normalized()
 		let pitchQuat = Quaternion(axis: pitchAxis, angle: 2.0 * cameraSpherical.phi * (rcsIsEnabled ? 0.0 : 1.0))
 		let yawQuat = Quaternion(axis: upVec, angle: 2.0 * cameraSpherical.theta * (rcsIsEnabled ? 0.0 : 1.0))
-		camFwd = yawQuat * pitchQuat * cameraTarget.orientation * camFwd
-		upVec = pitchQuat * cameraTarget.orientation * upVec
+		camFwd = yawQuat * pitchQuat * camFwd
+		//camFwd = yawQuat * pitchQuat * cameraTarget.orientation * camFwd
+		//upVec = pitchQuat * cameraTarget.orientation * upVec
+		upVec = pitchQuat * upVec
 		renderMisc.camForward = (Float(camFwd.x), Float(camFwd.y), Float(camFwd.z))
 		renderMisc.camUp = (Float(upVec.x), Float(upVec.y), Float(upVec.z))
-
-		// delete this, it's just to silence a warning
-		if(prograde.y == 0){
-			print("")
-		}
 
 		// camera is at 0,0,0 to make it easy for the renderer
 		renderMisc.camPosition = (0, 0, 0)
@@ -433,6 +430,7 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 			ccod.position -= camera.position
 			let c = toC(ccod)
 			objrefs.append(submitComposite(c))
+			print("new object ", objrefs[0])
 		}
 
 		// we have to sort the things before we send them to the renderer, otherwise transparency breaks.
@@ -461,14 +459,16 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 										radius: Float(player1.radius * pow(position.length * 0.01, 0.9)),
 										material_idx: 6)
 		}
-		objrefs[0].orientation = player1.orientation.float
-		objrefs[0].position = player1.position.float
+		composites[0].orientation = player1.orientation
+		composites[0].position = player1.position
 		let compositeArray = UnsafeMutablePointer<Objref>.allocate(capacity: objrefs.count)
 		for (index, object) in objrefs.enumerated() {
-			let position = Vector(object.position) - camera.position
+			let position = composites[object.id].position - camera.position
 			compositeArray[index] = Objref(orientation: object.orientation, position: position.float, id: object.id, type: object.type)
 		}
 
+		//print("sending \(objrefs.count) composites to rendering \(compositeArray[0]) ", player1.position, player1.radius)
+		//print("camera position: \(camera.position)")
 		render(compositeArray, objrefs.count, sphereArray, allTheThings.count + trajectory.count, renderMisc)
 
 		sphereArray.deallocate()

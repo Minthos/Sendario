@@ -827,7 +827,7 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 neeext:
 		;
 	}
-	//printf("1 mesh subdivided. %d verts, %d tris, %d edges, %d indices\n", numVerts, numTris, numEdges, numIndices);
+	printf("1 mesh subdivided. %d verts, %d tris, %d edges, %d indices\n", numVerts, numTris, numEdges, numIndices);
 	return Mesh(original->centre, original->faceNormals, original->faceCentres, verts, numVerts, tris, numTris, edges, numEdges, indices, numIndices);
 }
 
@@ -908,7 +908,7 @@ neeext:
 		}
 	}
 	free(edges);
-	//printf("1 mesh generated. 8 verts, %d tris, %d edges, %d indices\n", t, r, indexIndex);
+	printf("1 mesh generated. 8 verts, %d tris, %d edges, %d indices\n", t, r, indexIndex);
 	return Mesh(centre, faceNormals, faceCentres, verts, 8, tris, t, realEdges, r, indices, indexIndex);
 }
 
@@ -1011,7 +1011,7 @@ void uploadMeshes(const Mesh* meshes, int numMeshes, BufferObject* bo)
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, totalNumIndices * sizeof(GLuint), adjustedIndices, GL_STATIC_DRAW);
 	free(adjustedIndices);
 	
-	/*
+	
 	// Probably don't need to do this here
 	GLsizei stride = sizeof(Vertex);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)offsetof(Vertex, position));
@@ -1023,8 +1023,10 @@ void uploadMeshes(const Mesh* meshes, int numMeshes, BufferObject* bo)
 	glEnableVertexAttribArray(1);
 	glEnableVertexAttribArray(2);
 	glEnableVertexAttribArray(3);
-	glEnableVertexAttribArray(4);*/
+	glEnableVertexAttribArray(4);
 	bo->num_indices = totalNumIndices;
+
+	printf("uploaded %d indices to vertex buffer\n", totalNumIndices);
 }
 
 void renderMeshes(BufferObject* bo)
@@ -1154,6 +1156,7 @@ void *rendererThread(void *arg) {
 			sharedData.orefs = sharedData.nextOrefs;
 			sharedData.norefs = sharedData.nextNorefs;
 			sharedData.nextOrefs = NULL;
+			sharedData.nextNorefs = 0;
 		}
 
 		if(sharedData.nextBatch != NULL) {
@@ -1163,10 +1166,12 @@ void *rendererThread(void *arg) {
 			sharedData.spheres = sharedData.nextBatch;
 			sharedData.numSpheres = sharedData.nextNum;
 			sharedData.nextBatch = NULL;
+			sharedData.nextNum = 0;
 		}
 
 		while(sd->pendingCreate != NULL) {
 			sd->pendingCreate->createBuffers();
+			sd->pendingCreate->copyToBuffers();
 			sd->pendingCreate = sd->pendingCreate->next;
 		}
 
@@ -1287,6 +1292,7 @@ void *rendererThread(void *arg) {
 			glUniform3fv(boxoidEmissiveLoc, 1, glm::value_ptr(emissiveComponent));
 		    int lod = sd->renderMisc.buttonPresses % MAX_LOD;
 			renderMeshes(&cro->bo[lod]);
+			//printf("rendered a mesh at LOD %d, position: %f %f %f\n", lod, center.x, center.y, center.z);
 		}
 		glBindVertexArray(0);
 		glfwSwapBuffers(sharedData.window);
@@ -1315,6 +1321,8 @@ extern "C" Objref submitComposite(Composite c) {
 	// create CompositeRenderObject
 	sd->cro[sd->ncro] = CompositeRenderObject(c, NULL);
 	Objref oref = Objref();
+	memcpy(oref.orientation, c.orientation, 4*sizeof(float));
+	memcpy(oref.position, c.position, 3*sizeof(float));
 	oref.id = sd->ncro;
 	oref.type = COMPOSITE;
 	sd->ncro++;
@@ -1328,7 +1336,7 @@ extern "C" Objref submitComposite(Composite c) {
 	sd->cro[oref.id].next = sd->pendingCreate;
 	sd->pendingCreate = &sd->cro[oref.id];
 	pthread_mutex_unlock(&sharedData.mutex);
-	
+
 	return oref;
 }
 
