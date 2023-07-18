@@ -1,10 +1,12 @@
+## First feature: ship builder interface
+
 Design ship sections (shape, material, thickness, purpose, initial tech level, other variables)
 
 Each option has a materials cost tree and equipment requirement for the whole process (ore/mineral refinery, gas refinery, chip fab, hardware factory, utility drones), time estimate and energy use estimate.
 
 Gather materials (mineral/gas deposits, salvage, trade), upgrade ship/base with new sections, upgrade existing sections.
 
-==== Sections:
+### Sections:
 
 * Weapon turret (business end curvature determines aiming angle, aiming angle restricts barrel length. Barrel must be contained inside the shape of the section. Lower aiming angle allows for lighter servos and more space efficient layout.
 * Main thruster (rcs comes for free)
@@ -21,7 +23,7 @@ Gather materials (mineral/gas deposits, salvage, trade), upgrade ship/base with 
 
 Your ship starts with a fusion reactor, rcs thrusters, and 2 utility drones. It's obviously not enough for a journey into space. You have to add a fuel tank and an engine at least. Fortunately you get to design your own starting ship and build it for free within reasonable limits. Good luck!
 
-== Tech tree
+## Tech tree
 
 Each item requires ingredients produced by the things that are required to enable it at the same level as the item to build.
 For example a level 0 chip fab requires level 0 refined minerals, level 0 hardware components and level 0 refined gases. Upgrading it to level 1 requires the level 1 versions of those ingredients.
@@ -30,7 +32,7 @@ In addition to building the ingredients needed to craft something the same secti
 
 Utility drones assemble parts made by the various factories into finished sections, move everything that needs to be moved, mine gas and minerals from deposits and repair your stuff.
 
-===== Tech level 0 enables:
+### Tech level 0 enables:
 RCS thrusters
 Arcjet rocket engine (high thrust low isp, electric)
 Propellant tank
@@ -41,53 +43,53 @@ Hardware factory
 Mineral refinery
 Gas refinery
 
-====== Hardware factory enables:
+### Hardware factory enables:
 Utility drones level 0
 Sensors
 Conveyor belt
 
-====== Mineral refinery enables:
+### Mineral refinery enables:
 Coilgun
 Armour plate (put on anything to increase hit points)
 Railroad track
 Gas pipe
 
-====== Hardware factory + mineral refinery enables:
+### Hardware factory + mineral refinery enables:
 Solar panel
 Trains
 
-====== Gas refinery enables:
+### Gas refinery enables:
 Dumbfire rockets
 Chemical explosive warheads
 Fuel
 Propellant
 
-====== Hardware factory + gas refinery enables:
+### Hardware factory + gas refinery enables:
 Life support
 
-====== Hardware factory + both refineries enables:
+### Hardware factory + both refineries enables:
 Chip fab
 Battery
 Autocannon
 Chemical rocket engine (high thrust, very low isp, self-powered)
 
-====== Chip fab + gas refinery enables:
+### Chip fab + gas refinery enables:
 Stealth coating
 
-====== Chip fab + hardware factory enables:
+### Chip fab + hardware factory enables:
 Utility drone tech level 1
 Homing missiles
 Proximity mines
 
-===== Tech level 1 enables:
+### Tech level 1 enables:
 Everything can be upgraded to level 1 if their prerequisites are at level 1.
 
-====== Hardware factory level 1 enables:
+### Hardware factory level 1 enables:
 Defense drones
 Attack drones (spacecraft, aircraft, tanks, mechs, boats, submarines)
 Sensor drones
 
-====== Hardware factory level 1 + both refineries level 1 enables:
+### Hardware factory level 1 + both refineries level 1 enables:
 Chip fab level 1
 Nuclear reactor (medium power low thermal efficiency)
 Nuclear warheads
@@ -95,27 +97,27 @@ Lasers
 Ion drive (low thrust high isp, electric)
 Nuclear rocket engine (high thrust medium isp, self-powered)
 
-====== Chip fab level 1 + hardware factory 1 enables:
+### Chip fab level 1 + hardware factory 1 enables:
 Utility drone tech level 2
 
-===== Tech level 2 enables:
+### Tech level 2 enables:
 Everything can be upgraded to level 2 if their prerequisites are at level 2.
 Gaslight drive (electric, allows hyperspace travel)
 
-====== Hardware factory level 2 + both refineries level 2 + any reactor level 2 enables:
+### Hardware factory level 2 + both refineries level 2 + any reactor level 2 enables:
 Fusion reactor (high power high thermal efficiency)
 Fusion warheads
 Fusion rocket engine (medium thrust high isp, hybrid electric/self-powered)
 
-====== Chip fab level 2 + hardware factory 2 enables:
+### Chip fab level 2 + hardware factory 2 enables:
 Utility drone tech level 3
 
-====== Tech level 3 yada yada
+### Tech level 3 yada yada
 
-====== Mineral refinery level 3 enables:
+### Mineral refinery level 3 enables:
 Space elevator
 
-====== Hardware factory level 3 + both refineries level 3 + chip fab level 3 + any reactor level 3 enables:
+### Hardware factory level 3 + both refineries level 3 + chip fab level 3 + any reactor level 3 enables:
 Antimatter beam
 Antimatter warheads
 Antimatter battery (very high burst power, expensive fuel, high thermal efficiency)
