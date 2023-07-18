@@ -955,7 +955,7 @@ struct CompositeRenderObject {
 		}
 	}
 
-	void syncState(CompositeRenderObject *latest) {
+	void submitMeshUpdate(CompositeRenderObject *latest) {
 		for(int i = 0; i <= MAX_LOD; i++) {
 			deleteMeshes(meshes[i], c.nb);
 			free(meshes[i]);
@@ -1262,9 +1262,16 @@ void *rendererThread(void *arg) {
 		for(int i = 0; i < sd->norefs; i++) {
 			// for now correctly assuming all orefs are to composites
 			CompositeRenderObject* cro = &sd->cro[sd->orefs[i].id];
+			cro->c.position[0] = sd->orefs[i].position[0];
+			cro->c.position[1] = sd->orefs[i].position[1];
+			cro->c.position[2] = sd->orefs[i].position[2];
+			cro->c.orientation[0] = sd->orefs[i].orientation[0];
+			cro->c.orientation[1] = sd->orefs[i].orientation[1];
+			cro->c.orientation[2] = sd->orefs[i].orientation[2];
+			cro->c.orientation[3] = sd->orefs[i].orientation[3];
+			glm::vec3 center = vectorize(cro->c.position);
 			// uniforms
 			glUseProgram(boxoidProgram);
-			glm::vec3 center = vectorize(cro->c.position);
 			model = glm::translate(glm::mat4(1.0f), center);
 			glUniformMatrix4fv(boxoidModelLoc, 1, GL_FALSE, glm::value_ptr(model));
 			glUniform3f(boxoidCenterLoc, center[0], center[1], center[2]);
@@ -1334,7 +1341,7 @@ extern "C" void updateComposite(Objref oref, Composite* c) {
 	
 	// swap out some pointers
 	pthread_mutex_lock(&sharedData.mutex);	
-	sd->cro[oref.id].syncState(&cro);
+	sd->cro[oref.id].submitMeshUpdate(&cro);
 
 	// send to render thread for buffering
 	sd->cro[oref.id].next = sd->pendingUpdate;

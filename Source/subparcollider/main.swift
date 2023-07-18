@@ -264,7 +264,6 @@ func main() {
 	startRenderer()
 	SDL_Init(SDL_INIT_GAMECONTROLLER | SDL_INIT_VIDEO)
    
-	objrefs.append(submitComposite(toC(composites[0])))
 
 	// main game loop. handle input, do a physics tick, send results to renderer
 	while( !shouldExit ) {
@@ -384,6 +383,7 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 
 		// camera and rendering
 		var renderMisc = render_misc()
+		renderMisc.buttonPresses = abs(buttonPresses);
 		renderMisc.materials = materialsArray
 		let cameraTarget = player1
 		let nearestCelestial = moon
@@ -427,6 +427,13 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 				lights_ptr[index].color = (4.38e24, 4.38e24, 4.18e24)
 			}
 		}
+	
+		if objrefs.count == 0 {
+			var ccod = composites[0]
+			ccod.position -= camera.position
+			let c = toC(ccod)
+			objrefs.append(submitComposite(c))
+		}
 
 		// we have to sort the things before we send them to the renderer, otherwise transparency breaks.
 		allTheThings.sort(by: { ($0.position - camera.position).lengthSquared > ($1.position - camera.position).lengthSquared })
@@ -454,10 +461,12 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 										radius: Float(player1.radius * pow(position.length * 0.01, 0.9)),
 										material_idx: 6)
 		}
-		renderMisc.buttonPresses = abs(buttonPresses);
+		objrefs[0].orientation = player1.orientation.float
+		objrefs[0].position = player1.position.float
 		let compositeArray = UnsafeMutablePointer<Objref>.allocate(capacity: objrefs.count)
 		for (index, object) in objrefs.enumerated() {
-			compositeArray[index] = object
+			let position = Vector(object.position) - camera.position
+			compositeArray[index] = Objref(orientation: object.orientation, position: position.float, id: object.id, type: object.type)
 		}
 
 		render(compositeArray, objrefs.count, sphereArray, allTheThings.count + trajectory.count, renderMisc)

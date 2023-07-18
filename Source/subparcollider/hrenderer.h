@@ -72,6 +72,8 @@ typedef struct {
 } shape_wrapper;
 
 typedef struct {
+    float orientation[4]; // w,x,y,z quaternion specifying the object's rotation from object space to world space
+    float position[3]; // x,y,z coordinates in world space
 	size_t id;
 	shape_type type;
 } Objref;

@@ -7,6 +7,12 @@ struct Vector: Codable {
     var y: Double
     var z: Double
    
+    init(_ coords: (Float, Float, Float)) {
+		self.x = Double(coords.0)
+		self.y = Double(coords.1)
+		self.z = Double(coords.2)
+	}
+
     init(_ coords: (Double, Double, Double)) {
 		self.x = coords.0
 		self.y = coords.1
@@ -27,6 +33,10 @@ struct Vector: Codable {
         let phi = acos(cosPhi)
         return Spherical(rho, theta, phi)
     }
+
+	var float: (Float, Float, Float) {
+		return (Float(x), Float(y), Float(z))
+	}
 
 #if DEBUG
     func sanityCheck() {
@@ -234,10 +244,14 @@ struct Quaternion: Codable {
     func sanityCheck() {}
 #endif
 
+	var float: (Float, Float, Float, Float) {
+		return (Float(w), Float(x), Float(y), Float(z))
+	}
+
     func getAxisAngle() -> (Vector, Double) {
-	let scale = 1.0 / sqrt(x * x + y * y + z * z)
+		let scale = 1.0 / sqrt(x * x + y * y + z * z)
         let axis = Vector(x: x * scale, y: y * scale, z: z * scale)
-	return (axis, acos(w) * 2.0)
+		return (axis, acos(w) * 2.0)
     }
 
     func length() -> Double {
