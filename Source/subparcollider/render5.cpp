@@ -315,9 +315,11 @@ struct BufferObject {
 	GLuint num_indices;
 	
 	BufferObject() {
-		glGenVertexArrays(1, &VAO);
-		glGenBuffers(1, &VBO);
-		glGenBuffers(1, &EBO);
+		if(sharedData.renderer_tid == pthread_self()){
+			glGenVertexArrays(1, &VAO);
+			glGenBuffers(1, &VBO);
+			glGenBuffers(1, &EBO);
+		}
 		num_indices = 0;
 	}
 

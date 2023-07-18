@@ -26,7 +26,7 @@ example von neumann probe that cools the reactor and ftl drive with main thruste
 ```
                           ------------------------------
      / armour | propellant                              tank | battery | chip fab | cargo hold | mineral refinery \
- gun | armour | propellant                              tank | ftl drive | heat sink | reactor | fuel         tank | main thruster
+ gun | armour | propellant                              tank + ftl drive - heat sink - reactor + fuel         tank + main thruster
      \ armour | propellant                              tank | hardware factory | cargo   hold | gas     refinery /
                           ------------------------------
 ```
@@ -93,8 +93,8 @@ Utility drones assemble parts made by the various factories into finished sectio
 - Everything can be upgraded to level 1 if their prerequisites are at level 1.
 
 ### Hardware factory level 1 enables:
-- Defense drones
-- Attack drones (spacecraft, aircraft, tanks, mechs, boats, submarines)
+- Defense drones (short range, fast and cheap)
+- Attack drones (longer range, spacecraft, aircraft, ground vehicles, mechs, boats, submarines)
 - Sensor drones
 
 ### Hardware factory level 1 + both refineries level 1 enables:
@@ -105,7 +105,7 @@ Utility drones assemble parts made by the various factories into finished sectio
 - Ion drive (low thrust high isp, electric)
 - Nuclear rocket engine (high thrust medium isp, self-powered)
 
-### Chip fab level 1 + hardware factory 1 enables:
+### Chip fab level 1 + hardware factory level 1 enables:
 - Utility drone tech level 2
 
 ### Tech level 2 enables:
@@ -117,10 +117,11 @@ Utility drones assemble parts made by the various factories into finished sectio
 - Fusion warheads
 - Fusion rocket engine (medium thrust high isp, hybrid electric/self-powered)
 
-### Chip fab level 2 + hardware factory 2 enables:
+### Chip fab level 2 + hardware factory level 2 enables:
 - Utility drone tech level 3
 
-### Tech level 3 yada yada
+### Tech level 3 enables:
+- Everything can be upgraded to level 3 if their prerequisites are at level 3.
 
 ### Mineral refinery level 3 enables:
 - Space elevator
@@ -128,7 +129,7 @@ Utility drones assemble parts made by the various factories into finished sectio
 ### Hardware factory level 3 + both refineries level 3 + chip fab level 3 + any reactor level 3 enables:
 - Antimatter beam
 - Antimatter warheads
-- Antimatter battery (very high burst power, expensive fuel, high thermal efficiency)
+- Antimatter reactor (very high burst power, expensive fuel, high thermal efficiency)
 
 ---
 

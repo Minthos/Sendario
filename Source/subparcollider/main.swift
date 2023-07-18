@@ -203,6 +203,7 @@ var buttonPresses: Int32 = 0
 
 var controller: OpaquePointer? = nil
 var interfaceMode: InterfaceMode = .physicsSim
+//var interfaceMode: InterfaceMode = .shipEditor
 var shouldExit = false
 var rcsIsEnabled = false
 let worldUpVector = Vector(x: 0, y: 1, z:0) // x is right, y is up, z is backward (right-handed coordinate system)
@@ -480,8 +481,15 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 	materialsArray.deallocate()
 }
 
-/*
+main()
 
+
+
+
+
+
+
+/*
 The value of 3.828 x 10^26 W is the total power emitted by the sun in all directions - this is its luminosity. To convert this to a power per unit solid angle (W/sr), we need to divide by the total solid angle of a sphere, which is 4π steradians.
 
 For the visible part, that's approximately 43.4% of the total power, or 1.66 x 10^26 W. Dividing by 4π gives us about 1.32 x 10^25 W/sr.
@@ -507,8 +515,4 @@ Ultraviolet: About 7.1% of the sun's total power output, or approximately 2.72 x
 X-rays: The sun's X-ray flux is highly variable and depends on solar activity, but it's estimated to be around 10^-6 W/m^2 during a solar flare. Over the entire surface of the sun, this would be about 10^20 W, which is still many orders of magnitude less than the total power output.
 
 Gamma rays: The sun produces essentially no gamma rays, because the temperatures in the sun's core are not high enough to support the nuclear reactions that produce gamma rays.
-
 */
-
-main()
-
