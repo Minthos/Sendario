@@ -1,18 +1,18 @@
 ## Near term TODO:
 
-* merge in universe procgen stuff with resource deposits
-* bounding boxes from hctree to compositecod
 * spaceship with a shape other than a sphere
  - user interface for editing boxoids
  - actually it would be nice to set some boxoids to not be rendered in the composite..
  - reading the data from json into swift
 
+* visual 3d grid to see the scale of our spaceship while designing it
 * renderer that renders objects with orientation
 * position camera based on ship's orientation instead of ship's velocity
 * rotate the ship's self-thrust vector by the ship's orientation
 
 ## Recently done:
 
+* bounding boxes from hctree to compositecod
  - codable boxoids, composites, spheres
  - moving the data from swift to cpp
  - rendering somewhat efficiently
@@ -55,6 +55,7 @@ y: repeat last action, redo
 * improve mining, refining and logistics
  - mining can be in several types: rich deposits in hard rock, sparse deposits in loose regolith, asteroids
  - logistics shouldn't be too tedious but scaling up should be time-consuming. we don't want players to get too big too fast.
+* merge in universe procgen stuff with resource deposits
 * Make a basic space exploration prototype
  - A solar system with the sun, some planets, a spaceship with a gaslight drive
 * w-space
