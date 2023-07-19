@@ -2,305 +2,6 @@ import Foundation
 
 let G: Double = 6.67430e-11
 
-struct Vector: Codable {
-    var x: Double
-    var y: Double
-    var z: Double
-   
-    init(_ coords: (Float, Float, Float)) {
-		self.x = Double(coords.0)
-		self.y = Double(coords.1)
-		self.z = Double(coords.2)
-	}
-
-    init(_ coords: (Double, Double, Double)) {
-		self.x = coords.0
-		self.y = coords.1
-		self.z = coords.2
-	}
-
-    init(x: Double, y: Double, z: Double) {
-        self.x = x
-        self.y = y
-        self.z = z
-        sanityCheck()
-    }
-
-    var spherical: Spherical {
-        let rho = sqrt(x * x + y * y + z * z)
-        let theta = atan2(y, x)
-        let cosPhi = z / rho
-        let phi = acos(cosPhi)
-        return Spherical(rho, theta, phi)
-    }
-
-	var float: (Float, Float, Float) {
-		return (Float(x), Float(y), Float(z))
-	}
-
-#if DEBUG
-    func sanityCheck() {
-        assert( !x.isNaN, "x is NaN")
-        assert( !y.isNaN, "y is NaN")
-        assert( !z.isNaN, "z is NaN")
-    }
-#else
-    func sanityCheck() {}
-#endif
-
-    func format(_ decimalPlaces: Int) -> String {
-        return "(\(String(format: "%.\(decimalPlaces)f", x)), \(String(format: "%.\(decimalPlaces)f", y)), \(String(format: "%.\(decimalPlaces)f", z)))"
-    }
-
-    var lengthSquared: Double {
-        sanityCheck()
-        return x * x + y * y + z * z
-    }
-
-    var length: Double {
-        sanityCheck()
-        return sqrt(x * x + y * y + z * z)
-    }
-    
-    func dot(_ other: Vector) -> Double {
-        sanityCheck()
-        return x * other.x + y * other.y + z * other.z
-    }
-
-    func normalized() -> Vector {
-        sanityCheck()
-        let length = self.length
-        if length == 0 {
-            return self
-        }
-        return self / length
-    }
-
-    static func +(lhs: Vector, rhs: Vector) -> Vector {
-        lhs.sanityCheck()
-        rhs.sanityCheck()
-        return Vector(x: lhs.x + rhs.x, y: lhs.y + rhs.y, z: lhs.z + rhs.z)
-    }
-    
-    static func -(lhs: Vector, rhs: Vector) -> Vector {
-        lhs.sanityCheck()
-        rhs.sanityCheck()
-        return Vector(x: lhs.x - rhs.x, y: lhs.y - rhs.y, z: lhs.z - rhs.z)
-    }
-    
-    static func *(lhs: Double, rhs: Vector) -> Vector {
-        return rhs * lhs
-    }
-
-    static func *(lhs: Vector, rhs: Vector) -> Vector {
-        return Vector(x: lhs.x * rhs.x, y: lhs.y * rhs.y, z: lhs.z * rhs.z)
-    }
- 
-    static func *(lhs: Vector, rhs: Double) -> Vector {
-        assert(!rhs.isNaN)
-        lhs.sanityCheck()
-        return Vector(x: lhs.x * rhs, y: lhs.y * rhs, z: lhs.z * rhs)
-    }
-    
-    static func /(lhs: Double, rhs: Vector) -> Vector {
-        return rhs * lhs
-    }
-
-    static func /(lhs: Vector, rhs: Double) -> Vector {
-        lhs.sanityCheck()
-        assert(rhs != 0)
-        assert(!rhs.isNaN)
-        return Vector(x: lhs.x / rhs, y: lhs.y / rhs, z: lhs.z / rhs)
-    }
-    
-    static func +=(lhs: inout Vector, rhs: Vector) {
-        lhs.sanityCheck()
-        rhs.sanityCheck()
-        lhs.x += rhs.x
-        lhs.y += rhs.y
-        lhs.z += rhs.z
-    }
-    
-    static func -=(lhs: inout Vector, rhs: Vector) {
-        lhs.sanityCheck()
-        rhs.sanityCheck()
-        lhs.x -= rhs.x
-        lhs.y -= rhs.y
-        lhs.z -= rhs.z
-    }
-    
-    static func *=(lhs: inout Vector, rhs: Double) {
-        lhs.sanityCheck()
-        assert(!rhs.isNaN)
-        lhs.x *= rhs
-        lhs.y *= rhs
-        lhs.z *= rhs
-    }
-    
-    static func /=(lhs: inout Vector, rhs: Double) {
-        let inv = 1.0 / rhs
-        lhs.x *= inv
-        lhs.y *= inv
-        lhs.z *= inv
-        assert(rhs != 0)
-        assert(!rhs.isNaN)
-        lhs.sanityCheck()
-    }
-
-    func cross(_ other: Vector) -> Vector {
-        sanityCheck()
-        other.sanityCheck()
-        return Vector(
-            x: y * other.z - z * other.y,
-            y: z * other.x - x * other.z,
-            z: x * other.y - y * other.x
-        )
-    }
-
-    static prefix func - (vector: Vector) -> Vector {
-        vector.sanityCheck()
-        return Vector(x: -vector.x, y: -vector.y, z: -vector.z)
-    }
-}
-
-struct Quaternion: Codable {
-    var w: Double
-    var x: Double
-    var y: Double
-    var z: Double
-    
-    init(w: Double, v: Vector) {
-        self.w = w
-        x = v.x
-        y = v.y
-        z = v.z
-        sanityCheck()
-    }
-
-    init(w: Double, x: Double, y: Double, z: Double) {
-        self.w = w
-        self.x = x
-        self.y = y
-        self.z = z
-        sanityCheck()
-    }
-
-    init(axis: Vector, angle: Double) {
-        let vn = axis.normalized()
-        let halfAngle = angle * 0.5
-	let sinAngle = sin(halfAngle);
-	x = (vn.x * sinAngle);
-	y = (vn.y * sinAngle);
-	z = (vn.z * sinAngle);
-	w = cos(angle);
-        sanityCheck()
-    }
-
-    init(axis: (Double, Double, Double), angle: Double) {
-        let halfAngle = angle * 0.5
-        let s = sin(halfAngle)
-        w = cos(halfAngle)
-        x = axis.0 * s
-        y = axis.1 * s
-        z = axis.2 * s
-        sanityCheck()
-    }
-/*
-    init(pitch: Double, yaw: Double, roll: Double)
-    {
-	// Basically we create 3 Quaternions, one for pitch, one for yaw, one for roll
-	// and multiply those together.
-	// the calculation below does the same, just shorter
-
-	let p = pitch * Double.pi;
-	let y = yaw * Double.pi;
-	let r = roll * Double.pi;
-	//let p = pitch * PIOVER180 / 2.0;
-	//let y = yaw * PIOVER180 / 2.0;
-	//let r = roll * PIOVER180 / 2.0;
-
-	let sinp = sin(p);
-	let siny = sin(y);
-	let sinr = sin(r);
-	let cosp = cos(p);
-	let cosy = cos(y);
-	let cosr = cos(r);
-        var tmp = Quaternion(x: sinr * cosp * cosy - cosr * sinp * siny,
-	                     y: cosr * sinp * cosy + sinr * cosp * siny,
-                             z: cosr * cosp * siny - sinr * sinp * cosy,
-	                     w: cosr * cosp * cosy + sinr * sinp * siny)
-
-        let len_inv = 1.0 / tmp.length()
-        w = tmp.w * len_inv
-        x = tmp.x * len_inv
-        y = tmp.y * len_inv
-        z = tmp.z * len_inv
-    }
-*/
-#if DEBUG
-    func sanityCheck() {
-        assert( !w.isNaN, "w is NaN")
-        assert( !x.isNaN, "x is NaN")
-        assert( !y.isNaN, "y is NaN")
-        assert( !z.isNaN, "z is NaN")
-    }
-#else
-    func sanityCheck() {}
-#endif
-
-	var float: (Float, Float, Float, Float) {
-		return (Float(w), Float(x), Float(y), Float(z))
-	}
-
-    func getAxisAngle() -> (Vector, Double) {
-		let scale = 1.0 / sqrt(x * x + y * y + z * z)
-        let axis = Vector(x: x * scale, y: y * scale, z: z * scale)
-		return (axis, acos(w) * 2.0)
-    }
-
-    func length() -> Double {
-        return sqrt(w*w + x*x + y*y + z*z)
-    }
-
-    func normalized() -> Quaternion {
-        let len_inv = 1.0 / length()
-        return Quaternion(w: w * len_inv, x: x * len_inv, y: y * len_inv, z: z * len_inv)
-    }
-
-    // if self is unit length, use conjugate instead
-    func inverse() -> Quaternion {
-        let f = 1.0 / -(w*w + x*x + y*y + z*z)
-        return Quaternion(w: w*(-f), x: x*f, y: y*f, z: z*f)
-    }
-    
-    func conjugate() -> Quaternion {
-        return Quaternion(w: w, x: -x, y: -y, z: -z)
-    }
-    
-    static func +(left: Quaternion, right: Quaternion) -> Quaternion {
-        return Quaternion(w: left.w + right.w, x: left.x + right.x, y: left.y + right.y, z: left.z + right.z)
-    }
-    
-    static func -(left: Quaternion, right: Quaternion) -> Quaternion {
-        return Quaternion(w: left.w - right.w, x: left.x - right.x, y: left.y - right.y, z: left.z - right.z)
-    }
-    
-    static func *(left: Quaternion, right: Quaternion) -> Quaternion {
-        let w = left.w*right.w - left.x*right.x - left.y*right.y - left.z*right.z
-        let x = left.w*right.x + left.x*right.w + left.y*right.z - left.z*right.y
-        let y = left.w*right.y - left.x*right.z + left.y*right.w + left.z*right.x
-        let z = left.w*right.z + left.x*right.y - left.y*right.x + left.z*right.w
-        return Quaternion(w: w, x: x, y: y, z: z)
-    }
-
-    static func *(left: Quaternion, right: Vector) -> Vector {
-	let vn = right.normalized()
-        let vecQuat = Quaternion(w: 0, x: vn.x, y: vn.y, z: vn.z)
-	let resQuat = left * vecQuat * left.conjugate()
-	return Vector(x: resQuat.x, y: resQuat.y, z: resQuat.z)
-    }
-}
-
 // assuming Earthlike conditions for now
 func atmosphericProperties(altitude: Double) -> (density: Double, pressure: Double, viscosity: Double) {
     let seaLevelTemperature: Double = 288.15
@@ -320,38 +21,10 @@ func atmosphericProperties(altitude: Double) -> (density: Double, pressure: Doub
 }
 
 
-struct Spherical: Codable {
-    var rho: Double
-    var theta: Double
-    var phi: Double
-
-    init(_ rho: Double, _ theta: Double, _ phi: Double) {
-        self.rho = rho
-        self.theta = theta
-        self.phi = phi
-    }
-
-    var cartesian: Vector {
-        let sinPhi = sin(phi)
-        let x = rho * sinPhi * cos(theta)
-        let y = rho * sinPhi * sin(theta)
-        let z = rho * cos(phi)
-        return Vector(x: x, y: y, z: z)
-    }
-   
-/*    var pretty: String {
-        return "(rho: \(rho.pretty), theta: \(theta.pretty), phi: \(phi.pretty))"
-    }
-    
-    var scientific: String {
-        return "SphericalPoint(rho: \(rho.scientific), theta: \(theta.scientific), phi: \(phi.scientific))"
-    }*/
-}
-
 class Celestial: Codable {
     var moo: SphericalCow
-    var perigee: Spherical
-    var apogee: Spherical
+    var perigee: SphericalVector
+    var apogee: SphericalVector
     var name: String
     var gravitationalParameter: Double
     var atmosphereHeight: Double?
@@ -360,7 +33,7 @@ class Celestial: Codable {
     var albedo: Double?
     var rotationPeriod: Double?
     
-    init(moo: SphericalCow, perigee: Spherical, apogee: Spherical, name: String) {
+    init(moo: SphericalCow, perigee: SphericalVector, apogee: SphericalVector, name: String) {
         self.moo = moo
         self.perigee = perigee
         self.apogee = apogee
@@ -389,7 +62,7 @@ class Celestial: Codable {
         // You can implement it based on your specific requirements
         // Here's an example implementation that ignores rotation:
         let gravity = surfaceGravity(at: distance)
-        let surfaceNormal = Vector(x: 0, y: 0, z: -1).normalized() // Assumes the body is a sphere with its center at the origin
+        let surfaceNormal = Vector(0, 0, -1).normalized() // Assumes the body is a sphere with its center at the origin
         return surfaceNormal * gravity
     }
     
@@ -445,10 +118,10 @@ class SphericalCow: Codable {
         self.velocity = velocity
         self.orientation = orientation
         self.spin = spin
-        self.accumulatedForce = Vector(x: 0, y: 0, z: 0)
-        self.accumulatedTorque = Vector(x: 0, y: 0, z: 0)
-        self.prevForce = Vector(x: 0, y: 0, z: 0)
-        self.prevTorque = Vector(x: 0, y: 0, z: 0)
+        self.accumulatedForce = Vector(0, 0, 0)
+        self.accumulatedTorque = Vector(0, 0, 0)
+        self.prevForce = Vector(0, 0, 0)
+        self.prevTorque = Vector(0, 0, 0)
         self.mass = mass
         self.radius = radius
         self.momentOfInertia = 2 * mass * radius * radius / 5
@@ -474,7 +147,7 @@ class SphericalCow: Codable {
         position = new_pos
         velocity = new_vel
         prevForce = accumulatedForce
-        accumulatedForce = Vector(x: 0, y: 0, z: 0)
+        accumulatedForce = Vector(0, 0, 0)
     }
 
 // oemga should probably be rotated 90 degrees or something
@@ -490,13 +163,13 @@ class SphericalCow: Codable {
         let new_spin = spin + (sum_rotAccel)*(dt*0.5)
         spin = new_spin
         prevTorque = accumulatedTorque
-        accumulatedTorque = Vector(x: 0, y: 0, z: 0)
+        accumulatedTorque = Vector(0, 0, 0)
     }
 
 }
 
 func calculateGravities(subject: SphericalCow, objects: [SphericalCow]) -> Vector {
-    var gravity = Vector(x: 0, y: 0, z: 0)
+    var gravity = Vector(0, 0, 0)
     for object in objects {
         if(subject !== object) {
             let deltaPosition = object.position - subject.position

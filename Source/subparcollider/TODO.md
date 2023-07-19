@@ -1,5 +1,7 @@
 ## Near term TODO:
 
+* merge in universe procgen stuff with resource deposits
+* bounding boxes from hctree to compositecod
 * spaceship with a shape other than a sphere
  - user interface for editing boxoids
  - actually it would be nice to set some boxoids to not be rendered in the composite..

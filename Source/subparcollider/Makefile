@@ -5,7 +5,7 @@ lintedrender5.cpp: render5.cpp lintcpp.py
 	cat render5.cpp | ./lintcpp.py > lintedrender5.cpp
 
 CPP_SRC := lintedrender5.cpp sdlwrapper.cpp
-SWIFT_SRC := main.swift gptphysics.swift
+SWIFT_SRC := main.swift gptphysics.swift spatialtypes.swift
 OBJC_HEADERS := subparcollider-Bridging-Header.h
 LIBS := -lglfw -lGL -lGLEW -lm -lSDL2
 LIBDIR := -L/usr/local/lib

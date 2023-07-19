@@ -48,46 +48,46 @@ struct Action {
 }
 
 var sun = SphericalCow(id: 0,
-						 position: Vector(x: 0, y: 0, z: 0),
-						 velocity: Vector(x: 0, y: 0, z: 0),
+						 position: Vector(0, 0, 0),
+						 velocity: Vector(0, 0, 0),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
-						 spin: Vector(x: 0, y: 0, z: 0),
+						 spin: Vector(0, 0, 0),
 						 mass: 1.989e30, radius: 696.34e6, frictionCoefficient: 0.8)
 var mercury = SphericalCow(id: 1,
-						 position: Vector(x: 0, y: 0, z: -57.91e9),
-						 velocity: Vector(x: 0, y: 0, z: 47.87e3),
+						 position: Vector(0, 0, -57.91e9),
+						 velocity: Vector(0, 0, 47.87e3),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
-						 spin: Vector(x: 0, y: 0, z: 0),
+						 spin: Vector(0, 0, 0),
 						 mass: 3.285e23, radius: 2.44e6, frictionCoefficient: 0.8)
 var venus = SphericalCow(id: 2,
-						 position: Vector(x: 0, y: 0, z: 108.2e9),
-						 velocity: Vector(x: 00, y: 0, z: 35.02e3),
+						 position: Vector(0, 0, 108.2e9),
+						 velocity: Vector(0, 0, 35.02e3),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
-						 spin: Vector(x: 0, y: 0, z: 0),
+						 spin: Vector(0, 0, 0),
 						 mass: 4.867e24, radius: 6.0518e6, frictionCoefficient: 0.8)
 var earth = SphericalCow(id: 3,
-						 position: Vector(x: 0, y: 0, z: -149.6e9),
-						 velocity: Vector(x: 0, y: 29.78e3, z: 0),
+						 position: Vector(0, 0, -149.6e9),
+						 velocity: Vector(0, 29.78e3, 0),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
-						 spin: Vector(x: 0, y: 0, z: 0),
+						 spin: Vector(0, 0, 0),
 						 mass: 5.972e24, radius: 6.371e6, frictionCoefficient: 0.0001)
 var moon = SphericalCow(id: 4,
-						 position: Vector(x: earth.position.x - 384e6, y: earth.position.y, z: earth.position.z),
-						 velocity: Vector(x: earth.velocity.x, y: earth.velocity.y, z: earth.velocity.z + 1.022e3),
+						 position: Vector(earth.position.x - 384e6, earth.position.y, earth.position.z),
+						 velocity: Vector(earth.velocity.x, earth.velocity.y, earth.velocity.z + 1.022e3),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
-						 spin: Vector(x: 0, y: 0, z: 0),
+						 spin: Vector(0, 0, 0),
 						 mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.8)
 var player1 = SphericalCow(id: 5,
-						 position: Vector(x: moon.position.x, y: moon.position.y, z: moon.position.z + moon.radius + 200000.1),
-						 velocity: Vector(x: moon.velocity.x, y: moon.velocity.y + 1600.0, z: moon.velocity.z),
+						 position: Vector(moon.position.x, moon.position.y, moon.position.z + moon.radius + 200000.1),
+						 velocity: Vector(moon.velocity.x, moon.velocity.y + 1600.0, moon.velocity.z),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
 						 spin: moon.spin,
 						 mass: 10e3, radius:1.0, frictionCoefficient: 0.5)
 var camera = SphericalCow(id: -1,
-						  position: Vector(x: earth.position.x, y: earth.position.y + earth.radius * 2.0, z: earth.position.z - earth.radius * 8.0),
+						  position: Vector(earth.position.x, earth.position.y + earth.radius * 2.0, earth.position.z - earth.radius * 8.0),
 						  velocity: earth.velocity,
 						  orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
-						  spin: Vector(x: 0, y: 0, z: 0),
+						  spin: Vector(0, 0, 0),
 						  mass: 0, radius: 0, frictionCoefficient: 0.0)
 
 struct BoxoidCod: Codable {
@@ -105,7 +105,7 @@ struct BoxoidCod: Codable {
 	}
 
 	mutating func elongate(_ v: Vector) {
-		let vx = Vector(x: elongationFactor(v.x), y: elongationFactor(v.y),  z: elongationFactor(v.z))
+		let vx = Vector(elongationFactor(v.x), elongationFactor(v.y),  elongationFactor(v.z))
 		for i in 0..<8 {
 			corners[i] = corners[i] * vx
 		}
@@ -122,7 +122,7 @@ func convertCToSwift(boxoid: inout Boxoid) -> BoxoidCod {
             let x = baseAddress[i*3]
             let y = baseAddress[i*3+1]
             let z = baseAddress[i*3+2]
-            corners.append(Vector(x: Double(x), y: Double(y), z: Double(z)))
+            corners.append(Vector(Double(x), Double(y), Double(z)))
         }
     }
 
@@ -168,14 +168,14 @@ func fromC(_ composite: inout Composite) -> CompositeCod {
         boxoids.append(convertCToSwift(boxoid: &composite.b[i]))
     }
     var orientation = Quaternion(w: 0, x: 0, y: 0, z: 0)
-    var position = Vector(x: 0, y: 0, z: 0)
+    var position = Vector(0, 0, 0)
     withUnsafePointer(to: &composite.orientation) { ptr in
         let baseAddress = ptr.withMemoryRebound(to: Float.self, capacity: 4) { $0 }
         orientation = Quaternion(w: Double(baseAddress[0]), x: Double(baseAddress[1]), y: Double(baseAddress[2]), z: Double(baseAddress[3]))
     }
     withUnsafePointer(to: &composite.position) { ptr in
         let baseAddress = ptr.withMemoryRebound(to: Float.self, capacity: 3) { $0 }
-        position = Vector(x: Double(baseAddress[0]), y: Double(baseAddress[1]), z: Double(baseAddress[2]))
+        position = Vector(Double(baseAddress[0]), Double(baseAddress[1]), Double(baseAddress[2]))
     }
     return CompositeCod(orientation: orientation, position: position, scale: composite.scale, b: boxoids)
 }
@@ -222,9 +222,9 @@ var controller: OpaquePointer? = nil
 var interfaceMode: InterfaceMode = .shipEditor
 var shouldExit = false
 var rcsIsEnabled = false
-let worldUpVector = Vector(x: 0, y: 1, z:0) // x is right, y is up, z is backward (right-handed coordinate system)
-var thrustVector = Vector(x: 0, y: 0, z: 0)
-var cameraSpherical = Spherical(1, 0, 0)
+let worldUpVector = Vector(0, 1,0) // x is right, y is up, z is backward (right-handed coordinate system)
+var thrustVector = Vector(0, 0, 0)
+var cameraSpherical = SphericalVector(1, 0, 0)
 
 
 let totalTime = 1e12
@@ -398,9 +398,9 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 		
 		if interfaceMode == .physicsSim {
 			if(rcsIsEnabled && interfaceMode == .physicsSim) {
-				actions = [Action(object: player1, force: thrustVector * 10000.0 / dt, torque: Vector(x: cameraSpherical.phi, y: 0, z: cameraSpherical.theta) * -1000.0)]
+				actions = [Action(object: player1, force: thrustVector * 10000.0 / dt, torque: Vector(cameraSpherical.phi, 0, cameraSpherical.theta) * -1000.0)]
 			} else {
-				actions = [Action(object: player1, force: thrustVector * 10000.0 / dt, torque: Vector(x: 0, y: 0, z: 0))]
+				actions = [Action(object: player1, force: thrustVector * 10000.0 / dt, torque: Vector(0, 0, 0))]
 			}
 			tick(actions: actions, movingObjects: &allTheThings, t: t, dt: dt)
 			t += dt
@@ -426,8 +426,8 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 		let relativeVelocity = cameraTarget.velocity - nearestCelestial.velocity
 		var prograde = relativeVelocity
 		if(relativeVelocity.lengthSquared == 0) {
-			camera.position = cameraTarget.position + Vector(x: 0, y: 0, z: -4.5 * cameraTarget.radius)
-			prograde = cameraTarget.orientation * Vector(x: 0, y: 0, z: 1)
+			camera.position = cameraTarget.position + Vector(0, 0, -4.5 * cameraTarget.radius)
+			prograde = cameraTarget.orientation * Vector(0, 0, 1)
 		} else {
 			prograde = relativeVelocity.normalized()
 			camera.position = cameraTarget.position + relativeVelocity.normalized() * -4.5 * cameraTarget.radius
@@ -481,7 +481,7 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 		}
 		for (index, object) in trajectory.enumerated() {
 			// center everything on the camera before converting to float to avoid float precision issues when rendering
-			let position = Vector(x: object.x - camera.position.x, y: object.y - camera.position.y, z: object.z - camera.position.z)
+			let position = Vector(object.x - camera.position.x, object.y - camera.position.y, object.z - camera.position.z)
 			sphereArray[index] = Sphere(position: (Float(position.x),
 										Float(position.y),
 										Float(position.z)),
