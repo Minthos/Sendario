@@ -486,7 +486,26 @@ struct BBox {
 		self.center = (top + bottom) * 0.5
 		self.halfsize = abs(top.x - bottom.x) * 0.5
 	}
-   
+	
+	init(_ points: [Vector]) {
+		var top = points[0]
+		var bottom = points[0]
+		for i in 1..<points.count {
+			top.x = max(points[i].x, top.x)
+			bottom.x = min(points[i].x, bottom.x)
+			top.y = max(points[i].y, top.y)
+			bottom.y = min(points[i].y, bottom.y)
+			top.z = max(points[i].z, top.z)
+			bottom.z = min(points[i].z, bottom.z)
+		}
+		self.center = (top + bottom) * 0.5
+		self.halfsize = max(abs(top.x - bottom.x), abs(top.y - bottom.y), abs(top.z - bottom.z)) * 0.5
+	}
+
+	func union(_ bbox: BBox) -> BBox {
+		return	BBox([bbox.top, bbox.bottom, self.top, self.bottom])
+	}
+
 	// returns a (1/4, 1/4, 1/4) size section of a bounding box.
 	// Which of the 64 possible subsections is indicated by the argument "index"
 	func selectQuadrant(_ index: UInt8) -> BBox {

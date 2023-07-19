@@ -110,6 +110,10 @@ struct BoxoidCod: Codable {
 			corners[i] = corners[i] * vx
 		}
 	}
+
+	var bbox: BBox {
+		return BBox(corners)
+	}
 }
 
 func convertCToSwift(boxoid: inout Boxoid) -> BoxoidCod {
@@ -160,6 +164,18 @@ struct CompositeCod: Codable {
 	var position: Vector
 	var scale: Float
 	var b: [BoxoidCod]
+	
+	var bbox: BBox {
+		if(b.count == 0) {
+			return BBox(center: self.position, halfsize: 0)
+		}
+		var bbox = b[0].bbox
+		for i in 1..<b.count {
+			bbox = bbox.union(b[i].bbox)
+		}
+		bbox.center += self.position
+		return bbox
+	}
 }
 
 func fromC(_ composite: inout Composite) -> CompositeCod {
@@ -388,6 +404,7 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 		}
 
 		// update game state
+		
 		if objrefs.count == 0 {
 			var ccod = composites[0]
 			ccod.position -= camera.position
@@ -395,7 +412,6 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 			objrefs.append(submitComposite(c))
 			print("new object ", objrefs[0])
 		}
-		
 		if interfaceMode == .physicsSim {
 			if(rcsIsEnabled && interfaceMode == .physicsSim) {
 				actions = [Action(object: player1, force: thrustVector * 10000.0 / dt, torque: Vector(cameraSpherical.phi, 0, cameraSpherical.theta) * -1000.0)]
@@ -409,10 +425,7 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 			if(thrustVector.length > 0.05) {
 				composites[0].b[curbox].elongate(thrustVector * 0.01)
 				updateComposite(objrefs[0], toC(composites[0]))
-				print("Elongate! ", thrustVector)
-
-				// TODO: grab bbox code from space-ai, make this awesome
-				player1.radius = composites[0].bbox.diagonal
+				player1.radius = player1.radius * 0.95 + 0.05 * composites[0].bbox.halfsize
 			}
 		}
 

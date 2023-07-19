@@ -104,10 +104,10 @@ class SphericalCow: Codable {
     var accumulatedTorque: Vector
     var prevForce: Vector
     var prevTorque: Vector
-    let mass: Double
-    let radius: Double
-    let momentOfInertia: Double // should be 3x3 matrix (inertia tensor)
-    let frictionCoefficient: Double
+    var mass: Double
+    var radius: Double
+    var momentOfInertia: Double // should be 3x3 matrix (inertia tensor)
+    var frictionCoefficient: Double
     var inertia: Double { return (2 / 5) * mass * pow(radius, 2) }
     var density: Double { return mass / (4 * Double.pi * pow(radius, 3) / 3) }
     var heat: Double = 0
