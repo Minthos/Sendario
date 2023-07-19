@@ -40,6 +40,13 @@ enum InterfaceMode {
 	case rts
 }
 
+enum DpadDirection {
+	case NONE	
+	case UP
+	case DOWN
+	case LEFT
+	case RIGHT
+}
 
 struct Action {
 	let object: SphericalCow
@@ -114,6 +121,19 @@ struct BoxoidCod: Codable {
 	var bbox: BBox {
 		return BBox(corners)
 	}
+
+	static func unit() -> BoxoidCod {
+		return BoxoidCod(corners:[Vector((-1.0,  1.0, 1.0)),
+							Vector((-1.0, -1.0, 1.0)),
+							Vector((1.0, -1.0, 1.0)),
+							Vector((1.0,  1.0, 1.0)),
+							Vector((-1.0,  1.0, -1.0)),
+							Vector((-1.0, -1.0, -1.0)),
+							Vector((1.0, -1.0, -1.0)),
+							Vector((1.0,  1.0, -1.0))],
+				  curvature:[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+				  material_idx: 4, missing_faces: 0)
+	}
 }
 
 func convertCToSwift(boxoid: inout Boxoid) -> BoxoidCod {
@@ -176,6 +196,10 @@ struct CompositeCod: Codable {
 		bbox.center += self.position
 		return bbox
 	}
+
+	static func unit() -> CompositeCod {
+		return CompositeCod(orientation: player1.orientation, position: player1.position, scale: 1.0, b:[BoxoidCod.unit()])
+	}
 }
 
 func fromC(_ composite: inout Composite) -> CompositeCod {
@@ -230,12 +254,17 @@ var allTheThings = [sun, mercury, venus, earth, moon, player1]
 var composites: [CompositeCod] = []
 var objrefs: [Objref] = []
 var actions: [Action] = []
-var buttonPresses: Int32 = 0
-var curbox: Int = 0 // current boxoid
-
-var controller: OpaquePointer? = nil
 //var interfaceMode: InterfaceMode = .physicsSim
 var interfaceMode: InterfaceMode = .shipEditor
+var buttonPresses: Int32 = 0
+var curcom: Int = 0 // current composite
+var curbox: Int = 0 // current boxoid
+var faceIndex: Int = 0
+var pickedPart: CompositeCod = CompositeCod.unit()
+var partsPickerIsOpen = false
+var sens: Double = 1 // input sensitivity
+var dpad: DpadDirection = .NONE
+var controller: OpaquePointer? = nil
 var shouldExit = false
 var rcsIsEnabled = false
 let worldUpVector = Vector(0, 1,0) // x is right, y is up, z is backward (right-handed coordinate system)
@@ -281,17 +310,7 @@ func main() {
 	materialsArray[6].diffuse = (0.0, 0.0, 0.0)
 	materialsArray[6].emissive = (50.0, 0.0, 0.0)
 
-	composites.append(CompositeCod(orientation: player1.orientation, position: player1.position, scale: 1.0, b:[
-		BoxoidCod(corners:[Vector((-1.0,  1.0, 1.0)),
-							Vector((-1.0, -1.0, 1.0)),
-							Vector((1.0, -1.0, 1.0)),
-							Vector((1.0,  1.0, 1.0)),
-							Vector((-1.0,  1.0, -1.0)),
-							Vector((-1.0, -1.0, -1.0)),
-							Vector((1.0, -1.0, -1.0)),
-							Vector((1.0,  1.0, -1.0))],
-				  curvature:[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-				  material_idx: 4, missing_faces: 0)]))
+	composites.append(CompositeCod.unit())
 	
 
 	startRenderer()
@@ -325,7 +344,40 @@ func main() {
 									buttonPresses -= 1;
 								}
 							} else if interfaceMode == .shipEditor {
-								// put stuff here
+ 								print("\(String(cString: getStringForButton(event.cbutton.button)!)) pressed")
+								if		event.cbutton.button == SDL_CONTROLLER_BUTTON_Y.rawValue {
+									sens *= sqrt(10.0)
+								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_X.rawValue {
+									sens *= 1.0 / sqrt(10.0)
+								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_B.rawValue {
+									if(partsPickerIsOpen) {
+										pickedPart = CompositeCod.unit()
+									} else {
+										composites[curcom].b[curbox] = BoxoidCod.unit() // todo: undo
+									}
+								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_A.rawValue {
+									if(partsPickerIsOpen) {
+										composites[curcom].b.append(contentsOf: pickedPart.b)
+									} else {
+										composites[curcom].b.append(composites[curcom].b[curbox])
+									}
+								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_LEFTSHOULDER.rawValue {
+									faceIndex = (faceIndex + 1 % 6)// select next face/previous boxoid
+								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_RIGHTSHOULDER.rawValue {
+									// open/close parts picker
+								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_UP.rawValue {
+									dpad = .UP
+									// move boxoid
+								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_DOWN.rawValue {
+									dpad = .DOWN
+									// adjust curvature
+								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_LEFT.rawValue {
+									dpad = .LEFT
+									// elongate
+								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_RIGHT.rawValue {
+									dpad = .RIGHT
+									// select boxoid
+								}
 							}
 						case SDL_CONTROLLERBUTTONUP.rawValue:
 							if event.cbutton.button == SDL_CONTROLLER_BUTTON_START.rawValue {
@@ -423,9 +475,9 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 		} else if interfaceMode == .shipEditor {
 			// Elongaaaate
 			if(thrustVector.length > 0.05) {
-				composites[0].b[curbox].elongate(thrustVector * 0.01)
-				updateComposite(objrefs[0], toC(composites[0]))
-				player1.radius = player1.radius * 0.95 + 0.05 * composites[0].bbox.halfsize
+				composites[curcom].b[curbox].elongate(thrustVector * 0.01)
+				updateComposite(objrefs[curcom], toC(composites[curcom]))
+				player1.radius = player1.radius * 0.95 + 0.05 * composites[curcom].bbox.halfsize
 			}
 		}
 
@@ -501,8 +553,8 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 										radius: Float(player1.radius * pow(position.length * 0.01, 0.9)),
 										material_idx: 6)
 		}
-		composites[0].orientation = player1.orientation
-		composites[0].position = player1.position
+		composites[curcom].orientation = player1.orientation
+		composites[curcom].position = player1.position
 		let compositeArray = UnsafeMutablePointer<Objref>.allocate(capacity: objrefs.count)
 		for (index, object) in objrefs.enumerated() {
 			let position = composites[object.id].position - camera.position

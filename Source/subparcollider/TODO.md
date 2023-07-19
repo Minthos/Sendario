@@ -6,6 +6,9 @@
  - reading the data from json into swift
 
 * visual 3d grid to see the scale of our spaceship while designing it
+ - I'll make this a composite
+ - gonna need textures or a new shader
+ - 3 planes that cross at origo? each plane has thin lines that grow thicker the further from origo they are? draw coordinates near round numbers
 * renderer that renders objects with orientation
 * position camera based on ship's orientation instead of ship's velocity
 * rotate the ship's self-thrust vector by the ship's orientation
