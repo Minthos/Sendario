@@ -13,7 +13,6 @@ Licence to be determined (open source).
 ![screenshot](/Subparcollider_000.jpg?raw=true "not much to show off yet")
 
 
----
 ### the *ahem* "physics" "engine"
 The so-called physics engine is a lo-fi approximation inspired by real world physics. Most of the features are missing
 and will likely stay missing.

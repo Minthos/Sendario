@@ -269,12 +269,14 @@ struct Quaternion: Codable {
 	}
 }
 
-postfix func --(value: inout Int) {
-	value -= 1
+postfix func --(value: inout Int) ->Int {
+	defer { value -= 1 }
+	return value
 }
 
-postfix func ++(value: inout Int) {
-	value += 1
+postfix func ++(value: inout Int) -> Int {
+	defer { value += 1 }
+	return value
 }
 
 prefix func - (vector: Vector) -> Vector {
