@@ -1,7 +1,3 @@
-// Subpar Collider.
-// It's a ahem "physics" "engine"
-// It calculates collisions and stuff.
-
 import Foundation
 import Glibc
 
@@ -253,6 +249,8 @@ struct Spaceship: Codable {
 	var c: CompositeCod
 }
 
+
+
 var lights = [sun]
 var allTheThings = [sun, mercury, venus, earth, moon, player1]
 // composite[0] is the player's ship
@@ -260,44 +258,51 @@ var allTheThings = [sun, mercury, venus, earth, moon, player1]
 // composite[2] is the design being worked on
 // composite[3] is gui overlay (object space = clip space)
 
-// TODO: JSON SAVING AND LOADING IS REQUIRED FOR THESE FEATURES, GET IT DONE COMMANDER
-let gameStatePath = "composites.json"
-var gameStateJSONstr: String? = nil
-if FileManager.default.fileExists(atPath: gameStatePath) {
-    gameStateJSONstr = try! String(contentsOfFile: gameStatePath, encoding: String.Encoding.utf8)
-} else {
-    gameStateJSONstr = "[]"
-    print("could not find composites.json, starting with nothing")
-}
-var composites: [CompositeCod] = try!JSONDecoder().decode([CompositeCod].self, from:gameStateJSONstr!.data(using: .utf8)!)
+struct GameState: Codable {
+	static let gameStatePath = "composites.json"
+	var composites: [CompositeCod] = []
+	var interfaceModeIndex: Int = 0
+	var sens: Double = 0.1 // input sensitivity
 
-func saveGameState(_ path: String = gameStatePath) {
-	do {
-		let jsonData = try JSONEncoder().encode(composites)
-		if let jsonString = String(data: jsonData, encoding: .utf8) {
-			try jsonString.write(toFile: gameStatePath, atomically: true, encoding: .utf8)
-			print("Saved composites.json successfully. \(composites.count) objects.")
+	static func load(_ path: String = gameStatePath) -> GameState {
+		var gameStateJSONstr: String? = nil
+		if FileManager.default.fileExists(atPath: path) {
+			gameStateJSONstr = try! String(contentsOfFile: path, encoding: String.Encoding.utf8)
+			return try!JSONDecoder().decode(self, from:gameStateJSONstr!.data(using: .utf8)!)
 		} else {
-			print("Failed to convert JSON data to string.")
+			print("could not find \(path), starting with nothing")
+			return GameState()
 		}
-	} catch {
-		print("Failed to save composites.json: \(error)")
+	}
+
+	func save(_ path: String = gameStatePath) {
+		do {
+			//let jsonData = try JSONEncoder().encode(composites)
+			let jsonData = try JSONEncoder().encode(self)
+			if let jsonString = String(data: jsonData, encoding: .utf8) {
+				try jsonString.write(toFile: path, atomically: true, encoding: .utf8)
+				print("Saved \(path) successfully. \(composites.count) objects.")
+			} else {
+				print("Failed to convert JSON data to string.")
+			}
+		} catch {
+			print("Failed to save to \(path): \(error)")
+		}
 	}
 }
 
-//var composites: [CompositeCod] = []
+var s: GameState = GameState();
+
 var objrefs: [Objref] = []
 var actions: [Action] = []
 //var interfaceMode: InterfaceMode = .physicsSim
 var interfaceMode: InterfaceMode = .workshop
-var interfaceModeIndex: Int = 0
 var buttonPresses: Int32 = 0
 var curcom: Int = 0 // current composite
 var curbox: Int = 0 // current boxoid
 var faceIndex: Int = 0
 var pickedPart: CompositeCod = CompositeCod.unit()
 var partsPickerIsOpen = false
-var sens: Double = 1 // input sensitivity
 var dpad: DpadDirection = .NONE
 var controller: OpaquePointer? = nil
 var shouldExit = false
@@ -305,7 +310,6 @@ var rcsIsEnabled = false
 let worldUpVector = Vector(0, 1, 0) // x is right, y is up, z is backward (right-handed coordinate system)
 var thrustVector = Vector(0, 0, 0)
 var cameraSpherical = SphericalVector(1, 0, 0)
-
 
 let totalTime = 1e12
 var dt = 0.0001
@@ -345,13 +349,17 @@ func main() {
 	materialsArray[6].diffuse = (0.0, 0.0, 0.0)
 	materialsArray[6].emissive = (50.0, 0.0, 0.0)
 
-	if composites.count == 0 {
-		composites.append(CompositeCod.unit())
+	//s.load()
+	s = GameState.load()
+	if s.composites.count == 0 {
+		s.composites.append(CompositeCod.unit())
 	}
+	let availableModes: [InterfaceMode] = [.workshop, .physicsSim]
+	interfaceMode = availableModes[s.interfaceModeIndex % availableModes.count]
 	
 
 	startRenderer()
-	SDL_Init(SDL_INIT_GAMECONTROLLER | SDL_INIT_VIDEO)
+	SDL_Init(SDL_INIT_GAMECONTROLLER)
    
 
 	// main game loop. handle input, do a physics tick, send results to renderer
@@ -383,23 +391,23 @@ func main() {
 							} else if interfaceMode == .workshop {
  								print("\(String(cString: getStringForButton(event.cbutton.button)!)) pressed")
 								if		event.cbutton.button == SDL_CONTROLLER_BUTTON_Y.rawValue {
-									sens *= sqrt(10.0)
+									s.sens *= sqrt(10.0)
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_X.rawValue {
-									sens *= 1.0 / sqrt(10.0)
+									s.sens *= 1.0 / sqrt(10.0)
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_B.rawValue {
 									if(partsPickerIsOpen) {
 										pickedPart = CompositeCod.unit()
 									} else {
-										composites[curcom].b[curbox] = BoxoidCod.unit() // todo: undo
+										s.composites[curcom].b[curbox] = BoxoidCod.unit() // todo: undo
 									}
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_A.rawValue {
 									if(partsPickerIsOpen) {
-										composites[curcom].b.append(contentsOf: pickedPart.b)
+										s.composites[curcom].b.append(contentsOf: pickedPart.b)
 									} else {
-										composites[curcom].b.append(composites[curcom].b[curbox])
+										s.composites[curcom].b.append(s.composites[curcom].b[curbox])
 									}
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_LEFTSHOULDER.rawValue {
-									faceIndex = (faceIndex + 1 % 6)// select next face/previous boxoid
+									faceIndex = ((faceIndex + 1) % 6)// select next face/previous boxoid
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_RIGHTSHOULDER.rawValue {
 									// open/close parts picker
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_UP.rawValue {
@@ -421,7 +429,6 @@ func main() {
 								shouldExit = true
 							} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_BACK.rawValue {
 								// cycle through game modes
-								let availableModes: [InterfaceMode] = [.workshop, .physicsSim]
 /* not everything has been implemented yet
 enum InterfaceMode {
 	case mainMenu
@@ -432,22 +439,22 @@ enum InterfaceMode {
 	case mining
 	case rts
 }*/
-								interfaceMode = availableModes[interfaceModeIndex++ % availableModes.count]
+								interfaceMode = availableModes[++s.interfaceModeIndex % availableModes.count]
 								rcsIsEnabled = !rcsIsEnabled
 							}
 						case SDL_CONTROLLERAXISMOTION.rawValue:
 							if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_LEFTX.rawValue) {
-								thrustVector.x = sens * Double(event.caxis.value) / TMAX
+								thrustVector.x = s.sens * Double(event.caxis.value) / TMAX
 							} else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_LEFTY.rawValue) {
-								thrustVector.y = sens * Double(event.caxis.value) / TMAX
+								thrustVector.y = s.sens * Double(event.caxis.value) / TMAX
 							} else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_TRIGGERLEFT.rawValue) {
-								thrustVector.z = sens * -Double(event.caxis.value) / TMAX
+								thrustVector.z = s.sens * -Double(event.caxis.value) / TMAX
 							} else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_TRIGGERRIGHT.rawValue) {
-								thrustVector.z = sens * Double(event.caxis.value) / TMAX
+								thrustVector.z = s.sens * Double(event.caxis.value) / TMAX
 							} else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_RIGHTX.rawValue) {
-								cameraSpherical.theta = sens * -Double(event.caxis.value) / TMAX
+								cameraSpherical.theta = s.sens * -Double(event.caxis.value) / TMAX
 							} else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_RIGHTY.rawValue) {
-								cameraSpherical.phi = sens * Double(event.caxis.value) / TMAX
+								cameraSpherical.phi = s.sens * Double(event.caxis.value) / TMAX
 							}
 						// FIXME use glfw
 /*
@@ -493,7 +500,7 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 							}
 						case SDL_MOUSEMOTION.rawValue:
 							let mouseX = Double(event.motion.x)
-							thrustVector.x = sens * mouseX / 1920.0 // adjust for your window width
+							thrustVector.x = s.sens * mouseX / 1920.0 // adjust for your window width
 						default:
 							break
 						}
@@ -508,7 +515,7 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 		// update game state
 		
 		if objrefs.count == 0 {
-			for (i, composite) in composites.enumerated() {
+			for (i, composite) in s.composites.enumerated() {
 				var ccod = composite
 				ccod.position -= camera.position
 				let c = toC(ccod)
@@ -524,14 +531,14 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 			}
 			tick(actions: actions, movingObjects: &allTheThings, t: t, dt: dt)
 			t += dt
-			composites[curcom].orientation = player1.orientation
-			composites[curcom].position = player1.position
+			s.composites[curcom].orientation = player1.orientation
+			s.composites[curcom].position = player1.position
 		} else if interfaceMode == .workshop {
 			// Elongaaaate
 			if(thrustVector.length > 0.05) {
-				composites[curcom].b[curbox].elongate(thrustVector * 0.01)
-				updateComposite(objrefs[curcom], toC(composites[curcom]))
-				player1.radius = player1.radius * 0.95 + 0.05 * composites[curcom].bbox.halfsize
+				s.composites[curcom].b[curbox].elongate(thrustVector * 0.01)
+				updateComposite(objrefs[curcom], toC(s.composites[curcom]))
+				player1.radius = player1.radius * 0.95 + 0.05 * s.composites[curcom].bbox.halfsize
 			}
 		}
 
@@ -613,11 +620,11 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 		}
 		let compositeArray = UnsafeMutablePointer<Objref>.allocate(capacity: objrefs.count)
 		for (index, object) in objrefs.enumerated() {
-			var position = composites[object.id].position - camera.position
+			var position = s.composites[object.id].position - camera.position
 			compositeArray[index] = Objref(orientation: object.orientation, position: position.float, id: object.id, type: object.type)
 		}
 
-		//print("sending \(objrefs.count) composites to rendering \(compositeArray[0]) ", player1.position, player1.radius)
+		//print("sending \(objrefs.count) s.composites to rendering \(compositeArray[0]) ", player1.position, player1.radius)
 		//print("camera position: \(camera.position)")
 		render(compositeArray, objrefs.count, sphereArray, allTheThings.count + trajectory.count, renderMisc)
 
@@ -625,7 +632,7 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 	}
 	// end main game loop
 
-	saveGameState()
+	s.save()
 
 	SDL_Quit()
 	stopRenderer()
