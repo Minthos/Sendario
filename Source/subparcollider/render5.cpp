@@ -255,7 +255,8 @@ out vec4 fragColor;
 
 void main()
 {
-	vec3 accumulatedLight = vec3(0.0, 0.0, 0.0);
+	//vec3 accumulatedLight = vec3(0.0, 0.0, 0.0);
+	vec3 accumulatedLight = fragLight;
 	vec4 invNormals = (vec4(1.0f) - vec4(fragNormal, 0.0));
 	for (int i = 0; i < MAX_LIGHTS; ++i) {
 		vec3 lightVector = lightPositions[i] - fragPos;
@@ -263,8 +264,8 @@ void main()
 		vec3 lightDirection = lightVector / sqrt(squaredDistance);
 		float attenuation = 1.0 / squaredDistance;
 		float lambertian = max(dot(fragNormal, lightDirection), 0.0);
-		//accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
-		accumulatedLight += attenuation * invNormals.xyz * lightColors[i] * lambertian;
+		accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
+		//accumulatedLight += attenuation * invNormals.xyz * lightColors[i] * lambertian;
 	}
 	vec3 radiance = materialEmissive * 0.079577 + accumulatedLight;
 	float darkness = 3.0 / (3.0 + exposure + radiance.r + radiance.g + radiance.b);
@@ -832,7 +833,7 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 neeext:
 		;
 	}
-	printf("1 mesh subdivided. %d verts, %d tris, %d edges, %d indices\n", numVerts, numTris, numEdges, numIndices);
+	//printf("1 mesh subdivided. %d verts, %d tris, %d edges, %d indices\n", numVerts, numTris, numEdges, numIndices);
 	return Mesh(original->centre, original->faceNormals, original->faceCentres, verts, numVerts, tris, numTris, edges, numEdges, indices, numIndices);
 }
 
@@ -913,7 +914,7 @@ neeext:
 		}
 	}
 	free(edges);
-	printf("1 mesh generated. 8 verts, %d tris, %d edges, %d indices\n", t, r, indexIndex);
+	//printf("1 mesh generated. 8 verts, %d tris, %d edges, %d indices\n", t, r, indexIndex);
 	return Mesh(centre, faceNormals, faceCentres, verts, 8, tris, t, realEdges, r, indices, indexIndex);
 }
 
@@ -1031,7 +1032,7 @@ void uploadMeshes(const Mesh* meshes, int numMeshes, BufferObject* bo)
 	glEnableVertexAttribArray(4);
 	bo->num_indices = totalNumIndices;
 
-	printf("uploaded %d indices to vertex buffer\n", totalNumIndices);
+	//printf("uploaded %d indices to vertex buffer\n", totalNumIndices);
 }
 
 void renderMeshes(BufferObject* bo)
@@ -1355,6 +1356,7 @@ extern "C" void updateComposite(Objref oref, Composite c) {
 	CompositeRenderObject cro = sd->cro[oref.id];
 	cro.c = c;
 	cro.tessellate();
+	printf("composite updated %f %f\n", c.b[0].curvature[0], c.b[0].curvature[1]);
 	
 	// swap out some pointers
 	pthread_mutex_lock(&sharedData.mutex);	

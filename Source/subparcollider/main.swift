@@ -111,6 +111,13 @@ struct BoxoidCod: Codable {
 		}
 	}
 
+	mutating func bulgerize(_ v: Vector) {
+		for i in 0..<6 {
+			curvature[i*2] = curvature[i*2] + Float(v.x)
+			curvature[i*2 + 1] = curvature[i*2+1] + Float(v.y)
+		}
+	}
+
 	mutating func elongate(_ v: Vector) {
 		let vx = Vector(elongationFactor(v.x), elongationFactor(v.y),  elongationFactor(v.z))
 		for i in 0..<8 {
@@ -249,10 +256,13 @@ struct Spaceship: Codable {
 	var c: CompositeCod
 }
 
-
-
 var lights = [sun]
+var celestials = [sun, mercury, venus, earth, moon]
 var allTheThings = [sun, mercury, venus, earth, moon, player1]
+//var stations = []
+var ships = [player1]
+//var asteroids = []
+
 // composite[0] is the player's ship
 // composite[1] is the workshop (object space = world space)
 // composite[2] is the design being worked on
@@ -297,7 +307,7 @@ var objrefs: [Objref] = []
 var actions: [Action] = []
 //var interfaceMode: InterfaceMode = .physicsSim
 var interfaceMode: InterfaceMode = .workshop
-var buttonPresses: Int32 = 0
+var buttonPresses: Int32 = 2
 var curcom: Int = 0 // current composite
 var curbox: Int = 0 // current boxoid
 var faceIndex: Int = 0
@@ -412,16 +422,12 @@ func main() {
 									// open/close parts picker
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_UP.rawValue {
 									dpad = .UP
-									// move boxoid
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_DOWN.rawValue {
 									dpad = .DOWN
-									// adjust curvature
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_LEFT.rawValue {
 									dpad = .LEFT
-									// elongate
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_RIGHT.rawValue {
 									dpad = .RIGHT
-									// select boxoid
 								}
 							}
 						case SDL_CONTROLLERBUTTONUP.rawValue:
@@ -429,18 +435,8 @@ func main() {
 								shouldExit = true
 							} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_BACK.rawValue {
 								// cycle through game modes
-/* not everything has been implemented yet
-enum InterfaceMode {
-	case mainMenu
-	case physicsSim
-	case workshop
-	case combat
-	case travel
-	case mining
-	case rts
-}*/
 								interfaceMode = availableModes[++s.interfaceModeIndex % availableModes.count]
-								rcsIsEnabled = !rcsIsEnabled
+								//rcsIsEnabled = !rcsIsEnabled
 							}
 						case SDL_CONTROLLERAXISMOTION.rawValue:
 							if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_LEFTX.rawValue) {
@@ -534,11 +530,23 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 			s.composites[curcom].orientation = player1.orientation
 			s.composites[curcom].position = player1.position
 		} else if interfaceMode == .workshop {
-			// Elongaaaate
-			if(thrustVector.length > 0.05) {
-				s.composites[curcom].b[curbox].elongate(thrustVector * 0.01)
-				updateComposite(objrefs[curcom], toC(s.composites[curcom]))
-				player1.radius = player1.radius * 0.95 + 0.05 * s.composites[curcom].bbox.halfsize
+			switch(dpad) {
+				case .RIGHT:
+					// Elongaaaate
+					if(thrustVector.length > 0.05) {
+						s.composites[curcom].b[curbox].elongate(thrustVector * thrustVector * 0.01)
+						updateComposite(objrefs[curcom], toC(s.composites[curcom]))
+						player1.radius = player1.radius * 0.95 + 0.05 * s.composites[curcom].bbox.halfsize
+					}
+				case .LEFT:
+					// wtf
+					if(thrustVector.length > 0.05) {
+						s.composites[curcom].b[curbox].bulgerize(thrustVector * thrustVector * 0.01)
+						updateComposite(objrefs[curcom], toC(s.composites[curcom]))
+						player1.radius = player1.radius * 0.95 + 0.05 * s.composites[curcom].bbox.halfsize
+					}
+				default:
+					break;
 			}
 		}
 
@@ -547,7 +555,7 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 		var renderMisc = render_misc()
 		renderMisc.buttonPresses = abs(buttonPresses);
 		renderMisc.materials = materialsArray
-		if interfaceMode == .physicsSim {
+		//if interfaceMode == .physicsSim {
 			let cameraTarget = player1
 			let nearestCelestial = moon
 			let relativeVelocity = cameraTarget.velocity - nearestCelestial.velocity
@@ -562,18 +570,18 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 			var camFwd = (cameraTarget.position - camera.position).normalized()
 			var upVec = (cameraTarget.position - nearestCelestial.position).normalized()
 			let pitchAxis = camFwd.cross(upVec).normalized()
-			let pitchQuat = Quaternion(axis: pitchAxis, angle: 2.0 * cameraSpherical.phi * (rcsIsEnabled ? 0.0 : 1.0))
-			let yawQuat = Quaternion(axis: upVec, angle: 2.0 * cameraSpherical.theta * (rcsIsEnabled ? 0.0 : 1.0))
+			let pitchQuat = Quaternion(axis: pitchAxis, angle: 2.0 * cameraSpherical.phi * (rcsIsEnabled ? 0.5 : 1.0))
+			let yawQuat = Quaternion(axis: upVec, angle: 2.0 * cameraSpherical.theta * (rcsIsEnabled ? 0.5 : 1.0))
 			camFwd = yawQuat * pitchQuat * camFwd
 			//camFwd = yawQuat * pitchQuat * cameraTarget.orientation * camFwd
 			//upVec = pitchQuat * cameraTarget.orientation * upVec
 			upVec = pitchQuat * upVec
 			renderMisc.camForward = (Float(camFwd.x), Float(camFwd.y), Float(camFwd.z))
 			renderMisc.camUp = (Float(upVec.x), Float(upVec.y), Float(upVec.z))
-		} else if interfaceMode == .workshop {
-			renderMisc.camUp = (0.1, 0.9899, -0.1)
-			renderMisc.camForward = (-0.4, -0.4, -0.82462)
-		}
+		//} else if interfaceMode == .workshop {
+		//	renderMisc.camUp = (0.1, 0.9899, -0.1)
+		//	renderMisc.camForward = (-0.4, -0.4, -0.82462)
+		//}
 		// camera is at 0,0,0 to make it easy for the renderer
 		renderMisc.camPosition = (0, 0, 0)
 		for (index, object) in lights.enumerated() {

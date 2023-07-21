@@ -78,6 +78,8 @@ y: repeat last action, redo
 ## Low priority:
 
 * render exhaust plumes
+* boxid support in the physics engine
+* more creative use of boxoids in the physics engine for things like explosions, magnetic fields, gas clouds, exhaust plumes
 * replace the skybox with "snow" that's aligned to the world coordinate space
 * some refactoring of the physics engine
 * implement tidal effects on celestial spin and orbit

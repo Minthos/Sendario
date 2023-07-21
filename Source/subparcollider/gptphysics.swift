@@ -96,6 +96,7 @@ class Celestial: Codable {
 class SphericalCow: Codable {
     let id: Int64
     var position: Vector
+	var w: Double
     var relativeTo: Celestial?
     var velocity: Vector
     var orientation: Quaternion
@@ -115,6 +116,7 @@ class SphericalCow: Codable {
     init(id: Int64, position: Vector, velocity: Vector, orientation: Quaternion, spin: Vector, mass: Double, radius: Double, frictionCoefficient: Double = 0.1) {
         self.id = id
         self.position = position
+		self.w = 1.0
         self.velocity = velocity
         self.orientation = orientation
         self.spin = spin
