@@ -3,11 +3,19 @@ when you travel to a system the server gives you the random seed for that system
 the server's universe and galaxy random seeds are secret
 if you play singleplayer you can see everything in the game but your universe will not be based on the same random seed as the server's
 
-maximum warp speed should be proportional to ship's delta-v investment in the journey
-and the ratio (gaslight drive power rating / log(shipmass))
+maximum warp speed should be proportional to ship's delta-v investment in the journey and the ratio
+(gaslight drive power rating / log(shipmass)) :
+```C
+if(gaslightDrive.isActive){
+	w = (drivePower / log(shipmass)) * max(spent_dv, remaining_dv, 0.25*max_dv);
+} else {
+	w = 1.0;
+}
+```
 warp speed for a medium-sized ship at example delta-v
 
 inner solar system: 1 AU/minute @ 10 km/s
+
 interstellar medium: 1 LY/minute @ 1000 km/s
 
 when you exit warp a visual shockwave goes out in a cone-shape in front of you

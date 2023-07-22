@@ -20,7 +20,7 @@ Gather materials (mineral/gas deposits, salvage, trade), upgrade ship/base with 
 * Mineral refinery
 * Gas refinery
 
-Your ship starts with a fusion reactor, rcs thrusters, and 2 utility drones. It's obviously not enough for a journey into space. You have to add a fuel tank and an engine at least. Fortunately you get to design your own starting ship and build it for free within reasonable limits. Good luck!
+Your ship starts with a fusion reactor, ftl drive, rcs thrusters, and 2 utility drones. It's obviously not enough for a journey into space. You have to add a fuel tank and a rocket engine at least. Fortunately you get to design your own starting ship and build it for free within reasonable limits. Good luck!
 
 example von neumann probe that cools the reactor and ftl drive with main thruster propellant:
 ```
@@ -53,11 +53,12 @@ Utility drones assemble parts made by the various factories into finished sectio
 
 ### Hardware factory enables:
 - Utility drones level 0
+- Motors, actuators, +++
 - Sensors
 - Conveyor belt
 
 ### Mineral refinery enables:
-- Coilgun
+- Coilgun (5 km/s)
 - Armour plate (put on anything to increase hit points)
 - Railroad track
 - Gas pipe
@@ -68,17 +69,17 @@ Utility drones assemble parts made by the various factories into finished sectio
 
 ### Gas refinery enables:
 - Dumbfire rockets
-- Chemical explosive warheads
+- Chemical explosives
 - Fuel
 - Propellant
 
 ### Hardware factory + gas refinery enables:
-- Life support
+- Life support (not used for anything since the game has no lifeforms)
 
 ### Hardware factory + both refineries enables:
 - Chip fab
 - Battery
-- Autocannon
+- Autocannon (3 km/s)
 - Chemical rocket engine (high thrust, very low isp, self-powered)
 
 ### Chip fab + gas refinery enables:
@@ -90,7 +91,10 @@ Utility drones assemble parts made by the various factories into finished sectio
 - Proximity mines
 
 ### Tech level 1 enables:
-- Everything can be upgraded to level 1 if their prerequisites are at level 1.
+- Everything can be upgraded to level 1 if their prerequisites and ingredients are at level 1.
+
+### Mineral refinery lv 1:
+- coilgun -> railgun (10 km/s)
 
 ### Hardware factory level 1 enables:
 - Defense drones (short range, fast and cheap)
@@ -104,13 +108,21 @@ Utility drones assemble parts made by the various factories into finished sectio
 - Lasers
 - Ion drive (low thrust high isp, electric)
 - Nuclear rocket engine (high thrust medium isp, self-powered)
+- Autocannon -> Advanced Autocannon (5 km/s)
 
 ### Chip fab level 1 + hardware factory level 1 enables:
 - Utility drone tech level 2
 
 ### Tech level 2 enables:
-- Everything can be upgraded to level 2 if their prerequisites are at level 2.
+- Everything can be upgraded to level 2 if their prerequisites and ingredients are at level 2.
 - Gaslight drive (electric, allows hyperspace travel)
+
+### Mineral refinery lv 2:
+- Railgun lv 2 (20 km/s)
+
+### Hardware factory level 2 + both refineries level 2 enables:
+- Advanced Autocannon -> Ultra Autocannon (8 km/s)
+- Chip fab lv 2
 
 ### Hardware factory level 2 + both refineries level 2 + any reactor level 2 enables:
 - Fusion reactor (high power high thermal efficiency)
@@ -121,10 +133,11 @@ Utility drones assemble parts made by the various factories into finished sectio
 - Utility drone tech level 3
 
 ### Tech level 3 enables:
-- Everything can be upgraded to level 3 if their prerequisites are at level 3.
+- Everything can be upgraded to level 3 if their prerequisites and ingredients are at level 3.
 
 ### Mineral refinery level 3 enables:
 - Space elevator
+- railgun -> plasma gun (30 km/s)
 
 ### Hardware factory level 3 + both refineries level 3 + chip fab level 3 + any reactor level 3 enables:
 - Antimatter beam
@@ -133,9 +146,27 @@ Utility drones assemble parts made by the various factories into finished sectio
 
 ---
 
-I guess utility drone tech level 2 with gaslight drive is where the game opens up and tech progress should slow down to a crawl. Fusion is the major milestone after that, until then it's only upgrading stuff and building/fighting. The end of the tech tree is antimatter. I guess I don't really want players to reach it in the persistent world, though if antimatter is obscenely expensive it may not be completely game-breaking to have it exist. Will have to tweak the game balance.
+The game should be fun. Let's give the starting ship access to a single small fusion rocket engine but no weaponry beyond level 0.
+This will give them freedom to travel far but if they want to cause damage they have to play the game.
 
-Before that it would be cool to have a singleplayer/coop mechwarrior-like campaign almost, fight some battles over control of a moon, either tech up and run away or tech up and win. It could devolve into a total annihilaton-inspired experience where the "commander" (your spaceship) arrives on a celestial body and has to bootstrap a base and fight a war with not much story behind it. Should get AI to come up with some story ideas.
+Pacing
+The first tech level should be revealed through a story-driven campaign or should be relatively quick up to combat drones.
+10 minutes build time for each of the first buildings + 20 minutes of resource gathering?
+Nuclear tech level should be reachable within ~1 day, so that means about 12 hour upgrade time on each of the refineries.
+Maybe a week to get to lv.2 and another week to build a gaslight drive?
+
+so
+lv 0: 1 minute drone, 5 minutes ship part or hw factory, 10 minutes refinery, 30 minutes chip fab
+lv 1: 1 hour drone, 6 hours ship part or hw factory, 12 hrs refinery, 2 days chip fab
+lv 2: 3 days drone, 1 week ship part or hw factory, 2 weeks refinery, 1 month chip fab
+lv 3: 1 month drone, 2 months ship part, 6 months refinery, 2 years chip fab
+
+If material input costs and difficulty of producing/sourcing ingredients scale somewhat in line with construction costs
+but power level differences are less extreme we should see most of pvp action happen using cheaper parts (lv 0 to 2).
+
+
+---
+It would be cool to have a singleplayer/coop mechwarrior-like campaign almost, fight some battles over control of a moon or asteroid, either run away or tech up and win. In fast game modes it could be a total annihilaton-inspired experience where the "commander" (your spaceship) arrives on a celestial body and has to bootstrap a base and fight a war with not much story behind it. Should get AI to come up with some story ideas.
 
 Your ship can be a mobile base, big and heavy and fielding its own army of drones - or it can be fast and nimble and geared for combat and exporation while the army projects power from a fixed base somewhere.
 
@@ -147,10 +178,14 @@ In a fast-research game with starting locations on different planets the game ge
 
 In games with players starting on the same planet or moon it may be good to have few resources in the starting area so they are incentivized to fight over the best deposits.
 
-This tech tree is farly simplistic and linear. It will be interesting to see what kind of meta evolves regarding ship designs and strategies when everyone has basically the same tech tree progression.
+This tech tree is farly simplistic and linear. It will be interesting to see what kind of meta evolves regarding ship designs and strategies.
 
-In an MMO persistent world I would like to have upgrades that players can research on specific ship designs or specific sections to tweak the stats. A system where players can spend compute and R&D effort to get a random bonus after a random time. Applying multiple upgrades to the same item gives diminishing returns. Maybe use AI to generate a description of the upgrades based on the stats of the upgrade and the item/section's description and calculate overlap by having AI rate how much the descriptions sound like they should overlap. More similar = more stacking penalty.
 
+
+## 2nd feature
+In an MMO persistent world I would like to have upgrades that players can research on specific ship designs or specific sections to tweak the stats. A system where players can experience points, R&D effort and compute to get a random bonus after a random time. Applying multiple upgrades to the same item gives diminishing returns. Maybe use AI to generate a description of the upgrades based on the stats of the upgrade and the item/section's description and calculate overlap by having AI rate how much the descriptions sound like they should overlap. More similar = more stacking penalty.
+
+Track the origin of every boxoid and every composite. When an item is part of equipment used to earn xp, the user, the builder, and the inventor of that item (can be the same or different players) each get some xp. The xp is tied to the (item design, player) pair. Players can use this xp as input material in r&d projects for that item, with each project having a chance to discover an upgrade that can be applied to the item. This means that players who design, manufacture and use a few popular items get to enjoy more available upgrades for those items than players using experimental, exotic and bespoke designs. I think the user should get most of the xp, maybe 80%, with 10% going to the builder and 10% to the inventor. Disallow transfer/sharing of upgrade recipes between players, but allow trading of the finished item with the upgrade applied. Designs for boxoids and composites will be automatically shared with other players because they are used for rendering. May as well build a system around copying and modifying each others' designs.
 
 
 
