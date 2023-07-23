@@ -1,5 +1,19 @@
 ## Near term TODO:
 
+
+* Make much of the interface a website hosted with redis, flask and tornado.
+* Use redis to hold server state, json file to hold client configuration and backup of all the composites and random seeds.
+* Players who spawn into the game can browse galaxies and star systems to spawn in via a website. If they just start
+the client it will pick a random unvisited starting location within 50 LY of Earth.
+* Use The Sims as inspration for the ship designing experience
+
+
+// editing interface shuld have a visual axis aligned grid and a button to snap to grid that snaps whatever you're doing to the grid
+// x and y shrinks/enlarges the grid size
+
+// navigation interface should enlarge nearby celestials, ships and structures and show name tags near the most
+// prominent ones of each kind
+
 * spaceship with a shape other than a sphere
  - user interface for editing boxoids
  - actually it would be nice to set some boxoids to not be rendered in the composite..
