@@ -1,5 +1,9 @@
 ## Near term TODO:
 
+* rigid-body physics with multiple connected boxoids
+ - maybe actually prioritize this because it's more fun than the UI stuff, but first get our existing code to compile and run
+ - also, you know, a very basic but functioning editing interface so we can build multi-boxoid spaceships for testing
+
 
 * Make much of the interface a website hosted with redis, flask and tornado.
 * Use redis to hold server state, json file to hold client configuration and backup of all the composites and random seeds.
@@ -17,22 +21,21 @@ the client it will pick a random unvisited starting location within 50 LY of Ear
 * spaceship with a shape other than a sphere
  - user interface for editing boxoids
  - actually it would be nice to set some boxoids to not be rendered in the composite..
- - reading the data from json into swift
-
 * visual 3d grid (or maybe just a single planar surface) to see the scale of our spaceship while designing it
  - I'll make this a composite
  - would be good if I had textures for this or at least a new shader
  - can probably abuse the boxoid shader somewhat
  - 3 planes that cross at origo? each plane has thin lines that grow thicker the further from origo they are? draw coordinates near round numbers
-* renderer that renders objects with orientation
 * position camera based on ship's orientation instead of ship's velocity
 * rotate the ship's self-thrust vector by the ship's orientation
 
 ## Recently done:
 
+* renderer that renders objects with orientation
 * bounding boxes from hctree to compositecod
  - codable boxoids, composites, spheres
  - moving the data from swift to cpp
+ - reading the data from json into swift
  - rendering somewhat efficiently
  - boxoid rendering <-- whooo boy that took me down some rabbit holes..
  - cleaning up and improving the rendering code, more generality and less hardcoded stuff
@@ -109,4 +112,7 @@ should be feasible to have a hctree of each star system, another of each galaxy,
 
 of course all of this will be procedurally generated but we still have to cache it so we don't generate the same data over and over again
 
+## New shit
+
+Spatial tree around a star: arranged by spherical coordinates with the star as centre. This way we make it easier to conduct intersection tests between objects and the star. The only inconvenience this causes us is that we must compute some spherical-cartesian conversions per object per frame. And we get to do the fun part which is to make a spatial tree and use it for ray casting.
 

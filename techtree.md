@@ -21,7 +21,7 @@ Gather materials (mineral/gas deposits, salvage, trade), upgrade ship/base with 
 * Gas refinery
 * Vehicle Assembly Building
 
-Your ship starts with a fusion reactor, ftl drive, rcs thrusters, and 2 utility drones. It's obviously not enough for a journey into space. You have to add a fuel tank and a rocket engine at least. Fortunately you get to design your own starting ship and build it for free within reasonable limits. Good luck!
+Your ship starts with a fusion reactor, fusion thruster, ftl drive, rcs thrusters, and 2 utility drones. It's obviously not enough for a journey into space. You have to add a propellant tank at least. Fortunately you get to design your own starting ship and build it for free within reasonable limits. Good luck!
 
 example von neumann probe that cools the reactor and ftl drive with main thruster propellant:
 ```
@@ -35,7 +35,7 @@ example von neumann probe that cools the reactor and ftl drive with main thruste
 ## Tech tree
 
 Each item requires ingredients produced by the things that are required to enable it at the same level as the item to build.
-For example a level 0 chip fab requires level 0 refined minerals, level 0 hardware components and level 0 refined gases. Upgrading it to level 1 requires the level 1 versions of those ingredients.
+For example a level 0 chip fab requires level 0 refined minerals, level 0 hardware components and level 0 refined gases. Upgrading it to level 1 requires the level 1 versions of those ingredients. Chip fabs produce computer chips. Chips go into everything and surplus chips can be used to research upgrades by installing them in the section that will do the research.
 
 In addition to building the ingredients needed to craft something the same sections also produce the consumables used by the thing, if it uses consumables. Exceptions are the consumables listed in the tech tree.
 
@@ -51,20 +51,20 @@ becomes useful output. The rest becomes heat that the ship's cooling system has 
 - Hull 100 hp/t (mass * 0.7^lv)
 - Cargo hold 100 hp/t (mass * 0.7^lv)
 - Heat sink 20 hp/t (mass * 0.5^lv)
-- Hardware factory 50 hp/t builds 0.1 t/t per hour
-- Mineral refinery 50 hp/t refines 2 t/t per hr
-- Gas refinery 50 hp/t refined 2 t/t per hr
+- Hardware factory 50 hp/t builds 0.5 t/t per hour
+- Mineral refinery 50 hp/t refines 5 t/t per hr
+- Gas refinery 50 hp/t refines 5 t/t per hr
 - VAB 50 hp/t
 
 ### Hardware factory enables:
-- Utility drones level 0 20 hp/t refines 1 t/t per hr
+- Utility drone level 0 20 hp/t, refines 1 t/t per hr, carries 1t/t, mines 60t/t/hr
 - Motors, actuators, +++
 - Sensors 20 hp/t
 - Conveyor belt
 
 ### Mineral refinery enables:
 - Coilgun 50 hp/t (5 km/s) 50% efficiency. simple and cost-effective way to damage a target
-- Armour plate 200 hp/t (mass * 0.6^lv)
+- Armour plate 200 hp/t (hp * 1.7^lv)
 - Railroad track 100 hp/t
 - Gas pipe 100 hp/t
 
@@ -91,7 +91,7 @@ becomes useful output. The rest becomes heat that the ship's cooling system has 
 - Chemical rocket engine 5 hp/t (450:1 twr, 3.7 km/s ve, self-powered)
 
 ### Chip fab + gas refinery enables:
-- Stealth coating
+- Stealth coating (reduced albedo in all frequencies of the EM spectrum)
 
 ### Chip fab + hardware factory enables:
 - Utility drone tech level 1 30 hp/t
@@ -201,6 +201,13 @@ lv 3: 1 month drone, 2 months ship part, 6 months refinery, 2 years chip fab
 If material input costs and difficulty of producing/sourcing ingredients scale somewhat in line with construction costs
 but power level differences are less extreme we should see most of pvp action happen using cheaper parts (lv 0 to 2).
 
+---
+
+### Damage calculation
+High instantaneous energy (kinetic or thermal) outside a thing's operating range causes hp damage proportional to the amount of energy. (conversion rate TBD).
+Visualization of this can be turning the thing progressively more crumpled/glowing as damage/heat accumulates and maybe vent some gas or smoke.
+At 100% damage the thing stops working and any subsequent damage dislodges parts until at 200% damage the whole thing is completely missing.
+
 
 ---
 It would be cool to have a singleplayer/coop mechwarrior-like campaign almost, fight some battles over control of a moon or asteroid, either run away or tech up and win. In fast game modes it could be a total annihilaton-inspired experience where the "commander" (your spaceship) arrives on a celestial body and has to bootstrap a base and fight a war with not much story behind it. Should get AI to come up with some story ideas.
@@ -217,17 +224,18 @@ In games with players starting on the same planet or moon it may be good to have
 
 This tech tree is farly simplistic and linear. It will be interesting to see what kind of meta evolves regarding ship designs and strategies.
 
+Lilliput world with 1/10 radius for all celestials and same density and orbital period, so the orbits have to be much closer to account for the very low gravity?
 
 
 ## 2nd feature
-In an MMO persistent world I would like to have upgrades that players can research on specific ship designs or specific sections to tweak the stats. A system where players can experience points, R&D effort and compute to get a random bonus after a random time. Applying multiple upgrades to the same item gives diminishing returns. Maybe use AI to generate a description of the upgrades based on the stats of the upgrade and the item/section's description and calculate overlap by having AI rate how much the descriptions sound like they should overlap. More similar = more stacking penalty.
+In an MMO persistent world I would like to have upgrades that players can research on specific ship designs or specific sections to tweak the stats. A system where players canspend experience points, R&D effort and compute cycles to get a random bonus after a random time. Applying multiple upgrades to the same item gives diminishing returns. Maybe use AI to generate a description of the upgrades based on the stats of the upgrade and the item/section's description and calculate overlap by having AI rate how much the descriptions sound like they should overlap. More similar = more stacking penalty.
 Applying an upgrade to an item of a different tech level than the upgrade was researched for produces a -20%/abs(delta lv)
 reduction in bonuses and +20%/abs(delta lv) increase in maluses.
 
 Track the origin of every boxoid and every composite. When an item is part of equipment used to earn xp, the user, the builder, and the inventor of that item (can be the same or different players) each get some xp. The xp is tied to the (item design, player) pair. Players can use this xp as input material in r&d projects for that item, with each project having a chance to discover an upgrade that can be applied to the item. This means that players who design, manufacture and use a few popular items get to enjoy more available upgrades for those items than players using experimental, exotic and bespoke designs. I think the user should get most of the xp, maybe 80%, with 10% going to the builder and 10% to the inventor. Disallow transfer/sharing of upgrade recipes between players, but allow trading of the finished item with the upgrade applied. Designs for boxoids and composites will be automatically shared with other players because they are used for rendering. May as well build a system around copying and modifying each others' designs.
 
 Research projects:
-1. An intern experiments on it
+1. An intern tinkers with it
  - cost: 10 xp, 1 PFLOPS * h, $10.000 r&d money, 1 of the item
  - Tier: 50% failure, 45% lv0, 4% lv1, 1% lv2
 2. A team of engineers looks at the telemetry and addresses the most glaring issues
