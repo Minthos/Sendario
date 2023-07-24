@@ -83,7 +83,7 @@ var moon = Celestial(name: "Luna", SphericalCow(id: 4,
 						 spin: Vector(0, 0, 0),
 						 mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.8))
 var player1 = Entity(name: "Player 1", SphericalCow(id: 5,
-						 position: Vector(moon.moo.position.x, moon.moo.position.y, moon.moo.position.z + moon.moo.radius + 2.0),
+						 position: Vector(moon.moo.position.x, moon.moo.position.y, moon.moo.position.z + moon.moo.radius + 2.2),
 						 velocity: Vector(moon.moo.velocity.x, moon.moo.velocity.y + 0.1, moon.moo.velocity.z),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
 						 spin: moon.moo.spin,
@@ -113,7 +113,7 @@ struct GameState: Codable {
 	static let gameStatePath = "composites.json"
 	var composites: [CompositeCod] = []
 	var interfaceModeIndex: Int = 0
-	var sens: Double = 0.1 // input sensitivity
+	var sens: Double = 0.5 // input sensitivity
 
 	static func load(_ path: String = gameStatePath) -> GameState {
 		var gameStateJSONstr: String? = nil
@@ -204,6 +204,8 @@ func main() {
 	s = GameState.load()
 	if s.composites.count == 0 {
 		s.composites.append(CompositeCod.unit())
+		s.composites[0].position = player1.moo.position
+		s.composites[0].orientation = player1.moo.orientation
 	} else {
 		player1.moo.position = s.composites[0].position
 		player1.moo.orientation = s.composites[0].orientation
@@ -364,11 +366,12 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 			}
 		}
 		if interfaceMode == .physicsSim {
-			if(rcsIsEnabled && interfaceMode == .physicsSim) {
+			if(rcsIsEnabled) {
 				actions = [Action(object: player1.moo, force: thrustVector * 10000.0 / dt, torque: Vector(cameraSpherical.phi, 0, cameraSpherical.theta) * -1000.0)]
 			} else {
-				actions = [Action(object: player1.moo, force: thrustVector * 10000.0 / dt, torque: Vector(0, 0, 0))]
+				actions = []//[Action(object: player1.moo, force: thrustVector * 10000.0 / dt, torque: Vector(0, 0, 0))]
 			}
+			gravTick(center: sun.moo, celestials: &celestials, t: t, dt: dt)
 			tick(actions: actions, entities: &ships, celestials: &celestials, t: t, dt: dt)
 			t += dt
 			s.composites[curcom].orientation = player1.moo.orientation
