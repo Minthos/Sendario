@@ -52,213 +52,54 @@ struct Action {
 	let torque: Vector
 }
 
-var sun = SphericalCow(id: 0,
+var sun = Celestial(name: "Sol", SphericalCow(id: 0,
 						 position: Vector(0, 0, 0),
 						 velocity: Vector(0, 0, 0),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
 						 spin: Vector(0, 0, 0),
-						 mass: 1.989e30, radius: 696.34e6, frictionCoefficient: 0.8)
-var mercury = SphericalCow(id: 1,
+						 mass: 1.989e30, radius: 696.34e6, frictionCoefficient: 0.8))
+var mercury = Celestial(name: "Mercury", SphericalCow(id: 1,
 						 position: Vector(0, 0, -57.91e9),
 						 velocity: Vector(0, 0, 47.87e3),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
 						 spin: Vector(0, 0, 0),
-						 mass: 3.285e23, radius: 2.44e6, frictionCoefficient: 0.8)
-var venus = SphericalCow(id: 2,
+						 mass: 3.285e23, radius: 2.44e6, frictionCoefficient: 0.8))
+var venus = Celestial(name: "Venus", SphericalCow(id: 2,
 						 position: Vector(0, 0, 108.2e9),
 						 velocity: Vector(0, 0, 35.02e3),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
 						 spin: Vector(0, 0, 0),
-						 mass: 4.867e24, radius: 6.0518e6, frictionCoefficient: 0.8)
-var earth = SphericalCow(id: 3,
+						 mass: 4.867e24, radius: 6.0518e6, frictionCoefficient: 0.8))
+var earth = Celestial(name: "Earth", SphericalCow(id: 3,
 						 position: Vector(0, 0, -149.6e9),
 						 velocity: Vector(0, 29.78e3, 0),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
 						 spin: Vector(0, 0, 0),
-						 mass: 5.972e24, radius: 6.371e6, frictionCoefficient: 0.0001)
-var moon = SphericalCow(id: 4,
-						 position: Vector(earth.position.x - 384e6, earth.position.y, earth.position.z),
-						 velocity: Vector(earth.velocity.x, earth.velocity.y, earth.velocity.z + 1.022e3),
+						 mass: 5.972e24, radius: 6.371e6, frictionCoefficient: 0.8))
+var moon = Celestial(name: "Luna", SphericalCow(id: 4,
+						 position: Vector(earth.moo.position.x - 384e6, earth.moo.position.y, earth.moo.position.z),
+						 velocity: Vector(earth.moo.velocity.x, earth.moo.velocity.y, earth.moo.velocity.z + 1.022e3),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
 						 spin: Vector(0, 0, 0),
-						 mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.8)
-var player1 = SphericalCow(id: 5,
-						 position: Vector(moon.position.x, moon.position.y, moon.position.z + moon.radius + 200000.1),
-						 velocity: Vector(moon.velocity.x, moon.velocity.y + 1600.0, moon.velocity.z),
+						 mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.8))
+var player1 = Entity(name: "Player 1", SphericalCow(id: 5,
+						 position: Vector(moon.moo.position.x, moon.moo.position.y, moon.moo.position.z + moon.moo.radius + 2.0),
+						 velocity: Vector(moon.moo.velocity.x, moon.moo.velocity.y + 0.1, moon.moo.velocity.z),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
-						 spin: moon.spin,
-						 mass: 10e3, radius:1.0, frictionCoefficient: 0.5)
-var camera = SphericalCow(id: -1,
-						  position: Vector(earth.position.x, earth.position.y + earth.radius * 2.0, earth.position.z - earth.radius * 8.0),
-						  velocity: earth.velocity,
+						 spin: moon.moo.spin,
+						 mass: 10e3, radius:1.0, frictionCoefficient: 0.5))
+var camera = Celestial(name: "Camera", SphericalCow(id: -1,
+						  position: Vector(earth.moo.position.x, earth.moo.position.y + earth.moo.radius * 2.0, earth.moo.position.z - earth.moo.radius * 8.0),
+						  velocity: earth.moo.velocity,
 						  orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
 						  spin: Vector(0, 0, 0),
-						  mass: 0, radius: 0, frictionCoefficient: 0.0)
+						  mass: 0, radius: 0, frictionCoefficient: 0.0))
 
 // wanted: spatially hierarchic pseudorandom deterministic universe generator that refines mass distribution probabilities from a high level and downwards somewhat realistically in acceptable cpu/gpu time
 
-struct BoxoidCod: Codable {
-	var corners: [Vector]
-	var curvature: [Float]
-	var material_idx: Int = 0 // placeholder
-	var missing_faces: UInt = 0
-
-	func elongationFactor(_ x: Double) -> Double {
-		if(x > 0){
-			return 1.0 + x
-		} else {
-			return 1.0 / (1.0 - x)
-		}
-	}
-
-	mutating func bulgerize(_ v: Vector) {
-		for i in 0..<6 {
-			curvature[i*2] = curvature[i*2] + Float(v.x)
-			curvature[i*2 + 1] = curvature[i*2+1] + Float(v.y)
-		}
-	}
-
-	mutating func elongate(_ v: Vector) {
-		let vx = Vector(elongationFactor(v.x), elongationFactor(v.y),  elongationFactor(v.z))
-		for i in 0..<8 {
-			corners[i] = corners[i] * vx
-		}
-	}
-
-	var bbox: BBox {
-		return BBox(corners)
-	}
-
-	static func unit() -> BoxoidCod {
-		return BoxoidCod(corners:[Vector((-1.0,  1.0, 1.0)),
-							Vector((-1.0, -1.0, 1.0)),
-							Vector((1.0, -1.0, 1.0)),
-							Vector((1.0,  1.0, 1.0)),
-							Vector((-1.0,  1.0, -1.0)),
-							Vector((-1.0, -1.0, -1.0)),
-							Vector((1.0, -1.0, -1.0)),
-							Vector((1.0,  1.0, -1.0))],
-				  curvature:[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-				  material_idx: 4, missing_faces: 0)
-	}
-}
-
-func convertCToSwift(boxoid: inout Boxoid) -> BoxoidCod {
-    var corners: [Vector] = []
-    var curvature: [Float] = []
-
-    withUnsafePointer(to: &boxoid.corners) { ptr in
-        let baseAddress = ptr.withMemoryRebound(to: Float.self, capacity: 24) { $0 }
-        for i in 0..<8 {
-            let x = baseAddress[i*3]
-            let y = baseAddress[i*3+1]
-            let z = baseAddress[i*3+2]
-            corners.append(Vector(Double(x), Double(y), Double(z)))
-        }
-    }
-
-    withUnsafePointer(to: &boxoid.curvature) { ptr in
-        let baseAddress = ptr.withMemoryRebound(to: Float.self, capacity: 12) { $0 }
-        curvature = Array(UnsafeBufferPointer(start: baseAddress, count: 12))
-    }
-
-    return BoxoidCod(corners: corners, curvature: curvature, material_idx: Int(boxoid.material_idx), missing_faces: UInt(boxoid.missing_faces))
-}
-
-func convertSwiftToC(boxoidCod: BoxoidCod) -> Boxoid {
-    var boxoid = Boxoid()
-    withUnsafeMutablePointer(to: &boxoid.corners) { ptr in
-        let baseAddress = ptr.withMemoryRebound(to: Float.self, capacity: 24) { $0 }
-        for i in 0..<8 {
-            baseAddress[i*3] = Float(boxoidCod.corners[i].x)
-            baseAddress[i*3+1] = Float(boxoidCod.corners[i].y)
-            baseAddress[i*3+2] = Float(boxoidCod.corners[i].z)
-        }
-    }
-    withUnsafeMutablePointer(to: &boxoid.curvature) { ptr in
-        let baseAddress = ptr.withMemoryRebound(to: Float.self, capacity: 12) { $0 }
-        for i in 0..<12 {
-            baseAddress[i] = Float(boxoidCod.curvature[i])
-        }
-    }
-    boxoid.material_idx = Int32(boxoidCod.material_idx)
-    boxoid.missing_faces = UInt32(boxoidCod.missing_faces)
-    return boxoid
-}
-
-struct CompositeCod: Codable {
-	var orientation: Quaternion
-	var position: Vector
-	var scale: Float
-	var b: [BoxoidCod]
-	
-	var bbox: BBox {
-		if(b.count == 0) {
-			return BBox(center: self.position, halfsize: 0)
-		}
-		var bbox = b[0].bbox
-		for i in 1..<b.count {
-			bbox = bbox.union(b[i].bbox)
-		}
-		bbox.center += self.position
-		return bbox
-	}
-
-	static func unit() -> CompositeCod {
-		return CompositeCod(orientation: player1.orientation, position: player1.position, scale: 1.0, b:[BoxoidCod.unit()])
-	}
-}
-
-func fromC(_ composite: inout Composite) -> CompositeCod {
-    var boxoids: [BoxoidCod] = []
-    for i in 0..<composite.nb {
-        boxoids.append(convertCToSwift(boxoid: &composite.b[i]))
-    }
-    var orientation = Quaternion(w: 0, x: 0, y: 0, z: 0)
-    var position = Vector(0, 0, 0)
-    withUnsafePointer(to: &composite.orientation) { ptr in
-        let baseAddress = ptr.withMemoryRebound(to: Float.self, capacity: 4) { $0 }
-        orientation = Quaternion(w: Double(baseAddress[0]), x: Double(baseAddress[1]), y: Double(baseAddress[2]), z: Double(baseAddress[3]))
-    }
-    withUnsafePointer(to: &composite.position) { ptr in
-        let baseAddress = ptr.withMemoryRebound(to: Float.self, capacity: 3) { $0 }
-        position = Vector(Double(baseAddress[0]), Double(baseAddress[1]), Double(baseAddress[2]))
-    }
-    return CompositeCod(orientation: orientation, position: position, scale: composite.scale, b: boxoids)
-}
-
-func toC(_ compositeCod: CompositeCod) -> Composite {
-    var composite = Composite()
-    composite.b = UnsafeMutablePointer<Boxoid>.allocate(capacity: Int(compositeCod.b.count))
-    for i in 0..<compositeCod.b.count {
-        composite.b[Int(i)] = convertSwiftToC(boxoidCod: compositeCod.b[Int(i)])
-    }
-    withUnsafeMutablePointer(to: &composite.orientation) { ptr in
-        let baseAddress = ptr.withMemoryRebound(to: Float.self, capacity: 4) { $0 }
-        baseAddress[0] = Float(compositeCod.orientation.w)
-        baseAddress[1] = Float(compositeCod.orientation.x)
-        baseAddress[2] = Float(compositeCod.orientation.y)
-        baseAddress[3] = Float(compositeCod.orientation.z)
-    }
-    withUnsafeMutablePointer(to: &composite.position) { ptr in
-        let baseAddress = ptr.withMemoryRebound(to: Float.self, capacity: 3) { $0 }
-        baseAddress[0] = Float(compositeCod.position.x)
-        baseAddress[1] = Float(compositeCod.position.y)
-        baseAddress[2] = Float(compositeCod.position.z)
-    }
-    composite.scale = Float(compositeCod.scale)
-    composite.nb = size_t(compositeCod.b.count)
-    return composite
-}
-
-struct Spaceship: Codable {
-	var moo: SphericalCow
-	var c: CompositeCod
-}
-
 var lights = [sun]
 var celestials = [sun, mercury, venus, earth, moon]
-var allTheThings = [sun, mercury, venus, earth, moon, player1]
+var allTheThings: [Moo] = [sun, mercury, venus, earth, moon, player1]
 //var stations = []
 var ships = [player1]
 //var asteroids = []
@@ -363,6 +204,9 @@ func main() {
 	s = GameState.load()
 	if s.composites.count == 0 {
 		s.composites.append(CompositeCod.unit())
+	} else {
+		player1.moo.position = s.composites[0].position
+		player1.moo.orientation = s.composites[0].orientation
 	}
 	let availableModes: [InterfaceMode] = [.workshop, .physicsSim]
 	interfaceMode = availableModes[s.interfaceModeIndex % availableModes.count]
@@ -513,7 +357,7 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 		if objrefs.count == 0 {
 			for (i, composite) in s.composites.enumerated() {
 				var ccod = composite
-				ccod.position -= camera.position
+				ccod.position -= camera.moo.position
 				let c = toC(ccod)
 				objrefs.append(submitComposite(c))
 				print("new object ", objrefs[i])
@@ -521,14 +365,14 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 		}
 		if interfaceMode == .physicsSim {
 			if(rcsIsEnabled && interfaceMode == .physicsSim) {
-				actions = [Action(object: player1, force: thrustVector * 10000.0 / dt, torque: Vector(cameraSpherical.phi, 0, cameraSpherical.theta) * -1000.0)]
+				actions = [Action(object: player1.moo, force: thrustVector * 10000.0 / dt, torque: Vector(cameraSpherical.phi, 0, cameraSpherical.theta) * -1000.0)]
 			} else {
-				actions = [Action(object: player1, force: thrustVector * 10000.0 / dt, torque: Vector(0, 0, 0))]
+				actions = [Action(object: player1.moo, force: thrustVector * 10000.0 / dt, torque: Vector(0, 0, 0))]
 			}
-			tick(actions: actions, movingObjects: &allTheThings, t: t, dt: dt)
+			tick(actions: actions, entities: &ships, celestials: &celestials, t: t, dt: dt)
 			t += dt
-			s.composites[curcom].orientation = player1.orientation
-			s.composites[curcom].position = player1.position
+			s.composites[curcom].orientation = player1.moo.orientation
+			s.composites[curcom].position = player1.moo.position
 		} else if interfaceMode == .workshop {
 			switch(dpad) {
 				case .RIGHT:
@@ -536,14 +380,14 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 					if(thrustVector.length > 0.05) {
 						s.composites[curcom].b[curbox].elongate(thrustVector * thrustVector * 0.01)
 						updateComposite(objrefs[curcom], toC(s.composites[curcom]))
-						player1.radius = player1.radius * 0.95 + 0.05 * s.composites[curcom].bbox.halfsize
+						player1.moo.radius = player1.moo.radius * 0.95 + 0.05 * s.composites[curcom].bbox.halfsize
 					}
 				case .LEFT:
 					// wtf
 					if(thrustVector.length > 0.05) {
 						s.composites[curcom].b[curbox].bulgerize(thrustVector * thrustVector * 0.01)
 						updateComposite(objrefs[curcom], toC(s.composites[curcom]))
-						player1.radius = player1.radius * 0.95 + 0.05 * s.composites[curcom].bbox.halfsize
+						player1.moo.radius = player1.moo.radius * 0.95 + 0.05 * s.composites[curcom].bbox.halfsize
 					}
 				default:
 					break;
@@ -556,18 +400,18 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 		renderMisc.buttonPresses = abs(buttonPresses);
 		renderMisc.materials = materialsArray
 		//if interfaceMode == .physicsSim {
-			let cameraTarget = player1
-			let nearestCelestial = moon
+			let cameraTarget = player1.moo
+			let nearestCelestial = moon.moo
 			let relativeVelocity = cameraTarget.velocity - nearestCelestial.velocity
 			var prograde = relativeVelocity
 			if(relativeVelocity.lengthSquared == 0) {
-				camera.position = cameraTarget.position + Vector(10, 10, -4.5 * cameraTarget.radius)
+				camera.moo.position = cameraTarget.position + Vector(10, 10, -4.5 * cameraTarget.radius)
 				prograde = cameraTarget.orientation * Vector(0, 0, 1)
 			} else {
 				prograde = relativeVelocity.normalized()
-				camera.position = cameraTarget.position + relativeVelocity.normalized() * -4.5 * cameraTarget.radius
+				camera.moo.position = cameraTarget.position + relativeVelocity.normalized() * -4.5 * cameraTarget.radius
 			}
-			var camFwd = (cameraTarget.position - camera.position).normalized()
+			var camFwd = (cameraTarget.position - camera.moo.position).normalized()
 			var upVec = (cameraTarget.position - nearestCelestial.position).normalized()
 			let pitchAxis = camFwd.cross(upVec).normalized()
 			let pitchQuat = Quaternion(axis: pitchAxis, angle: 2.0 * cameraSpherical.phi * (rcsIsEnabled ? 0.5 : 1.0))
@@ -591,9 +435,9 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 			}
 			withUnsafeMutablePointer(to:&renderMisc.lights) { lights_ptr in
 				lights_ptr[index].position =
-					(Float(object.position.x - camera.position.x),
-					 Float(object.position.y - camera.position.y),
-					 Float(object.position.z - camera.position.z))
+					(Float(object.moo.position.x - camera.moo.position.x),
+					 Float(object.moo.position.y - camera.moo.position.y),
+					 Float(object.moo.position.z - camera.moo.position.z))
 				// hardcoded values for the sun, improve later
 				lights_ptr[index].color = (4.38e24, 4.38e24, 4.18e24)
 			}
@@ -601,39 +445,39 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 	
 
 		// we have to sort the things before we send them to the renderer, otherwise transparency breaks.
-		allTheThings.sort(by: { ($0.position - camera.position).lengthSquared > ($1.position - camera.position).lengthSquared })
+		allTheThings.sort(by: { ($0.moo.position - camera.moo.position).lengthSquared > ($1.moo.position - camera.moo.position).lengthSquared })
 		var trajectory: [Vector] = []
 		//var trajectory = extrapolateTrajectory(subject: cameraTarget, relativeTo: nearestCelestial, otherObjects: allTheThings, t: t, dt: 10.0, iterations: 500)
-		trajectory.sort(by: { ($0 - camera.position).lengthSquared > ($1 - camera.position).lengthSquared })
+		trajectory.sort(by: { ($0 - camera.moo.position).lengthSquared > ($1 - camera.moo.position).lengthSquared })
 		//print("cameraTarget: \(cameraTarget.position)\ntrajectory: \(trajectory)\n")
 		//let sphereArray = UnsafeMutablePointer<sphere>.allocate(capacity: allTheThings.count)
 		let sphereArray = UnsafeMutablePointer<Sphere>.allocate(capacity: allTheThings.count + trajectory.count)
 		for (index, object) in allTheThings.enumerated() {
 			// the mapping from object.id to material_idx should not be 1:1 in the future but it's good enough for now
 			// center everything on the camera before converting to float to avoid float precision issues when rendering
-			sphereArray[index + trajectory.count] = Sphere(position: (Float(object.position.x - camera.position.x),
-										Float(object.position.y - camera.position.y),
-										Float(object.position.z - camera.position.z)),
-										radius: Float(object.radius),
-										material_idx: (Int32(object.id)))
+			sphereArray[index + trajectory.count] = Sphere(position: (Float(object.moo.position.x - camera.moo.position.x),
+										Float(object.moo.position.y - camera.moo.position.y),
+										Float(object.moo.position.z - camera.moo.position.z)),
+										radius: Float(object.moo.radius),
+										material_idx: (Int32(object.moo.id)))
 		}
 		for (index, object) in trajectory.enumerated() {
 			// center everything on the camera before converting to float to avoid float precision issues when rendering
-			let position = Vector(object.x - camera.position.x, object.y - camera.position.y, object.z - camera.position.z)
+			let position = Vector(object.x - camera.moo.position.x, object.y - camera.moo.position.y, object.z - camera.moo.position.z)
 			sphereArray[index] = Sphere(position: (Float(position.x),
 										Float(position.y),
 										Float(position.z)),
-										radius: Float(player1.radius * pow(position.length * 0.01, 0.9)),
+										radius: Float(player1.moo.radius * pow(position.length * 0.01, 0.9)),
 										material_idx: 6)
 		}
 		let compositeArray = UnsafeMutablePointer<Objref>.allocate(capacity: objrefs.count)
 		for (index, object) in objrefs.enumerated() {
-			var position = s.composites[object.id].position - camera.position
-			compositeArray[index] = Objref(orientation: object.orientation, position: position.float, id: object.id, type: object.type)
+			var position = s.composites[object.id].position - camera.moo.position
+			compositeArray[index] = Objref(orientation: s.composites[object.id].orientation.float, position: position.float, id: object.id, type: object.type)
 		}
 
-		//print("sending \(objrefs.count) s.composites to rendering \(compositeArray[0]) ", player1.position, player1.radius)
-		//print("camera position: \(camera.position)")
+		//print("sending \(objrefs.count) s.composites to rendering \(compositeArray[0]) ", player1.position, player1.moo.radius)
+		//print("camera.moo.position: \(camera.moo.position)")
 		render(compositeArray, objrefs.count, sphereArray, allTheThings.count + trajectory.count, renderMisc)
 
 		sphereArray.deallocate()

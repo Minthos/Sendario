@@ -4,6 +4,12 @@ struct Vector: Codable {
 	var x: Double
 	var y: Double
 	var z: Double
+
+	init() {
+		self.x = 0
+		self.y = 0
+		self.z = 0
+	}
    
 	init(_ coords: (Float, Float, Float)) {
 		self.x = Double(coords.0)
@@ -136,6 +142,13 @@ struct Quaternion: Codable {
 	var x: Double
 	var y: Double
 	var z: Double
+
+	init() {
+		self.w = 1
+		self.x = 0
+		self.y = 0
+		self.z = 0
+	}
 	
 	init(w: Double, v: Vector) {
 		self.w = w
@@ -156,11 +169,11 @@ struct Quaternion: Codable {
 	init(axis: Vector, angle: Double) {
 		let vn = axis.normalized()
 		let halfAngle = angle * 0.5
-	let sinAngle = sin(halfAngle);
-	x = (vn.x * sinAngle);
-	y = (vn.y * sinAngle);
-	z = (vn.z * sinAngle);
-	w = cos(angle);
+		let sinAngle = sin(halfAngle);
+		x = (vn.x * sinAngle);
+		y = (vn.y * sinAngle);
+		z = (vn.z * sinAngle);
+		w = cos(angle);
 		sanityCheck()
 	}
 
