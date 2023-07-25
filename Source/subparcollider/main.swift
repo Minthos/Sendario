@@ -403,14 +403,14 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 				case .RIGHT:
 					// Elongaaaate
 					if(thrustVector.length > 0.05) {
-						s.composites[curcom].b[curbox].elongate(thrustVector * thrustVector * 0.01)
+						s.composites[curcom].b[curbox].elongate(thrustVector * 0.01)
 						updateComposite(objrefs[curcom], toC(s.composites[curcom]))
 						player1.moo.radius = player1.moo.radius * 0.95 + 0.05 * s.composites[curcom].bbox.halfsize
 					}
 				case .LEFT:
-					// wtf
+					// Bouba vs Kiki
 					if(thrustVector.length > 0.05) {
-						s.composites[curcom].b[curbox].bulgerize(thrustVector * thrustVector * 0.01)
+						s.composites[curcom].b[curbox].bulgerize(thrustVector * 0.01)
 						updateComposite(objrefs[curcom], toC(s.composites[curcom]))
 						player1.moo.radius = player1.moo.radius * 0.95 + 0.05 * s.composites[curcom].bbox.halfsize
 					}
