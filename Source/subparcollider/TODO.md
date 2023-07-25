@@ -1,20 +1,10 @@
 ## Near term TODO:
 
-* rigid-body physics with multiple connected boxoids
- - maybe actually prioritize this because it's more fun than the UI stuff, but first get our existing code to compile and run
- - also, you know, a very basic but functioning editing interface so we can build multi-boxoid spaceships for testing
+UI developers! UI developers! UI developers!
 
-
-* Make much of the interface a website hosted with redis, flask and tornado.
-* Use redis to hold server state, json file to hold client configuration and backup of all the composites and random seeds.
-* Players who spawn into the game can browse galaxies and star systems to spawn in via a website. If they just start
-the client it will pick a random unvisited starting location within 50 LY of Earth.
 * Use The Sims as inspration for the ship designing experience
-
-
 // editing interface shuld have a visual axis aligned grid and a button to snap to grid that snaps whatever you're doing to the grid
 // x and y shrinks/enlarges the grid size
-
 // navigation interface should enlarge nearby celestials, ships and structures and show name tags near the most
 // prominent ones of each kind
 
@@ -26,11 +16,15 @@ the client it will pick a random unvisited starting location within 50 LY of Ear
  - would be good if I had textures for this or at least a new shader
  - can probably abuse the boxoid shader somewhat
  - 3 planes that cross at origo? each plane has thin lines that grow thicker the further from origo they are? draw coordinates near round numbers
-* position camera based on ship's orientation instead of ship's velocity
-* rotate the ship's self-thrust vector by the ship's orientation
+* rigid-body physics with multiple connected boxoids
+ - maybe actually prioritize this because it's more fun than the UI stuff, but first get our existing code to compile and run
+ - also, you know, a very basic but functioning editing interface so we can build multi-boxoid spaceships for testing
 
 ## Recently done:
 
+* position camera based on ship's orientation instead of ship's velocity
+* rotate the ship's self-thrust vector by the ship's orientation
+* w-space
 * renderer that renders objects with orientation
 * bounding boxes from hctree to compositecod
  - codable boxoids, composites, spheres
@@ -79,11 +73,13 @@ y: repeat last action, redo
 * merge in universe procgen stuff with resource deposits
 * Make a basic space exploration prototype
  - A solar system with the sun, some planets, a spaceship with a gaslight drive
-* w-space
 * deprioritized tasks
  - the shader
  - reactivate atmospheric drag but make it follow the celestial and not apply to the celestial
  - improve trajectory visualization: future trajectories with lines in colors of the rainbow with quadratic timestep to about 1 orbital period
+* Use redis to hold server state, json file to hold client configuration and backup of all the composites and random seeds.
+* Players who spawn into the game can browse galaxies and star systems to spawn in via a website. If they just start
+the client it will pick a random unvisited starting location within 50 LY of Earth.
 
 
 ## Even further out:
