@@ -84,8 +84,8 @@ var moon = Celestial(name: "Luna", SphericalCow(id: 4,
 						 spin: Vector(0, 0, 0),
 						 mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.2))
 var player1 = Entity(name: "Player 1", SphericalCow(id: 5,
-						 position: Vector(moon.moo.position.x, moon.moo.position.y, moon.moo.position.z + moon.moo.radius + 2.2),
-						 velocity: Vector(moon.moo.velocity.x, moon.moo.velocity.y + 1.1, moon.moo.velocity.z),
+						 position: Vector(moon.moo.position.x, moon.moo.position.y, moon.moo.position.z + moon.moo.radius + 0.01),
+						 velocity: Vector(moon.moo.velocity.x, moon.moo.velocity.y + 0, moon.moo.velocity.z),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
 						 spin: moon.moo.spin,
 						 mass: 10e3, radius:1.0, frictionCoefficient: 0.5))
@@ -148,7 +148,7 @@ var s: GameState = GameState();
 var objrefs: [Objref] = []
 var actions: [Action] = []
 //var interfaceMode: InterfaceMode = .physicsSim
-var interfaceMode: InterfaceMode = .workshop
+var interfaceMode: InterfaceMode = .flightMode
 var buttonPresses: Int32 = 2
 var curcom: Int = 0 // current composite
 var curbox: Int = 0 // current boxoid
@@ -158,7 +158,7 @@ var partsPickerIsOpen = false
 var dpad: DpadDirection = .NONE
 var controller: OpaquePointer? = nil
 var shouldExit = false
-var rcsIsEnabled = false
+var rcsIsEnabled = true
 let worldUpVector = Vector(0, 1, 0) // x is right, y is up, z is backward (right-handed coordinate system)
 var thrustVector = Vector(0, 0, 0)
 var cameraSpherical = SphericalVector(1, 0, 0)
@@ -211,7 +211,8 @@ func main() {
 		player1.moo.position = s.composites[0].position
 		player1.moo.orientation = s.composites[0].orientation
 	}
-	let availableModes: [InterfaceMode] = [.workshop, .physicsSim, .flightMode]
+	let availableModes: [InterfaceMode] = [.flightMode, .workshop]
+	//let availableModes: [InterfaceMode] = [.workshop, .physicsSim, .flightMode]
 	interfaceMode = availableModes[s.interfaceModeIndex % availableModes.count]
 	
 
@@ -433,8 +434,8 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 			let pitchQuat = Quaternion(axis: pitchAxis, angle: 2.0 * cameraSpherical.phi * (rcsIsEnabled ? 0.0 : 1.0))
 			let yawQuat = Quaternion(axis: upVec, angle: 2.0 * cameraSpherical.theta * (rcsIsEnabled ? 0.0 : 1.0))
 			if(interfaceMode == .flightMode) {
-				camFwd = cameraTarget.orientation * camFwd
-				upVec = cameraTarget.orientation * upVec
+				camFwd = cameraTarget.orientation * Vector(0, 0, -1)
+				upVec = cameraTarget.orientation * worldUpVector
 				camera.moo.position = cameraTarget.position + camFwd * -4.5 * cameraTarget.radius
 			} else {
 				camFwd = yawQuat * pitchQuat * camFwd
