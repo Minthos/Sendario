@@ -186,38 +186,28 @@ struct Quaternion: Codable {
 		z = axis.2 * s
 		sanityCheck()
 	}
-/*
+
+	// seems to have yaw and roll mixed up
 	init(pitch: Double, yaw: Double, roll: Double)
 	{
-	// Basically we create 3 Quaternions, one for pitch, one for yaw, one for roll
-	// and multiply those together.
-	// the calculation below does the same, just shorter
-
-	let p = pitch * Double.pi;
-	let y = yaw * Double.pi;
-	let r = roll * Double.pi;
-	//let p = pitch * PIOVER180 / 2.0;
-	//let y = yaw * PIOVER180 / 2.0;
-	//let r = roll * PIOVER180 / 2.0;
-
-	let sinp = sin(p);
-	let siny = sin(y);
-	let sinr = sin(r);
-	let cosp = cos(p);
-	let cosy = cos(y);
-	let cosr = cos(r);
-		var tmp = Quaternion(x: sinr * cosp * cosy - cosr * sinp * siny,
-						 y: cosr * sinp * cosy + sinr * cosp * siny,
-							 z: cosr * cosp * siny - sinr * sinp * cosy,
-						 w: cosr * cosp * cosy + sinr * sinp * siny)
-
+		let sinp = sin(pitch);
+		let siny = sin(yaw);
+		let sinr = sin(roll);
+		let cosp = cos(pitch);
+		let cosy = cos(yaw);
+		let cosr = cos(roll);
+		let w: Double = (cosr * cosp * cosy) + (sinr * sinp * siny)
+		let x: Double = (sinr * cosp * cosy) - (cosr * sinp * siny)
+		let y: Double = (cosr * sinp * cosy) + (sinr * cosp * siny)
+		let z: Double = (cosr * cosp * siny) - (sinr * sinp * cosy)
+		var tmp = Quaternion(w: w, x: x, y: y, z: z)
 		let len_inv = 1.0 / tmp.length()
-		w = tmp.w * len_inv
-		x = tmp.x * len_inv
-		y = tmp.y * len_inv
-		z = tmp.z * len_inv
+		self.w = tmp.w * len_inv
+		self.x = tmp.x * len_inv
+		self.y = tmp.y * len_inv
+		self.z = tmp.z * len_inv
 	}
-*/
+
 #if DEBUG
 	func sanityCheck() {
 		assert( !w.isNaN, "w is NaN")
@@ -231,6 +221,10 @@ struct Quaternion: Codable {
 
 	var float: (Float, Float, Float, Float) {
 		return (Float(w), Float(x), Float(y), Float(z))
+	}
+
+	var xyz: Vector {
+		return Vector(x, y, z)
 	}
 
 	func getAxisAngle() -> (Vector, Double) {
@@ -254,7 +248,7 @@ struct Quaternion: Codable {
 		return Quaternion(w: w*(-f), x: x*f, y: y*f, z: z*f)
 	}
 	
-	func conjugate() -> Quaternion {
+	var conjugate: Quaternion {
 		return Quaternion(w: w, x: -x, y: -y, z: -z)
 	}
 	
@@ -277,7 +271,7 @@ struct Quaternion: Codable {
 	static func *(left: Quaternion, right: Vector) -> Vector {
 		let vn = right.normalized()
 		let vecQuat = Quaternion(w: 0, x: vn.x, y: vn.y, z: vn.z)
-		let resQuat = left * vecQuat * left.conjugate()
+		let resQuat = left * vecQuat * left.conjugate
 		return Vector(resQuat.x, resQuat.y, resQuat.z)
 	}
 }

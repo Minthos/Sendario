@@ -93,6 +93,7 @@ class SphericalCow: Codable {
 	var position: Vector
 	var w: Double
 	var warpVector: Vector
+	var FTL: Bool
 	var velocity: Vector
 	var orientation: Quaternion
 	var spin: Vector
@@ -110,8 +111,9 @@ class SphericalCow: Codable {
 	init(id: Int64, position: Vector, velocity: Vector, orientation: Quaternion, spin: Vector, mass: Double, radius: Double, frictionCoefficient: Double = 0.1) {
 		self.id = id
 		self.position = position
-		self.w = 0.0
+		self.w = 20.0
 		self.warpVector = Vector()
+		self.FTL = false
 		self.velocity = velocity
 		self.orientation = orientation
 		self.spin = spin
@@ -157,7 +159,7 @@ class SphericalCow: Codable {
 		let new_pos = position + velocity * dt + (prevForce / mass) * (dt * dt * 0.5)
 		let sum_accel = (prevForce + accumulatedForce) / mass
 		let new_vel = velocity + (sum_accel)*(dt*0.5)
-		position = new_pos + warpVector * (w * w * dt)
+		position = FTL ? (new_pos + warpVector * (w * w * dt)) : new_pos
 		velocity = new_vel
 		prevForce = accumulatedForce
 		accumulatedForce = Vector(0, 0, 0)
@@ -169,7 +171,6 @@ class SphericalCow: Codable {
 		let rotation = Quaternion(axis: omega, angle: angle)
 		if(omega.x != 0 || omega.y != 0 || omega.z != 0) {
 			orientation = (rotation * orientation).normalized()
-	//		print("spin: \(spin) omega: \(omega)")
 		}
 		let sum_rotAccel = (prevTorque + accumulatedTorque) / momentOfInertia
 		let new_spin = spin + (sum_rotAccel)*(dt*0.5)

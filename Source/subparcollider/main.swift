@@ -249,14 +249,14 @@ func main() {
 							} else if interfaceMode == .flightMode {
 								print("\(String(cString: getStringForButton(event.cbutton.button)!)) pressed")
 								if		event.cbutton.button == SDL_CONTROLLER_BUTTON_Y.rawValue {
-									player1.moo.w += 0.1
+									player1.moo.w += 1
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_X.rawValue {
-									player1.moo.w -= 0.1
+									player1.moo.w -= 1
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_B.rawValue {
 									player1.moo.warpVector = Vector();
-									player1.moo.w = 0.0
+									player1.moo.FTL = false
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_A.rawValue {
-									player1.moo.w = 0.0 + log(player1.moo.warpVector.length)
+									player1.moo.FTL = true
 								}
 							} else if interfaceMode == .workshop {
  								print("\(String(cString: getStringForButton(event.cbutton.button)!)) pressed")
@@ -381,9 +381,15 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 		}
 		if interfaceMode == .physicsSim || interfaceMode == .flightMode {
 			if(rcsIsEnabled) {
-				actions = [Action(object: player1.moo, force: thrustVector * 10000.0 / dt, torque: Vector(cameraSpherical.phi, 0, cameraSpherical.theta) * -10000.0)]
+				var q = Quaternion(pitch: cameraSpherical.theta, yaw: -thrustVector.z, roll: cameraSpherical.phi)
+				q = player1.moo.orientation * q * player1.moo.orientation.conjugate
+				let torque = q.xyz * 10000.0
+				actions = [Action(
+					object: player1.moo,
+					force: Vector(thrustVector.x, 0, thrustVector.z) * 10000.0 / dt,
+					torque: torque)]
 			} else {
-				actions = []//[Action(object: player1.moo, force: thrustVector * 10000.0 / dt, torque: Vector(0, 0, 0))]
+				actions = []
 			}
 			gravTick(center: sun.moo, celestials: &celestials, t: t, dt: dt)
 			tick(actions: actions, entities: &ships, celestials: &celestials, t: t, dt: dt)
