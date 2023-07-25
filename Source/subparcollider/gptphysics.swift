@@ -300,6 +300,8 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 	collisions.sort { $0.0 < $1.0 }
 	for (elapsedTime, object1, object2) in collisions {
 		// rewind this tick's movement and apply movement up to the time of collision
+
+		// rewind this tick's movement and apply movement up to the time of collision
 		object1.position -= object1.velocity * (dt - elapsedTime)
 		object2.position -= object2.velocity * (dt - elapsedTime)
 		let deltaPosition = object2.position - object1.position
@@ -307,24 +309,24 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		let centerDistance = deltaPosition.length
 		let collisionNormal = deltaPosition / centerDistance
 		let normalVelocity = collisionNormal * (deltaVelocity.dot(collisionNormal))
-		let tangentVelocity = deltaVelocity - normalVelocity
+		let tangentVelocity = deltaVelocity - normalVelocity 
 		let closingSpeed = normalVelocity.length
 		let impulseMagnitude = abs(min(object1.mass, object2.mass) * closingSpeed * 2)
 		let impulse = collisionNormal * impulseMagnitude
 		object1.velocity -= impulse / object1.mass
 		object2.velocity += impulse / object2.mass
-		// I did consider advancing the movement by the same dt as I rewinded it earlier, but I think it's fine to
-		// steal some time here, it's in the direction of the missing elasticity so it's kind of a good thing and it may
-		// help reduce weirdness when three or more objects collide in the same tick.
 
-		// rotation is still a bit messed up
-		// This crappy algorithm doesn't compare difference in spin at the point of contact, just difference in spin.
+		// Here's the correction for the rotation.
 		let collisionPoint = object1.position + (collisionNormal * object1.radius)
 		let r1 = collisionPoint - object1.position
 		let r2 = collisionPoint - object2.position
 		let frictionCoefficient = (object1.frictionCoefficient * object2.frictionCoefficient)
-		let rotationVelocity1 = object1.spin * object1.radius
-		let rotationVelocity2 = object2.spin * object2.radius
+
+		// Calculate the tangential velocities due to rotation at the point of contact
+		let rotationVelocity1 = object1.spin.cross(r1) 
+		let rotationVelocity2 = object2.spin.cross(r2)
+
+		// Now compute the total relative tangential velocity
 		let totalRelativeTangentialVelocity = tangentVelocity + rotationVelocity2 - rotationVelocity1
 		let minLinearMomentum = min(object1.mass, object2.mass) * totalRelativeTangentialVelocity.length
 		let angularMomentum1 = object1.momentOfInertia * totalRelativeTangentialVelocity.length / object1.radius
@@ -338,8 +340,10 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		let torque2 = r2.cross(frictionImpulse * 0.5)
 		let deltaSpin1 = torque1 / object1.momentOfInertia
 		let deltaSpin2 = torque2 / object2.momentOfInertia
-		object1.spin += deltaSpin1
-		object2.spin -= deltaSpin2
+		object1.spin -= deltaSpin1
+		object2.spin += deltaSpin2
+
+
 		print("Collision Time:", String(format: "%f", elapsedTime))
 		print("dvel:", deltaVelocity.format(4))
 		print("dtan:", tangentVelocity.format(4))
