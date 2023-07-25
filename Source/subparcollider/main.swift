@@ -81,10 +81,10 @@ var moon = Celestial(name: "Luna", SphericalCow(id: 4,
 						 velocity: Vector(earth.moo.velocity.x, earth.moo.velocity.y, earth.moo.velocity.z + 1.022e3),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
 						 spin: Vector(0, 0, 0),
-						 mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.8))
+						 mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.2))
 var player1 = Entity(name: "Player 1", SphericalCow(id: 5,
 						 position: Vector(moon.moo.position.x, moon.moo.position.y, moon.moo.position.z + moon.moo.radius + 2.2),
-						 velocity: Vector(moon.moo.velocity.x, moon.moo.velocity.y + 0.1, moon.moo.velocity.z),
+						 velocity: Vector(moon.moo.velocity.x, moon.moo.velocity.y + 1.1, moon.moo.velocity.z),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
 						 spin: moon.moo.spin,
 						 mass: 10e3, radius:1.0, frictionCoefficient: 0.5))
@@ -163,7 +163,7 @@ var thrustVector = Vector(0, 0, 0)
 var cameraSpherical = SphericalVector(1, 0, 0)
 
 let totalTime = 1e12
-var dt = 0.0001
+var dt = 0.01
 var t = 0.0
 
 /*

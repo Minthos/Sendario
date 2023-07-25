@@ -279,11 +279,7 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 	}
 
 	var collisions: [(Double, SphericalCow, SphericalCow)] = []
-	var everything: [Moo] = celestials + entities
-	//for i in 0..<entities.count {
-	//	for j in 0..<celestials.count {
-	//		let object1 = entities[i].moo
-	//		let object2 = celestials[j].moo
+	var everything: [Moo] = entities + celestials
 	for i in 0..<everything.count {
 		for j in i+1..<everything.count {
 			let object1 = everything[i].moo
@@ -293,9 +289,8 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 			let distance = deltaPosition.length - sumRadii
 			let deltaVelocity = object2.velocity - object1.velocity
 			let closingSpeed = -(deltaVelocity.dot(deltaPosition.normalized()))
-
 			if distance > 0 && closingSpeed > 0 && distance < (closingSpeed * dt) {
-				print("collision \(t): \(distance) \(closingSpeed)")
+				print("collision \(t): \(distance) \(closingSpeed) dt: \(dt)")
 				let collisionTime = distance / closingSpeed
 				collisions.append((collisionTime, object1, object2))
 			}
@@ -318,8 +313,12 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		let impulse = collisionNormal * impulseMagnitude
 		object1.velocity -= impulse / object1.mass
 		object2.velocity += impulse / object2.mass
+		// I did consider advancing the movement by the same dt as I rewinded it earlier, but I think it's fine to
+		// steal some time here, it's in the direction of the missing elasticity so it's kind of a good thing and it may
+		// help reduce weirdness when three or more objects collide in the same tick.
 
-/*
+		// rotation is still a bit messed up
+		// This crappy algorithm doesn't compare difference in spin at the point of contact, just difference in spin.
 		let collisionPoint = object1.position + (collisionNormal * object1.radius)
 		let r1 = collisionPoint - object1.position
 		let r2 = collisionPoint - object2.position
@@ -333,25 +332,26 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		let minAngularMomentum = min(angularMomentum1, angularMomentum2)
 		let maxFrictionImpulseMagnitude = min(frictionCoefficient * impulseMagnitude * totalRelativeTangentialVelocity.length, minLinearMomentum + minAngularMomentum)
 		let frictionImpulse = -totalRelativeTangentialVelocity.normalized() * maxFrictionImpulseMagnitude
-		object1.velocity -= frictionImpulse / object1.mass
-		object2.velocity += frictionImpulse / object2.mass
-		let torque1 = r1.cross(frictionImpulse)
-		let torque2 = r2.cross(frictionImpulse)
+		object1.velocity -= frictionImpulse * 0.5 / object1.mass
+		object2.velocity += frictionImpulse * 0.5 / object2.mass
+		let torque1 = r1.cross(frictionImpulse * 0.5)
+		let torque2 = r2.cross(frictionImpulse * 0.5)
 		let deltaSpin1 = torque1 / object1.momentOfInertia
 		let deltaSpin2 = torque2 / object2.momentOfInertia
 		object1.spin += deltaSpin1
 		object2.spin -= deltaSpin2
 		print("Collision Time:", String(format: "%f", elapsedTime))
-		//print("Collision Normal:", collisionNormal.format(2))
-//		print("dpos:", (centerDistance - sumRadii))
 		print("dvel:", deltaVelocity.format(4))
+		print("dtan:", tangentVelocity.format(4))
 		print("Impulse Magnitude:", String(format: "%.4f", impulseMagnitude))
 		print("Impulse:", impulse.format(4))
+		print("angular \(minAngularMomentum)")
+		print("linear \(minLinearMomentum)")
 		print("Friction Impulse:", frictionImpulse.format(4))
 		print("dspin 1:", deltaSpin1.format(4))
-		print("dspin 1:", deltaSpin2.format(4))
+		print("dspin 2:", deltaSpin2.format(4))
 		print()
-*/
+
 	}
 }
 
