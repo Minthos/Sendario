@@ -163,7 +163,7 @@ var thrustVector = Vector(0, 0, 0)
 var cameraSpherical = SphericalVector(1, 0, 0)
 
 let totalTime = 1e12
-var dt = 0.01
+var dt = 0.001
 var t = 0.0
 
 /*

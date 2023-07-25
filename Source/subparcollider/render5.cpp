@@ -348,7 +348,7 @@ struct BufferObject {
 };
 
 glm::quat quaternize(float in[4]) {
-	// convert from hamilton WXYZ convention to JPL XYZW convention
+	// convert from Hamilton WXYZ convention to JPL XYZW convention
 	return glm::quat(-in[1], -in[2], -in[3], in[0]);
 }
 
@@ -1143,7 +1143,7 @@ void *rendererThread(void *arg) {
 	glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenWidth / (float)screenHeight, 1.0f, 1e12f);
 	glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 0.0f);
 	glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
-	glm::vec3 cameraUp = glm::vec3(1.0f, 0.0f, 0.0f);
+	glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 
 	// Rendering loop
 	while (!glfwWindowShouldClose(sharedData.window) && !sharedData.shouldExit) {
@@ -1280,10 +1280,11 @@ void *rendererThread(void *arg) {
 			cro->c.position[0] = sd->orefs[i].position[0];
 			cro->c.position[1] = sd->orefs[i].position[1];
 			cro->c.position[2] = sd->orefs[i].position[2];
-			cro->c.orientation[0] = sd->orefs[i].orientation[0];
-			cro->c.orientation[1] = sd->orefs[i].orientation[1];
-			cro->c.orientation[2] = sd->orefs[i].orientation[2];
-			cro->c.orientation[3] = sd->orefs[i].orientation[3];
+			// convert from Hamilton WXYZ convention to JPL XYZW convention
+			cro->c.orientation[0] = -sd->orefs[i].orientation[1];
+			cro->c.orientation[1] = -sd->orefs[i].orientation[2];
+			cro->c.orientation[2] = -sd->orefs[i].orientation[3];
+			cro->c.orientation[3] = sd->orefs[i].orientation[0];
 			glm::vec3 center = vectorize(cro->c.position);
 			// for now correctly assuming all orefs are to composites
 			glUseProgram(boxoidProgram);
