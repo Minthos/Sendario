@@ -249,9 +249,9 @@ func main() {
 							} else if interfaceMode == .flightMode {
 								print("\(String(cString: getStringForButton(event.cbutton.button)!)) pressed")
 								if		event.cbutton.button == SDL_CONTROLLER_BUTTON_Y.rawValue {
-									player1.moo.w += 1
+									player1.moo.w *= 1.25
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_X.rawValue {
-									player1.moo.w -= 1
+									player1.moo.w *= 0.8
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_B.rawValue {
 									player1.moo.warpVector = Vector();
 									player1.moo.FTL = false
@@ -317,15 +317,15 @@ func main() {
 // Callback functions for key and mouse button events
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-    if (key == GLFW_KEY_W && action == GLFW_PRESS)
-        dt *= 10.0;
-    // And so on for other keys...
+	if (key == GLFW_KEY_W && action == GLFW_PRESS)
+		dt *= 10.0;
+	// And so on for other keys...
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 {
-    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
-        // Handle left mouse button press...
+	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+		// Handle left mouse button press...
 }
 
 // In your initialization code:
@@ -384,9 +384,11 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 				var q = Quaternion(pitch: cameraSpherical.theta, yaw: -thrustVector.z, roll: cameraSpherical.phi)
 				q = player1.moo.orientation * q * player1.moo.orientation.conjugate
 				let torque = q.xyz * 10000.0
+				var f = Quaternion(w: 0, x: thrustVector.x * 1e5, y: 0, z: thrustVector.y * 1e5)
+				f = player1.moo.orientation * f * player1.moo.orientation.conjugate
 				actions = [Action(
 					object: player1.moo,
-					force: Vector(thrustVector.x, 0, thrustVector.z) * 10000.0 / dt,
+					force: f.xyz,
 					torque: torque)]
 			} else {
 				actions = []
