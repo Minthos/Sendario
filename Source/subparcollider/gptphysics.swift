@@ -79,6 +79,12 @@ class Celestial: Codable, Moo {
 	}
 }
 
+enum ForceCategory {
+	case thrust
+	case gravity
+	case impact // the impact forces are not reported through the correct channels.
+}
+
 // 3. upgrade celestial class with reentry heat and drag
 // 4. upgrade collisions to be not instantaneous and handle multiple bodies colliding. 1 ms default timestep
 class SphericalCow: Codable {
@@ -86,6 +92,7 @@ class SphericalCow: Codable {
 	var frameOfReference: SphericalCow? = nil
 	var position: Vector
 	var w: Double
+	var warpVector: Vector
 	var velocity: Vector
 	var orientation: Quaternion
 	var spin: Vector
@@ -103,7 +110,8 @@ class SphericalCow: Codable {
 	init(id: Int64, position: Vector, velocity: Vector, orientation: Quaternion, spin: Vector, mass: Double, radius: Double, frictionCoefficient: Double = 0.1) {
 		self.id = id
 		self.position = position
-		self.w = 1.0
+		self.w = 0.0
+		self.warpVector = Vector()
 		self.velocity = velocity
 		self.orientation = orientation
 		self.spin = spin
@@ -125,19 +133,23 @@ class SphericalCow: Codable {
 		return SphericalCow(id: 0, position: Vector(), velocity: Vector(), orientation: Quaternion(), spin: Vector(), mass: 0, radius: 0, frictionCoefficient: 0)
 	}
 
+	// let's not do this for now, instead let's keep different star systems in separate coordinate spaces and not mix objects between them.
 	func updateFrameOfReference(_ new: SphericalCow) {
 		let old = self.frameOfReference ?? SphericalCow.unit()
-		// let's not do this for now, instead let's keep different star systems in separate coordinate spaces and not mix objects between them.
 		//self.position = self.position + old.position - new.position
 		//self.velocity = self.velocity + old.velocity - new.velocity
 		self.frameOfReference = new
 	}
 
-	func applyForce(force: Vector, dt: Double) {
+	// this function is not called by the collision code
+	func applyForce(force: Vector, category: ForceCategory, dt: Double) {
 		self.accumulatedForce += force
+		if(category == .thrust) {
+			warpVector += force * (dt / mass)
+		}
 	}
 
-	func applyTorque(torque: Vector, dt: Double) {
+	func applyTorque(torque: Vector, category: ForceCategory, dt: Double) {
 		self.accumulatedTorque += torque
 	}
 
@@ -145,7 +157,7 @@ class SphericalCow: Codable {
 		let new_pos = position + velocity * dt + (prevForce / mass) * (dt * dt * 0.5)
 		let sum_accel = (prevForce + accumulatedForce) / mass
 		let new_vel = velocity + (sum_accel)*(dt*0.5)
-		position = new_pos
+		position = new_pos + warpVector * (w * w * dt)
 		velocity = new_vel
 		prevForce = accumulatedForce
 		accumulatedForce = Vector(0, 0, 0)
@@ -220,7 +232,7 @@ func gravTick(center: SphericalCow, celestials: inout [Celestial], t: Double, dt
 	for object in celestials {
 		if(object.moo !== center){
 			let (gravity, nearest) = calculateGravities(subject: object.moo, objects: celestials)
-			object.moo.applyForce(force: gravity, dt: dt)
+			object.moo.applyForce(force: gravity, category: .gravity, dt: dt)
 			// these are celestials, they should all have the same frame of reference (their star's)
 			//if(nearest !== object.moo.frameOfReference) {
 				//object.moo.updateFrameOfReference(nearest)
@@ -245,13 +257,13 @@ func gravTick(center: SphericalCow, celestials: inout [Celestial], t: Double, dt
 // star systems don't have to orbit the galactic center, they can just be stationary.
 func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celestial], t: Double, dt: Double) {
 	for action in actions {
-		action.object.applyForce(force: action.force, dt: dt)
-		action.object.applyTorque(torque: action.torque, dt: dt)
+		action.object.applyForce(force: action.force, category: .thrust, dt: dt)
+		action.object.applyTorque(torque: action.torque, category: .thrust, dt: dt)
 	}
 
 	for object in entities {
 		let (gravity, nearest) = calculateGravities(subject: object.moo, objects: celestials)
-		object.moo.applyForce(force: gravity, dt: dt)
+		object.moo.applyForce(force: gravity, category: .gravity, dt: dt)
 		if(nearest !== object.moo.frameOfReference) {
 			object.moo.updateFrameOfReference(nearest)
 		}

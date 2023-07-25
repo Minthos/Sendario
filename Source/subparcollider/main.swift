@@ -32,6 +32,7 @@ enum InterfaceMode {
 	case mainMenu
 	case physicsSim
 	case workshop
+	case flightMode
 	case combat
 	case travel
 	case mining
@@ -210,7 +211,7 @@ func main() {
 		player1.moo.position = s.composites[0].position
 		player1.moo.orientation = s.composites[0].orientation
 	}
-	let availableModes: [InterfaceMode] = [.workshop, .physicsSim]
+	let availableModes: [InterfaceMode] = [.workshop, .physicsSim, .flightMode]
 	interfaceMode = availableModes[s.interfaceModeIndex % availableModes.count]
 	
 
@@ -243,6 +244,18 @@ func main() {
 									buttonPresses += 1;
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_A.rawValue {
 									buttonPresses -= 1;
+								}
+							} else if interfaceMode == .flightMode {
+								print("\(String(cString: getStringForButton(event.cbutton.button)!)) pressed")
+								if		event.cbutton.button == SDL_CONTROLLER_BUTTON_Y.rawValue {
+									player1.moo.w += 0.1
+								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_X.rawValue {
+									player1.moo.w -= 0.1
+								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_B.rawValue {
+									player1.moo.warpVector = Vector();
+									player1.moo.w = 0.0
+								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_A.rawValue {
+									player1.moo.w = 0.0 + log(player1.moo.warpVector.length)
 								}
 							} else if interfaceMode == .workshop {
  								print("\(String(cString: getStringForButton(event.cbutton.button)!)) pressed")
@@ -282,7 +295,7 @@ func main() {
 							} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_BACK.rawValue {
 								// cycle through game modes
 								interfaceMode = availableModes[++s.interfaceModeIndex % availableModes.count]
-								//rcsIsEnabled = !rcsIsEnabled
+								rcsIsEnabled = (interfaceMode == .flightMode)
 							}
 						case SDL_CONTROLLERAXISMOTION.rawValue:
 							if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_LEFTX.rawValue) {
@@ -365,9 +378,9 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 				print("new object ", objrefs[i])
 			}
 		}
-		if interfaceMode == .physicsSim {
+		if interfaceMode == .physicsSim || interfaceMode == .flightMode {
 			if(rcsIsEnabled) {
-				actions = [Action(object: player1.moo, force: thrustVector * 10000.0 / dt, torque: Vector(cameraSpherical.phi, 0, cameraSpherical.theta) * -1000.0)]
+				actions = [Action(object: player1.moo, force: thrustVector * 10000.0 / dt, torque: Vector(cameraSpherical.phi, 0, cameraSpherical.theta) * -10000.0)]
 			} else {
 				actions = []//[Action(object: player1.moo, force: thrustVector * 10000.0 / dt, torque: Vector(0, 0, 0))]
 			}
@@ -417,12 +430,16 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 			var camFwd = (cameraTarget.position - camera.moo.position).normalized()
 			var upVec = (cameraTarget.position - nearestCelestial.position).normalized()
 			let pitchAxis = camFwd.cross(upVec).normalized()
-			let pitchQuat = Quaternion(axis: pitchAxis, angle: 2.0 * cameraSpherical.phi * (rcsIsEnabled ? 0.5 : 1.0))
-			let yawQuat = Quaternion(axis: upVec, angle: 2.0 * cameraSpherical.theta * (rcsIsEnabled ? 0.5 : 1.0))
-			camFwd = yawQuat * pitchQuat * camFwd
-			//camFwd = yawQuat * pitchQuat * cameraTarget.orientation * camFwd
-			//upVec = pitchQuat * cameraTarget.orientation * upVec
-			upVec = pitchQuat * upVec
+			let pitchQuat = Quaternion(axis: pitchAxis, angle: 2.0 * cameraSpherical.phi * (rcsIsEnabled ? 0.0 : 1.0))
+			let yawQuat = Quaternion(axis: upVec, angle: 2.0 * cameraSpherical.theta * (rcsIsEnabled ? 0.0 : 1.0))
+			if(interfaceMode == .flightMode) {
+				camFwd = cameraTarget.orientation * camFwd
+				upVec = cameraTarget.orientation * upVec
+				camera.moo.position = cameraTarget.position + camFwd * -4.5 * cameraTarget.radius
+			} else {
+				camFwd = yawQuat * pitchQuat * camFwd
+				upVec = pitchQuat * upVec
+			}
 			renderMisc.camForward = (Float(camFwd.x), Float(camFwd.y), Float(camFwd.z))
 			renderMisc.camUp = (Float(upVec.x), Float(upVec.y), Float(upVec.z))
 		//} else if interfaceMode == .workshop {
