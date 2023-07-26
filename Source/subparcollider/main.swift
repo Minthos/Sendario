@@ -84,7 +84,7 @@ var moon = Celestial(name: "Luna", SphericalCow(id: 4,
 						 spin: Vector(0, 0, 0),
 						 mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.2))
 var player1 = Entity(name: "Player 1", SphericalCow(id: 5,
-						 position: Vector(moon.moo.position.x, moon.moo.position.y, moon.moo.position.z + moon.moo.radius + 0.01),
+						 position: Vector(moon.moo.position.x + 50, moon.moo.position.y + 50, moon.moo.position.z + moon.moo.radius + 0.01),
 						 velocity: Vector(moon.moo.velocity.x, moon.moo.velocity.y + 0, moon.moo.velocity.z),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
 						 spin: moon.moo.spin,
@@ -115,6 +115,7 @@ struct GameState: Codable {
 	var composites: [CompositeCod] = []
 	var interfaceModeIndex: Int = 0
 	var sens: Double = 0.5 // input sensitivity
+	var deadzone: Double = 0.05
 
 	static func load(_ path: String = gameStatePath) -> GameState {
 		var gameStateJSONstr: String? = nil
@@ -146,7 +147,7 @@ struct GameState: Codable {
 var s: GameState = GameState();
 var grid: [CompositeCod] = []
 var gridrefs: [Objref] = []
-let grid_size = 1000.0
+let grid_size = 10000.0
 var objrefs: [Objref] = []
 var actions: [Action] = []
 //var interfaceMode: InterfaceMode = .physicsSim
@@ -216,7 +217,7 @@ func main() {
 		player1.moo.orientation = s.composites[0].orientation
 	}
 
-	grid.append(CompositeCod.generateGrid(4, grid_size))
+	grid.append(CompositeCod.generateGrid(grid_size * 10.0))
 	let availableModes: [InterfaceMode] = [.flightMode, .workshop]
 	//let availableModes: [InterfaceMode] = [.workshop, .physicsSim, .flightMode]
 	interfaceMode = availableModes[s.interfaceModeIndex % availableModes.count]
@@ -305,18 +306,22 @@ func main() {
 								rcsIsEnabled = (interfaceMode == .flightMode)
 							}
 						case SDL_CONTROLLERAXISMOTION.rawValue:
+							var val = Double(event.caxis.value) / TMAX
+							if(abs(val) < s.deadzone) {
+								val = 0
+							}
 							if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_LEFTX.rawValue) {
-								thrustVector.x = s.sens * Double(event.caxis.value) / TMAX
+								thrustVector.x = s.sens * val
 							} else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_LEFTY.rawValue) {
-								thrustVector.y = s.sens * Double(event.caxis.value) / TMAX
+								thrustVector.y = s.sens * val
 							} else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_TRIGGERLEFT.rawValue) {
-								thrustVector.z = s.sens * -Double(event.caxis.value) / TMAX
+								thrustVector.z = s.sens * -val
 							} else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_TRIGGERRIGHT.rawValue) {
-								thrustVector.z = s.sens * Double(event.caxis.value) / TMAX
+								thrustVector.z = s.sens * val
 							} else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_RIGHTX.rawValue) {
-								cameraSpherical.theta = s.sens * -Double(event.caxis.value) / TMAX
+								cameraSpherical.theta = s.sens * -val
 							} else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_RIGHTY.rawValue) {
-								cameraSpherical.phi = s.sens * Double(event.caxis.value) / TMAX
+								cameraSpherical.phi = s.sens * val
 							}
 						// FIXME use glfw
 /*
@@ -511,34 +516,36 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 										radius: Float(player1.moo.radius * pow(position.length * 0.01, 0.9)),
 										material_idx: 6)
 		}
-		let compositeArray = UnsafeMutablePointer<Objref>.allocate(capacity: objrefs.count + 57)
+		let compositeArray = UnsafeMutablePointer<Objref>.allocate(capacity: objrefs.count + 1)
 		for (index, object) in objrefs.enumerated() {
 			var position = s.composites[object.id].position - camera.moo.position
 			compositeArray[index] = Objref(orientation: s.composites[object.id].orientation.float, position: position.float, id: object.id, type: object.type)
 		}
-		for i in 0..<27 {
-			var position = grid[0].position + (Vector(Double((i/9) - 1), Double(((i/3) % 3) - 1), Double(((i % 9) % 3) - 1)) * (grid_size * 4)) - camera.moo.position
-			compositeArray[i + objrefs.count] = Objref(orientation: grid[0].orientation.float, position: position.float, id: gridrefs[0].id, type: gridrefs[0].type)
-		}
+		var position = grid[0].position - camera.moo.position
+		compositeArray[objrefs.count] = Objref(orientation: grid[0].orientation.float, position: position.float, id: gridrefs[0].id, type: gridrefs[0].type)
+		//for i in 0..<27 {
+		//	var position = grid[0].position + (Vector(Double((i/9) - 1), Double(((i/3) % 3) - 1), Double(((i % 9) % 3) - 1)) * (grid_size * 4)) - camera.moo.position
+		//	compositeArray[i + objrefs.count] = Objref(orientation: grid[0].orientation.float, position: position.float, id: gridrefs[0].id, type: gridrefs[0].type)
+		//}
 
-		for i in 0..<30 {
-			var position = grid[0].position - camera.moo.position
-			if(i < 10) {
-				position.x += Double((i%10) - 5) * (grid_size * 12) 
-			} else if(i < 20) {
-				position.y += Double((i%10) - 5) * (grid_size * 12) 
-			} else {
-				position.z += Double((i%10) - 5) * (grid_size * 12) 
-			}
-			compositeArray[i + 27 + objrefs.count] = Objref(orientation: grid[0].orientation.float, position: position.float, id: gridrefs[0].id, type: gridrefs[0].type)
-		}
+		//for i in 0..<30 {
+		//	var position = grid[0].position - camera.moo.position
+		//	if(i < 10) {
+		//		position.x += Double((i%10) - 5) * (grid_size * 12) 
+		//	} else if(i < 20) {
+		//		position.y += Double((i%10) - 5) * (grid_size * 12) 
+		//	} else {
+		//		position.z += Double((i%10) - 5) * (grid_size * 12) 
+		//	}
+		//	compositeArray[i + 27 + objrefs.count] = Objref(orientation: grid[0].orientation.float, position: position.float, id: gridrefs[0].id, type: gridrefs[0].type)
+		//}
 
 //		for i in 0..<125 {
 //			var position = grid[0].position + (Vector(Double((i/25) - 2), Double(((i/5) % 5) - 2), Double(((i % 25) % 5) - 2)) * (grid_size * 4)) - camera.moo.position
 //			compositeArray[i + objrefs.count] = Objref(orientation: grid[0].orientation.float, position: position.float, id: gridrefs[0].id, type: gridrefs[0].type)
 //		}
 
-		render(compositeArray, objrefs.count + 57, sphereArray, allTheThings.count + trajectory.count, renderMisc)
+		render(compositeArray, objrefs.count + 1, sphereArray, allTheThings.count + trajectory.count, renderMisc)
 
 		sphereArray.deallocate()
 	}
