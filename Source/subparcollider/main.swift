@@ -144,7 +144,9 @@ struct GameState: Codable {
 }
 
 var s: GameState = GameState();
-
+var grid: [CompositeCod] = []
+var gridrefs: [Objref] = []
+let grid_size = 1000.0
 var objrefs: [Objref] = []
 var actions: [Action] = []
 //var interfaceMode: InterfaceMode = .physicsSim
@@ -207,10 +209,14 @@ func main() {
 		s.composites.append(CompositeCod.unit())
 		s.composites[0].position = player1.moo.position
 		s.composites[0].orientation = player1.moo.orientation
+		//s.composites.append(CompositeCod.load("grid.json"))
+		//s.composites[1].orientation = Quaternion()
 	} else {
 		player1.moo.position = s.composites[0].position
 		player1.moo.orientation = s.composites[0].orientation
 	}
+
+	grid.append(CompositeCod.generateGrid(4, grid_size))
 	let availableModes: [InterfaceMode] = [.flightMode, .workshop]
 	//let availableModes: [InterfaceMode] = [.workshop, .physicsSim, .flightMode]
 	interfaceMode = availableModes[s.interfaceModeIndex % availableModes.count]
@@ -378,6 +384,11 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 				objrefs.append(submitComposite(c))
 				print("new object ", objrefs[i])
 			}
+			var ccod = grid[0]
+			ccod.position -= camera.moo.position
+			let c = toC(ccod)
+			gridrefs.append(submitComposite(c))
+			print("new object: grid")
 		}
 		if interfaceMode == .physicsSim || interfaceMode == .flightMode {
 			if(rcsIsEnabled) {
@@ -418,43 +429,39 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 					break;
 			}
 		}
-
+		grid[0].position = player1.moo.position
+		grid[0].position.round(grid_size)
 
 		// camera and rendering
 		var renderMisc = render_misc()
 		renderMisc.buttonPresses = abs(buttonPresses);
 		renderMisc.materials = materialsArray
-		//if interfaceMode == .physicsSim {
-			let cameraTarget = player1.moo
-			let nearestCelestial = moon.moo
-			let relativeVelocity = cameraTarget.velocity - nearestCelestial.velocity
-			var prograde = relativeVelocity
-			if(relativeVelocity.lengthSquared == 0) {
-				camera.moo.position = cameraTarget.position + Vector(10, 10, -4.5 * cameraTarget.radius)
-				prograde = cameraTarget.orientation * Vector(0, 0, 1)
-			} else {
-				prograde = relativeVelocity.normalized()
-				camera.moo.position = cameraTarget.position + relativeVelocity.normalized() * -4.5 * cameraTarget.radius
-			}
-			var camFwd = (cameraTarget.position - camera.moo.position).normalized()
-			var upVec = (cameraTarget.position - nearestCelestial.position).normalized()
-			let pitchAxis = camFwd.cross(upVec).normalized()
-			let pitchQuat = Quaternion(axis: pitchAxis, angle: 2.0 * cameraSpherical.phi * (rcsIsEnabled ? 0.0 : 1.0))
-			let yawQuat = Quaternion(axis: upVec, angle: 2.0 * cameraSpherical.theta * (rcsIsEnabled ? 0.0 : 1.0))
-			if(interfaceMode == .flightMode) {
-				camFwd = cameraTarget.orientation * Vector(0, 0, -1)
-				upVec = cameraTarget.orientation * worldUpVector
-				camera.moo.position = cameraTarget.position + camFwd * -4.5 * cameraTarget.radius
-			} else {
-				camFwd = yawQuat * pitchQuat * camFwd
-				upVec = pitchQuat * upVec
-			}
-			renderMisc.camForward = (Float(camFwd.x), Float(camFwd.y), Float(camFwd.z))
-			renderMisc.camUp = (Float(upVec.x), Float(upVec.y), Float(upVec.z))
-		//} else if interfaceMode == .workshop {
-		//	renderMisc.camUp = (0.1, 0.9899, -0.1)
-		//	renderMisc.camForward = (-0.4, -0.4, -0.82462)
-		//}
+		let cameraTarget = player1.moo
+		let nearestCelestial = moon.moo
+		let relativeVelocity = cameraTarget.velocity - nearestCelestial.velocity
+		var prograde = relativeVelocity
+		if(relativeVelocity.lengthSquared == 0) {
+			camera.moo.position = cameraTarget.position + Vector(10, 10, -4.5 * cameraTarget.radius)
+			prograde = cameraTarget.orientation * Vector(0, 0, 1)
+		} else {
+			prograde = relativeVelocity.normalized()
+			camera.moo.position = cameraTarget.position + relativeVelocity.normalized() * -4.5 * cameraTarget.radius
+		}
+		var camFwd = (cameraTarget.position - camera.moo.position).normalized()
+		var upVec = (cameraTarget.position - nearestCelestial.position).normalized()
+		let pitchAxis = camFwd.cross(upVec).normalized()
+		let pitchQuat = Quaternion(axis: pitchAxis, angle: 2.0 * cameraSpherical.phi * (rcsIsEnabled ? 0.0 : 1.0))
+		let yawQuat = Quaternion(axis: upVec, angle: 2.0 * cameraSpherical.theta * (rcsIsEnabled ? 0.0 : 1.0))
+		if(interfaceMode == .flightMode) {
+			camFwd = cameraTarget.orientation * Vector(0, 0, -1)
+			upVec = cameraTarget.orientation * worldUpVector
+			camera.moo.position = cameraTarget.position + camFwd * -4.5 * cameraTarget.radius
+		} else {
+			camFwd = yawQuat * pitchQuat * camFwd
+			upVec = pitchQuat * upVec
+		}
+		renderMisc.camForward = (Float(camFwd.x), Float(camFwd.y), Float(camFwd.z))
+		renderMisc.camUp = (Float(upVec.x), Float(upVec.y), Float(upVec.z))
 		// camera is at 0,0,0 to make it easy for the renderer
 		renderMisc.camPosition = (0, 0, 0)
 		for (index, object) in lights.enumerated() {
@@ -499,15 +506,34 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 										radius: Float(player1.moo.radius * pow(position.length * 0.01, 0.9)),
 										material_idx: 6)
 		}
-		let compositeArray = UnsafeMutablePointer<Objref>.allocate(capacity: objrefs.count)
+		let compositeArray = UnsafeMutablePointer<Objref>.allocate(capacity: objrefs.count + 57)
 		for (index, object) in objrefs.enumerated() {
 			var position = s.composites[object.id].position - camera.moo.position
 			compositeArray[index] = Objref(orientation: s.composites[object.id].orientation.float, position: position.float, id: object.id, type: object.type)
 		}
+		for i in 0..<27 {
+			var position = grid[0].position + (Vector(Double((i/9) - 1), Double(((i/3) % 3) - 1), Double(((i % 9) % 3) - 1)) * (grid_size * 4)) - camera.moo.position
+			compositeArray[i + objrefs.count] = Objref(orientation: grid[0].orientation.float, position: position.float, id: gridrefs[0].id, type: gridrefs[0].type)
+		}
 
-		//print("sending \(objrefs.count) s.composites to rendering \(compositeArray[0]) ", player1.position, player1.moo.radius)
-		//print("camera.moo.position: \(camera.moo.position)")
-		render(compositeArray, objrefs.count, sphereArray, allTheThings.count + trajectory.count, renderMisc)
+		for i in 0..<30 {
+			var position = grid[0].position - camera.moo.position
+			if(i < 10) {
+				position.x += Double((i%10) - 5) * (grid_size * 12) 
+			} else if(i < 20) {
+				position.y += Double((i%10) - 5) * (grid_size * 12) 
+			} else {
+				position.z += Double((i%10) - 5) * (grid_size * 12) 
+			}
+			compositeArray[i + 27 + objrefs.count] = Objref(orientation: grid[0].orientation.float, position: position.float, id: gridrefs[0].id, type: gridrefs[0].type)
+		}
+
+//		for i in 0..<125 {
+//			var position = grid[0].position + (Vector(Double((i/25) - 2), Double(((i/5) % 5) - 2), Double(((i % 25) % 5) - 2)) * (grid_size * 4)) - camera.moo.position
+//			compositeArray[i + objrefs.count] = Objref(orientation: grid[0].orientation.float, position: position.float, id: gridrefs[0].id, type: gridrefs[0].type)
+//		}
+
+		render(compositeArray, objrefs.count + 57, sphereArray, allTheThings.count + trajectory.count, renderMisc)
 
 		sphereArray.deallocate()
 	}

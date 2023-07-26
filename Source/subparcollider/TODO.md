@@ -8,14 +8,14 @@ UI developers! UI developers! UI developers!
 // navigation interface should enlarge nearby celestials, ships and structures and show name tags near the most
 // prominent ones of each kind
 
+* rendering velocity vectors
+* rendering text
 * spaceship with a shape other than a sphere
  - user interface for editing boxoids
  - actually it would be nice to set some boxoids to not be rendered in the composite..
 * visual 3d grid (or maybe just a single planar surface) to see the scale of our spaceship while designing it
  - I'll make this a composite
- - would be good if I had textures for this or at least a new shader
- - can probably abuse the boxoid shader somewhat
- - 3 planes that cross at origo? each plane has thin lines that grow thicker the further from origo they are? draw coordinates near round numbers
+ - 3d grid of boxes/spheres axis-aligned, optional lines connecting them
 * rigid-body physics with multiple connected boxoids
  - maybe actually prioritize this because it's more fun than the UI stuff, but first get our existing code to compile and run
  - also, you know, a very basic but functioning editing interface so we can build multi-boxoid spaceships for testing

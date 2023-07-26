@@ -50,6 +50,12 @@ struct Vector: Codable {
 		let phi = acos(z/sqrt(x*x+y*y+z*z))
 		return SphericalVector(rho, theta, phi)
 	}
+	
+	mutating func round(_ n: Double) {
+		x = (x/n).rounded() * n
+		y = (y/n).rounded() * n
+		z = (z/n).rounded() * n
+	}
 
 	// round each coordinate up to nearest power of 2
 	mutating func potimize() {
