@@ -111,7 +111,7 @@ class SphericalCow: Codable {
 	init(id: Int64, position: Vector, velocity: Vector, orientation: Quaternion, spin: Vector, mass: Double, radius: Double, frictionCoefficient: Double = 0.1) {
 		self.id = id
 		self.position = position
-		self.w = 50.0
+		self.w = 200.0
 		self.warpVector = Vector()
 		self.FTL = false
 		self.velocity = velocity

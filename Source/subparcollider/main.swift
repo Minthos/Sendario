@@ -395,7 +395,7 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 				var q = Quaternion(pitch: cameraSpherical.theta, yaw: -thrustVector.z, roll: cameraSpherical.phi)
 				q = player1.moo.orientation * q * player1.moo.orientation.conjugate
 				let torque = q.xyz * 10000.0
-				var f = Quaternion(w: 0, x: thrustVector.x * 1e5, y: 0, z: thrustVector.y * 1e5)
+				var f = Quaternion(w: 0, x: thrustVector.x * 1e6, y: 0, z: thrustVector.y * 1e6)
 				f = player1.moo.orientation * f * player1.moo.orientation.conjugate
 				actions = [Action(
 					object: player1.moo,
