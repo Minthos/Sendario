@@ -1,21 +1,48 @@
 ## Near term TODO:
 
-UI developers! UI developers! UI developers!
 
-* Use The Sims as inspration for the ship designing experience
-// editing interface shuld have a visual axis aligned grid and a button to snap to grid that snaps whatever you're doing to the grid
-// x and y shrinks/enlarges the grid size
-// navigation interface should enlarge nearby celestials, ships and structures and show name tags near the most
-// prominent ones of each kind
 
-* rendering velocity vectors
+
+## Medium term TODO:
+
+* Tech tree, mining, crafting and various equipment
+* improve mining, refining and logistics
+ - build bases on celestials and in orbit
+ - mining can be in several types: rich deposits in hard rock, sparse deposits in loose regolith, asteroids
+ - logistics shouldn't be too tedious but scaling up should be time-consuming. we don't want players to get too big too fast.
+* merge in universe procgen stuff with resource deposits
+* Make a basic space exploration prototype
+ - A solar system with the sun, some planets, a spaceship with a gaslight drive
+* deprioritized tasks
+ - the shader
+ - reactivate atmospheric drag but make it follow the celestial and not apply to the celestial
+ - improve trajectory visualization: future trajectories with lines in colors of the rainbow with quadratic timestep to about 1 orbital period
+* Use redis to hold server state, json file to hold client configuration and backup of all the composites and random seeds.
+* more interesting celestials with textures and normal maps?
+
 * rendering text
+* rendering velocity vectors
+* navigation interface should enlarge nearby celestials, ships and structures and show name tags near the most prominent ones of each kind
 * spaceship with a shape other than a sphere
  - user interface for editing boxoids
- - actually it would be nice to set some boxoids to not be rendered in the composite..
+ - it would be nice to set some boxoids to not be rendered in the composite
 * rigid-body physics with multiple connected boxoids
  - maybe actually prioritize this because it's more fun than the UI stuff, but first get our existing code to compile and run
  - also, you know, a very basic but functioning editing interface so we can build multi-boxoid spaceships for testing
+* Use The Sims as inspration for the ship designing experience
+ - two modes, one for editing boxoids and one for combining boxoids into composites
+ - import/export json without restarting the client
+ - editing interface shuld have a visual axis aligned grid and a button to snap to grid that snaps whatever you're doing to the grid
+ - x and y shrinks/enlarges the grid size
+We can start coding an interface for building a spaceship using boxoids. Will have to get some json going. Swift is appropriate for that.
+3d crosshairs should intersect at the camera's target, aligned to world space or object space axis depending on context.
+lt and rt buttons to cycle between shapes
+a: save, edit, new, accept
+x: cancel, undo
+b: context-aware menu. Anything immediately useful easily accessible and more stuff in subtrees, user configurable with scripting "support" (i.e. we have documented where in the source code you can hardcode your own menu options into the menu).
+y: repeat last action, redo
+
+
 
 ## Recently done:
 
@@ -50,37 +77,6 @@ UI developers! UI developers! UI developers!
 * "eliminated" physics bugs (partly by commenting out the drag and magnus force)
 * installed valgrind from source because fuck ubuntu (it was easy and it works, 10/10 with rice)
 
-## High priority right now
-
-We can start coding an interface for building a spaceship using boxoids. Will have to get some json going. Swift is appropriate for that.
-Use thumbsticks and throttle to elongate and adjust curvature in any direction.
-Press cam button to switch between moving the camera and editing the shape.
-3d crosshairs should intersect at the camera's target, aligned to world space or object space axis depending on context.
-
-lt and rt buttons to cycle between shapes
-a: save, edit, new, accept
-x: cancel, undo
-b: context-aware menu. Anything immediately useful easily accessible and more stuff in subtrees, user configurable with scripting "support" (i.e. we have documented where in the source code you can hardcode your own menu options into the menu).
-y: repeat last action, redo
-
-
-## Medium term TODO:
-
-* Tech tree, mining, crafting and various equipment
-* improve mining, refining and logistics
- - mining can be in several types: rich deposits in hard rock, sparse deposits in loose regolith, asteroids
- - logistics shouldn't be too tedious but scaling up should be time-consuming. we don't want players to get too big too fast.
-* merge in universe procgen stuff with resource deposits
-* Make a basic space exploration prototype
- - A solar system with the sun, some planets, a spaceship with a gaslight drive
-* deprioritized tasks
- - the shader
- - reactivate atmospheric drag but make it follow the celestial and not apply to the celestial
- - improve trajectory visualization: future trajectories with lines in colors of the rainbow with quadratic timestep to about 1 orbital period
-* Use redis to hold server state, json file to hold client configuration and backup of all the composites and random seeds.
-* Players who spawn into the game can browse galaxies and star systems to spawn in via a website. If they just start
-the client it will pick a random unvisited starting location within 50 LY of Earth.
-
 
 ## Even further out:
 
@@ -93,7 +89,6 @@ the client it will pick a random unvisited starting location within 50 LY of Ear
 * render exhaust plumes
 * boxid support in the physics engine
 * more creative use of boxoids in the physics engine for things like explosions, magnetic fields, gas clouds, exhaust plumes
-* replace the skybox with "snow" that's aligned to the world coordinate space
 * some refactoring of the physics engine
 * implement tidal effects on celestial spin and orbit
 

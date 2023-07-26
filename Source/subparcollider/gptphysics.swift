@@ -89,7 +89,7 @@ enum ForceCategory {
 // 4. upgrade collisions to be not instantaneous and handle multiple bodies colliding. 1 ms default timestep
 class SphericalCow: Codable {
 	let id: Int64
-	var frameOfReference: SphericalCow? = nil
+	var referenceFrame: SphericalCow? = nil
 	var position: Vector
 	var w: Double
 	var warpVector: Vector
@@ -137,10 +137,10 @@ class SphericalCow: Codable {
 
 	// let's not do this for now, instead let's keep different star systems in separate coordinate spaces and not mix objects between them.
 	func updateFrameOfReference(_ new: SphericalCow) {
-		let old = self.frameOfReference ?? SphericalCow.unit()
+		let old = self.referenceFrame ?? SphericalCow.unit()
 		//self.position = self.position + old.position - new.position
 		//self.velocity = self.velocity + old.velocity - new.velocity
-		self.frameOfReference = new
+		self.referenceFrame = new
 	}
 
 	// this function is not called by the collision code
@@ -235,7 +235,7 @@ func gravTick(center: SphericalCow, celestials: inout [Celestial], t: Double, dt
 			let (gravity, nearest) = calculateGravities(subject: object.moo, objects: celestials)
 			object.moo.applyForce(force: gravity, category: .gravity, dt: dt)
 			// these are celestials, they should all have the same frame of reference (their star's)
-			//if(nearest !== object.moo.frameOfReference) {
+			//if(nearest !== object.moo.referenceFrame) {
 				//object.moo.updateFrameOfReference(nearest)
 			//}
 		}
@@ -265,7 +265,7 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 	for object in entities {
 		let (gravity, nearest) = calculateGravities(subject: object.moo, objects: celestials)
 		object.moo.applyForce(force: gravity, category: .gravity, dt: dt)
-		if(nearest !== object.moo.frameOfReference) {
+		if(nearest !== object.moo.referenceFrame) {
 			object.moo.updateFrameOfReference(nearest)
 		}
 		object.moo.integrateForce(dt: dt)
