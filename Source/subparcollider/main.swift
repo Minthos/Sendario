@@ -431,6 +431,11 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 		}
 		grid[0].position = player1.moo.position
 		grid[0].position.round(grid_size)
+		if(player1.moo.frameOfReference != nil) {
+			grid[0].position = (player1.moo.position - player1.moo.frameOfReference!.position)
+			grid[0].position.round(grid_size)
+			grid[0].position += player1.moo.frameOfReference!.position
+		}
 
 		// camera and rendering
 		var renderMisc = render_misc()

@@ -13,15 +13,15 @@ UI developers! UI developers! UI developers!
 * spaceship with a shape other than a sphere
  - user interface for editing boxoids
  - actually it would be nice to set some boxoids to not be rendered in the composite..
-* visual 3d grid (or maybe just a single planar surface) to see the scale of our spaceship while designing it
- - I'll make this a composite
- - 3d grid of boxes/spheres axis-aligned, optional lines connecting them
 * rigid-body physics with multiple connected boxoids
  - maybe actually prioritize this because it's more fun than the UI stuff, but first get our existing code to compile and run
  - also, you know, a very basic but functioning editing interface so we can build multi-boxoid spaceships for testing
 
 ## Recently done:
 
+* visual 3d grid (or maybe just a single planar surface) to see the scale of our spaceship while designing it
+ - I'll make this a composite
+ - 3d grid of boxes/spheres axis-aligned, optional lines connecting them
 * position camera based on ship's orientation instead of ship's velocity
 * rotate the ship's self-thrust vector by the ship's orientation
 * w-space
