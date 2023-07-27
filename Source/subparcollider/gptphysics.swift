@@ -85,6 +85,13 @@ enum ForceCategory {
 	case impact // the impact forces are not reported through the correct channels.
 }
 
+/*
+
+After all the forces have been applied from collisions and other sources, propagate forces between connected boxoids
+to determine the forces acting on the composite itself and damage/deformation/disconnection/destruction of boxoids
+as appropriate.
+
+*/
 // 3. upgrade celestial class with reentry heat and drag
 // 4. upgrade collisions to be not instantaneous and handle multiple bodies colliding. 1 ms default timestep
 class SphericalCow: Codable {
@@ -136,7 +143,7 @@ class SphericalCow: Codable {
 	}
 
 	// let's not do this for now, instead let's keep different star systems in separate coordinate spaces and not mix objects between them.
-	func updateFrameOfReference(_ new: SphericalCow) {
+	func updateReferenceFrame(_ new: SphericalCow) {
 		let old = self.referenceFrame ?? SphericalCow.unit()
 		//self.position = self.position + old.position - new.position
 		//self.velocity = self.velocity + old.velocity - new.velocity
@@ -236,7 +243,7 @@ func gravTick(center: SphericalCow, celestials: inout [Celestial], t: Double, dt
 			object.moo.applyForce(force: gravity, category: .gravity, dt: dt)
 			// these are celestials, they should all have the same frame of reference (their star's)
 			//if(nearest !== object.moo.referenceFrame) {
-				//object.moo.updateFrameOfReference(nearest)
+				//object.moo.updateReferenceFrame(nearest)
 			//}
 		}
 		object.moo.integrateForce(dt: dt)
@@ -266,7 +273,7 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		let (gravity, nearest) = calculateGravities(subject: object.moo, objects: celestials)
 		object.moo.applyForce(force: gravity, category: .gravity, dt: dt)
 		if(nearest !== object.moo.referenceFrame) {
-			object.moo.updateFrameOfReference(nearest)
+			object.moo.updateReferenceFrame(nearest)
 		}
 		object.moo.integrateForce(dt: dt)
 		object.moo.integrateTorque(dt: dt)

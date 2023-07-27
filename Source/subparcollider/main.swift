@@ -260,10 +260,12 @@ func main() {
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_X.rawValue {
 									player1.moo.w *= 0.8
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_B.rawValue {
-									player1.moo.warpVector = Vector();
 									player1.moo.FTL = false
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_A.rawValue {
-									player1.moo.FTL = true
+									if( ! player1.moo.FTL) {
+										player1.moo.warpVector = Vector();
+										player1.moo.FTL = true
+									}
 								}
 							} else if interfaceMode == .workshop {
  								print("\(String(cString: getStringForButton(event.cbutton.button)!)) pressed")
@@ -421,6 +423,7 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 					if(thrustVector.length > 0.05) {
 						s.composites[curcom].b[curbox].elongate(thrustVector * 0.01)
 						updateComposite(objrefs[curcom], toC(s.composites[curcom]))
+						s.composites[curcom].bbox = s.composites[curcom].calculateBBox()
 						player1.moo.radius = player1.moo.radius * 0.95 + 0.05 * s.composites[curcom].bbox.halfsize
 					}
 				case .LEFT:
@@ -428,6 +431,7 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 					if(thrustVector.length > 0.05) {
 						s.composites[curcom].b[curbox].bulgerize(thrustVector * 0.01)
 						updateComposite(objrefs[curcom], toC(s.composites[curcom]))
+						s.composites[curcom].bbox = s.composites[curcom].calculateBBox()
 						player1.moo.radius = player1.moo.radius * 0.95 + 0.05 * s.composites[curcom].bbox.halfsize
 					}
 				default:

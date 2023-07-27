@@ -1,6 +1,10 @@
+# To do
 ## Near term TODO:
 
-
+* Multiple boxoids. UI for adding a boxoid adjacent to another boxoid.
+* Boxoids each get a spherical cow. The Entity class can represent a single boxoid or a single composite.
+- Collision detection algo should first consider the composite's bounding sphere and if that collides
+  it can proceed to check which boxoid collides first.
 
 
 ## Medium term TODO:
@@ -14,12 +18,10 @@
 * Make a basic space exploration prototype
  - A solar system with the sun, some planets, a spaceship with a gaslight drive
 * deprioritized tasks
- - the shader
  - reactivate atmospheric drag but make it follow the celestial and not apply to the celestial
  - improve trajectory visualization: future trajectories with lines in colors of the rainbow with quadratic timestep to about 1 orbital period
 * Use redis to hold server state, json file to hold client configuration and backup of all the composites and random seeds.
 * more interesting celestials with textures and normal maps?
-
 * rendering text
 * rendering velocity vectors
 * navigation interface should enlarge nearby celestials, ships and structures and show name tags near the most prominent ones of each kind
@@ -29,6 +31,9 @@
 * rigid-body physics with multiple connected boxoids
  - maybe actually prioritize this because it's more fun than the UI stuff, but first get our existing code to compile and run
  - also, you know, a very basic but functioning editing interface so we can build multi-boxoid spaceships for testing
+* Ground vehicle using physics model and 4 wheels (rotation limited to 1 axis): dump truck with a cargo boxoid
+ - rigid body physics with linked spherical cows
+ - springs with adjustable rebound and compression damping
 * Use The Sims as inspration for the ship designing experience
  - two modes, one for editing boxoids and one for combining boxoids into composites
  - import/export json without restarting the client

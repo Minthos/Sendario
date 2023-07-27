@@ -494,13 +494,18 @@ func hexString(_ number: UInt64) -> String {
 	return String(format: "%llx", number)
 }
 
-struct BBox {
+struct BBox: Codable {
 	var center: Vector
 	var halfsize: Double
 
 	var top: Vector { get { return center + halfsize } }
 	var bottom: Vector { get { return center - halfsize } }
 	var pretty: String { get { return center.pretty + " halfsize: " + halfsize.pretty }}
+
+	init() {
+		center = Vector()
+		halfsize = 0
+	}
 
 	init(center: Vector, halfsize: Double) {
 		self.center = center

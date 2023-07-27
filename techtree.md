@@ -48,7 +48,7 @@ becomes useful output. The rest becomes heat that the ship's cooling system has 
 - RCS thrusters
 - Arcjet rocket engine 5 hp/t (300:1 twr @ 4 km/s ve, max 10 km/s ve, electric, twr +100 * lv)
 - Propellant tank 50 hp/t hp/t (mass * 0.8^lv)
-- Hull 100 hp/t (mass * 0.7^lv)
+- Hull 100 hp/t (mass * 0.7^lv) - hull strengthens the ship against high acceleration such as collisions, turret recoil and engine thrust
 - Cargo hold 100 hp/t (mass * 0.7^lv)
 - Heat sink 20 hp/t (mass * 0.5^lv)
 - Hardware factory 50 hp/t builds 0.5 t/t per hour
@@ -64,7 +64,7 @@ becomes useful output. The rest becomes heat that the ship's cooling system has 
 
 ### Mineral refinery enables:
 - Coilgun 50 hp/t (5 km/s) 50% efficiency. simple and cost-effective way to damage a target
-- Armour plate 200 hp/t (hp * 1.7^lv)
+- Armour plate 200 hp/t (hp * 1.7^lv) - armor protects mainly against high energy, low impulse effects
 - Railroad track 100 hp/t
 - Gas pipe 100 hp/t
 
@@ -80,7 +80,8 @@ becomes useful output. The rest becomes heat that the ship's cooling system has 
 - Propellant 20 hp/t nonvolatile (+10% density/lv, upgrades boost thrust and isp)
 
 ### Hardware factory + gas refinery enables:
-- Life support (not used for anything since the game has no lifeforms)
+- Life support
+- Biofactory 10 hp/t refines 0.001 t/t per hour (can refine and synthesize some exotic compounds).
 
 ### Hardware factory + both refineries enables:
 - Chip fab (5 hp/t) builds 1 PFLOPS * t * h
@@ -123,7 +124,7 @@ becomes useful output. The rest becomes heat that the ship's cooling system has 
 
 ### Tech level 2 enables:
 - Everything can be upgraded to level 2 if their prerequisites and ingredients are at level 2.
-- Gaslight drive 30 hp/t (electric, allows hyperspace travel)
+- Gaslight drive 30 hp/t (electric, allows hyperspace travel, 15 MW/t energy consumption, 1000 * sqrt(t) warp strength).
 
 ### Hardware factory level 2 enables:
 - Gamma beam cannon. 200 hp/t Detonates a tiny nuclear bomb inside a reflector that focuses the radiation from the blast
@@ -232,7 +233,9 @@ In an MMO persistent world I would like to have upgrades that players can resear
 Applying an upgrade to an item of a different tech level than the upgrade was researched for produces a -20%/abs(delta lv)
 reduction in bonuses and +20%/abs(delta lv) increase in maluses.
 
-Track the origin of every boxoid and every composite. When an item is part of equipment used to earn xp, the user, the builder, and the inventor of that item (can be the same or different players) each get some xp. The xp is tied to the (item design, player) pair. Players can use this xp as input material in r&d projects for that item, with each project having a chance to discover an upgrade that can be applied to the item. This means that players who design, manufacture and use a few popular items get to enjoy more available upgrades for those items than players using experimental, exotic and bespoke designs. I think the user should get most of the xp, maybe 80%, with 10% going to the builder and 10% to the inventor. Disallow transfer/sharing of upgrade recipes between players, but allow trading of the finished item with the upgrade applied. Designs for boxoids and composites will be automatically shared with other players because they are used for rendering. May as well build a system around copying and modifying each others' designs.
+For the sake of stimulating trade and exploration we can have a bunch of rare exotic ingredients that, when available to the player, get a small chance of being a required ingredient in upgrades that player researches from then on. If the item is required it provides an extra boost to the upgrade's strength. Rare minerals, biological compounds, gases. Some can be synthesized after they have been discovered and refined to lv3, others can only be harvested where they naturally occur. Melange, unobtainium, kryptonite, fairy dust, spider silk, mithril, angel hair, unicorn farts, dragon scales, plutonic quartz, happiness, carebear tears and so on. Each ingredient's chance of being included in a recipe is independent of the other ingredients. The locations of these ingredients should be secret and the server will let the client know when the player enters sensor range of an exotic deposit. Could also hand the resources out as quest rewards, dungeon boss loot drops and have deposits that are mined and guarded by npc factions. Use AI to generate lots of substances and lots of quest to find deposits of them. Each system with a habitable planet should have at least 1 exotic resource deposit.
+
+Track the origin of every boxoid and every composite. When an item is part of equipment used to earn xp, the user, the builder, and the inventor of that item (can be the same or different players) each get some xp. The xp is tied to the (item design, player) pair. Players can use this xp as input material in r&d projects for that item, with each project having a chance to discover an upgrade that can be applied to the item. This means that players who design, manufacture and use a few popular items get to enjoy more available upgrades for those items than players using experimental, exotic and bespoke designs. I think the user of the item should get most of the xp, maybe 80%, with 10% going to the builder and 10% to the inventor (can all be the same player). Disallow transfer/sharing of upgrade recipes between players, but allow trading of the finished item with the upgrade applied. Designs for boxoids and composites will be automatically shared with other players because they are used for rendering. May as well build a system around copying and modifying each others' designs.
 
 Research projects:
 1. An intern tinkers with it
@@ -248,11 +251,16 @@ Research projects:
  - cost: 1000 xp, 10 EFLOPS * h, $20M r&d money
  - Tier: 30% failure, 50% lv2, 20% lv3
 
+Success means you get a prototype of the resulting upgrade and you unlock a project to mass produce it.
+Failure means you get refunded 150% of the xp cost.
+
 upgrade tiers:
 lv0: up to 2 bonuses, up to 1 malus, 1x strength
-lv1: up to 3 bonuses, up to 2 maluses, 2x strength
-lv2: up to 4 bonuses, up to 3 maluses, 3x strength
-lv3: up to 5 bonuses, up to 4 maluses, 4x strength
+lv1: up to 3 bonuses, up to 2 maluses, 2x strength, up to 1 exotic ingredient for up to 20% boost (1% boost per 1% ingredient mass)
+lv2: up to 4 bonuses, up to 3 maluses, 3x strength, up to 2 exotic ingredients for up to 40% boost (1% boost per 1% ingredient mass)
+lv3: up to 5 bonuses, up to 4 maluses, 4x strength, up to 3 exotic ingredients for up to 60% boost (1% boost per 1% ingredient mass)
+"Up to" means random number of randomly chosen bonuses that can stack with each other. Maluses can not be on
+the same stats as there are bonuses. 
 
 All items can have the following upgrades:
 - telemetry harness: boosts xp gain from using this item

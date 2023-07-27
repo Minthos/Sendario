@@ -86,8 +86,7 @@ void main() {
 	crossNoise = max(crossNoise, crossNoise2);
 	float detailNoise = noise(uv2 * 150.0 + time * 0.0015);
 	float combinedNoise = mix(crossNoise, detailNoise, 0.6);
-	//float intensity = smoothstep(0.8, 1.0, combinedNoise) * 1.0;
-	float intensity = smoothstep(0.8, 1.0, combinedNoise) * 2.0;
+	float intensity = smoothstep(0.8, 1.0, combinedNoise) * 1.0;
 	vec3 starColor = hsv2rgb(vec3(random(floor(gl_FragCoord.xy / 12) * 12), 0.7-intensity, intensity));
 	FragColor = vec4(starColor, 1.0);
 }
