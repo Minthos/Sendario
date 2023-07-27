@@ -37,6 +37,10 @@ Not implemented. Pull requests welcome.
 
 ## Gameplay
 
+### How is it about AI?
+
+I will allow bots to play the game. Not sure about the details but I want to see a thriving bot development community.
+
 ### State of gameplay implementation
 
 First I have to build a ui for designing a spaceship..
