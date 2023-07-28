@@ -15,6 +15,7 @@ Gather materials (mineral/gas deposits, salvage, trade), upgrade ship/base with 
 * Heat sink
 * Battery
 * Fuel tank/cargo hold/armor/bulkhead
+* Drone bay
 * Chip fab
 * Hardware factory
 * Mineral refinery
@@ -57,8 +58,9 @@ becomes useful output. The rest becomes heat that the ship's cooling system has 
 - VAB 50 hp/t
 
 ### Hardware factory enables:
+- Drone bay 50 hp/t stores, repairs, refuels and rearms drones (repair 10 t/t/hr, rearm 100 t/t/hr, refuel 1000 t/t/hr)
 - Utility drone level 0 20 hp/t, refines 1 t/t per hr, carries 1t/t, mines 60t/t/hr
-- Motors, actuators, +++
+- Components (motors, actuators, +++)
 - Sensors 20 hp/t
 - Conveyor belt
 
@@ -80,13 +82,14 @@ becomes useful output. The rest becomes heat that the ship's cooling system has 
 - Propellant 20 hp/t nonvolatile (+10% density/lv, upgrades boost thrust and isp)
 
 ### Hardware factory + gas refinery enables:
-- Life support
+- Life support 20 hp/t
 - Biofactory 10 hp/t refines 0.001 t/t per hour (can refine and synthesize some exotic compounds).
 
 ### Hardware factory + both refineries enables:
 - Chip fab (5 hp/t) builds 1 PFLOPS * t * h
 - Battery (20 hp/t)
-- Autocannon 50 hp/t (3 km/s) 80% efficiency (configurable warhead: kinetic, flak, explosive, smoke, nuclear, fusion, antimatter)
+- Autocannon 50 hp/t (3 km/s) 80% efficiency (configurable warhead: kinetic, flak, explosive, smoke, nuclear, fusion, antimatter.
+	Switching ammo types requires a utility drone.)
 	Autocannons are good for saturating an area with danger but are defeated by maneuverability and speed.
 	Effective point defense against unguided missiles.
 - Chemical rocket engine 5 hp/t (450:1 twr, 3.7 km/s ve, self-powered)
@@ -117,7 +120,9 @@ becomes useful output. The rest becomes heat that the ship's cooling system has 
 - Lasers 20 hp/t 1 GW/t input (lv1 5% efficiency, lv2 10% efficiency, lv3 20% efficiency) essential defense against nuclear missiles.
 - Ion drive 10 hp/t (0.4:1 twr @ 30 km/s ve, max 50 km/s ve, electric. +0.2 max twr and +20km/s max ve per level)
 - Nuclear rocket engine 20 hp/t (40:1 twr @ 10 km/s ve, max 20 km/s ve, self-powered)
-- Autocannon -> Advanced Autocannon (5 km/s) 90% efficiency (configurable warhead)
+- Autocannon -> Advanced Autocannon (5 km/s) 90% efficiency (configurable warhead. thanks to the 3d printing community
+	inventing automatic filament switching the advanced autocannon can switch seamlessly between ammo types with no
+	interruption of fire.)
 
 ### Chip fab level 1 + hardware factory level 1 enables:
 - Utility drone tech level 2 60 hp/t
@@ -135,7 +140,7 @@ armored equipment and biological creatures. Large AOE.
 - Railgun -> Advanced Railgun (20 km/s) 70% efficiency
 
 ### Hardware factory level 2 + both refineries level 2 enables:
-- Advanced Autocannon -> Ultra Autocannon (8 km/s) 95% efficiency (configurable warhead)
+- Advanced Autocannon -> Ultra Autocannon (8 km/s) 95% efficiency (configurable warhead, each shell can carry 2 warheads, auto ammo switcher)
 - Chip fab lv 2 builds 100 PFLOPS * t * h
 
 ### Hardware factory level 2 + both refineries level 2 + any reactor level 2 enables:
@@ -160,7 +165,7 @@ armored equipment and biological creatures. Large AOE.
 - Antimatter beam 20 hp/t 1 GW/t input, 99% thermal efficiency, volatile
 - Antimatter warheads 10 hp/t small, extremely powerful, volatile. Large AOE.
 - Antimatter reactor 5 hp/t (250 GW/t power, 2% waste heat) volatile
-Antmatter is extremely expensive, usually not a cost effective way to fight unless the battle is very high stakes.
+Antmatter is extremely expensive, usually not a cost effective way to fight.
 It also releases all its energy when the containment fails, unlike fusion and nuclear.
 
 ---
@@ -233,7 +238,7 @@ In an MMO persistent world I would like to have upgrades that players can resear
 Applying an upgrade to an item of a different tech level than the upgrade was researched for produces a -20%/abs(delta lv)
 reduction in bonuses and +20%/abs(delta lv) increase in maluses.
 
-For the sake of stimulating trade and exploration we can have a bunch of rare exotic ingredients that, when available to the player, get a small chance of being a required ingredient in upgrades that player researches from then on. If the item is required it provides an extra boost to the upgrade's strength. Rare minerals, biological compounds, gases. Some can be synthesized after they have been discovered and refined to lv3, others can only be harvested where they naturally occur. Melange, unobtainium, kryptonite, fairy dust, spider silk, mithril, angel hair, unicorn farts, dragon scales, plutonic quartz, happiness, carebear tears and so on. Each ingredient's chance of being included in a recipe is independent of the other ingredients. The locations of these ingredients should be secret and the server will let the client know when the player enters sensor range of an exotic deposit. Could also hand the resources out as quest rewards, dungeon boss loot drops and have deposits that are mined and guarded by npc factions. Use AI to generate lots of substances and lots of quest to find deposits of them. Each system with a habitable planet should have at least 1 exotic resource deposit.
+For the sake of stimulating trade and exploration we can have a bunch of rare exotic ingredients that, when available to the player, get a small chance of being a required ingredient in upgrades that player researches from then on. If the item is required it provides an extra boost to the upgrade's strength. Rare minerals, biological compounds, gases. Stuff that has interesting properties and is hard to synthesize. Melange, unobtainium, kryptonite, fairy dust, spider silk, mithril, angel hair, unicorn farts, dragon scales, plutonic quartz, happiness, carebear tears and so on. Each ingredient's chance of being included in a recipe is independent of the other ingredients. The locations of these ingredients should be secret and the server will let the client know when the player enters sensor range of an exotic deposit. Could also hand the resources out as quest rewards, dungeon boss loot drops and have deposits that are mined and guarded by npc factions. Use AI to generate lots of substances and lots of quest to find deposits of them. Each system with a habitable planet should have at least 1 exotic resource available for drops. Each system has a 10% chance of having at least 1 exotic resource, having a habitable planet bumps it to 100%. If it has 1 there is 20% chance it has two, 4% for three and so on.
 
 Track the origin of every boxoid and every composite. When an item is part of equipment used to earn xp, the user, the builder, and the inventor of that item (can be the same or different players) each get some xp. The xp is tied to the (item design, player) pair. Players can use this xp as input material in r&d projects for that item, with each project having a chance to discover an upgrade that can be applied to the item. This means that players who design, manufacture and use a few popular items get to enjoy more available upgrades for those items than players using experimental, exotic and bespoke designs. I think the user of the item should get most of the xp, maybe 80%, with 10% going to the builder and 10% to the inventor (can all be the same player). Disallow transfer/sharing of upgrade recipes between players, but allow trading of the finished item with the upgrade applied. Designs for boxoids and composites will be automatically shared with other players because they are used for rendering. May as well build a system around copying and modifying each others' designs.
 

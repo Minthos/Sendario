@@ -210,6 +210,9 @@ func main() {
 		s.composites.append(CompositeCod.unit())
 		s.composites[0].position = player1.moo.position
 		s.composites[0].orientation = player1.moo.orientation
+		player1.createCows()
+		player1.recomputeCows()
+		player1.updateCows()
 		//s.composites.append(CompositeCod.load("grid.json"))
 		//s.composites[1].orientation = Quaternion()
 	} else {
@@ -262,7 +265,7 @@ func main() {
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_B.rawValue {
 									player1.moo.FTL = false
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_A.rawValue {
-									if( ! player1.moo.FTL) {
+									if( !player1.moo.FTL) {
 										player1.moo.warpVector = Vector();
 										player1.moo.FTL = true
 									}
@@ -424,6 +427,7 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 						s.composites[curcom].b[curbox].elongate(thrustVector * 0.01)
 						updateComposite(objrefs[curcom], toC(s.composites[curcom]))
 						s.composites[curcom].bbox = s.composites[curcom].calculateBBox()
+						player1.recomputeCows()
 						player1.moo.radius = player1.moo.radius * 0.95 + 0.05 * s.composites[curcom].bbox.halfsize
 					}
 				case .LEFT:
@@ -432,6 +436,7 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 						s.composites[curcom].b[curbox].bulgerize(thrustVector * 0.01)
 						updateComposite(objrefs[curcom], toC(s.composites[curcom]))
 						s.composites[curcom].bbox = s.composites[curcom].calculateBBox()
+						player1.recomputeCows()
 						player1.moo.radius = player1.moo.radius * 0.95 + 0.05 * s.composites[curcom].bbox.halfsize
 					}
 				default:

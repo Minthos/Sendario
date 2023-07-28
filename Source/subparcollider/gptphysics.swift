@@ -1,90 +1,5 @@
 import Foundation
 
-let G: Double = 6.67430e-11
-
-// assuming Earthlike conditions for now
-func atmosphericProperties(altitude: Double) -> (density: Double, pressure: Double, viscosity: Double) {
-	let seaLevelTemperature: Double = 288.15
-	let temperatureLapseRate: Double = -0.0065
-	let seaLevelPressure: Double = 101325.0
-	let gasConstant: Double = 287.05
-	let gravityConstant: Double = 9.81
-	let airMolarMass: Double = 28.97e-3
-	let boltzmannConstant: Double = 1.38064852e-23
-
-	let temperature = seaLevelTemperature + temperatureLapseRate * altitude
-	let pressure = seaLevelPressure * pow(1 + temperatureLapseRate * altitude / seaLevelTemperature, -gravityConstant * airMolarMass / (gasConstant * temperatureLapseRate))
-	let density = pressure / (gasConstant * temperature)
-	let viscosity = (boltzmannConstant * temperature) / (sqrt(2) * Double.pi * pow(airMolarMass, 2))
-
-	return (density, pressure, viscosity)
-}
-
-protocol Moo {
-	var moo: SphericalCow { get }
-}
-
-class Entity: Codable, Moo {
-	var moo: SphericalCow
-	var name: String
-	var c: CompositeCod
-	
-	init(name: String, _ moo: SphericalCow) {
-		self.name = name
-		self.moo = moo
-		self.c = CompositeCod.unit()
-	}
-}
-
-class Celestial: Codable, Moo {
-	var moo: SphericalCow
-	var perigee: SphericalVector
-	var apogee: SphericalVector
-	var name: String
-	var gravitationalParameter: Double
-	var atmosphereComposition: [String: Double]?
-	var meanTemperature: Double?
-	var albedo: Double?
-	var rotationPeriod: Double?
-	
-	init(name: String, _ moo: SphericalCow) {
-		self.moo = moo
-		(self.perigee, self.apogee) = calculatePeriApo(moo)
-		self.name = name
-		self.gravitationalParameter = 6.67430e-11 * moo.mass // Standard gravitational parameter
-	}
-	
-	func escapeVelocity(at distance: Double) -> Double {
-		return sqrt(2 * gravitationalParameter / distance)
-	}
-	
-	func orbitVelocity(at distance: Double) -> Double {
-		return sqrt(gravitationalParameter / distance)
-	}
-	
-	func period(forOrbitRadius radius: Double) -> Double {
-		return 2 * Double.pi * sqrt(pow(radius, 3) / gravitationalParameter)
-	}
-	
-	func surfaceGravity(at distance: Double) -> Double {
-		return gravitationalParameter / pow(distance, 2)
-	}
-	
-	func surfaceTemperature(at distance: Double) -> Double {
-		return meanTemperature ?? 0 // Placeholder implementation
-	}
-	
-	func atmospherePressure(at altitude: Double) -> Double? {
-		return 101325 * pow((288.15 - 0.0065 * altitude) / 288.15, 5.25588) // based on the International Standard Atmosphere
-	}
-}
-
-enum ForceCategory {
-	case thrust
-	case gravity
-	case impact // the impact forces are not reported through the correct channels.
-}
-
 /*
 
 After all the forces have been applied from collisions and other sources, propagate forces between connected boxoids
@@ -114,6 +29,8 @@ class SphericalCow: Codable {
 	var frictionCoefficient: Double
 	var density: Double { return mass / (4 * Double.pi * pow(radius, 3) / 3) }
 	var heat: Double = 0
+	var hp: Double = 0
+	var armor: Double = 0
 
 	init(id: Int64, position: Vector, velocity: Vector, orientation: Quaternion, spin: Vector, mass: Double, radius: Double, frictionCoefficient: Double = 0.1) {
 		self.id = id
@@ -242,13 +159,19 @@ func gravTick(center: SphericalCow, celestials: inout [Celestial], t: Double, dt
 			let (gravity, nearest) = calculateGravities(subject: object.moo, objects: celestials)
 			object.moo.applyForce(force: gravity, category: .gravity, dt: dt)
 			// these are celestials, they should all have the same frame of reference (their star's)
-			//if(nearest !== object.moo.referenceFrame) {
-				//object.moo.updateReferenceFrame(nearest)
-			//}
 		}
 		object.moo.integrateForce(dt: dt)
 		object.moo.integrateTorque(dt: dt)
 	}
+}
+
+func collisionTest(_ object1: SphericalCow, _ object2: SphericalCow) -> (Double, Double) {
+			let deltaPosition = object2.position - object1.position
+			let sumRadii = object1.radius + object2.radius
+			let distance = deltaPosition.length - sumRadii
+			let deltaVelocity = object2.velocity - object1.velocity
+			let closingSpeed = -(deltaVelocity.dot(deltaPosition.normalized()))
+			return (distance, closingSpeed)
 }
 
 // "frame of reference" is zoning in the physics engine.
@@ -277,6 +200,12 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		}
 		object.moo.integrateForce(dt: dt)
 		object.moo.integrateTorque(dt: dt)
+		if(object.c.b.count != object.bmoo.count) {
+			object.createCows()
+			object.recomputeCows()
+		}
+
+		object.updateCows()
 		//let altitude = object.position.z - earth.radius
 		//let (density, _, viscosity) = atmosphericProperties(altitude: altitude)
 		//let dragCoefficient = 0.47 // Assuming a sphere
@@ -298,27 +227,137 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		//object.applyHeat(heat: 
 	}
 
-	var collisions: [(Double, SphericalCow, SphericalCow)] = []
+	var easycollisions: [(Double, SphericalCow, SphericalCow)] = []
+	var hardcollisions: [(Double, SphericalCow, SphericalCow, Entity)] = []
+	var fmlcollisions: [(Double, SphericalCow, SphericalCow, Entity, Entity)] = []
 	var everything: [Moo] = entities + celestials
-	for i in 0..<everything.count {
-		for j in i+1..<everything.count {
-			let object1 = everything[i].moo
-			let object2 = everything[j].moo
-			let deltaPosition = object2.position - object1.position
-			let sumRadii = object1.radius + object2.radius
-			let distance = deltaPosition.length - sumRadii
-			let deltaVelocity = object2.velocity - object1.velocity
-			let closingSpeed = -(deltaVelocity.dot(deltaPosition.normalized()))
+	for i in 0..<celestials.count {
+		for j in i+1..<celestials.count {
+			let object1 = celestials[i].moo
+			let object2 = celestials[j].moo
+			let (distance, closingSpeed) = collisionTest(object1, object2)
 			if distance > 0 && closingSpeed > 0 && distance < (closingSpeed * dt) {
 				print("collision \(t): \(distance) \(closingSpeed) dt: \(dt)")
 				let collisionTime = distance / closingSpeed
-				collisions.append((collisionTime, object1, object2))
+				easycollisions.append((collisionTime, object1, object2))
+			}
+		}
+	}
+	for i in 0..<entities.count {
+		for j in 0..<celestials.count {
+			let object1 = entities[i]
+			let object2 = celestials[j]
+			let (distance, closingSpeed) = collisionTest(object1.moo, object2.moo)
+			if closingSpeed > 0 && distance < (closingSpeed * dt) {
+				for k in 0..<object1.bmoo.count {
+					let (distance2, closingSpeed2) = collisionTest(object1.bmoo[k], object2.moo)
+					if distance2 > 0 && closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
+						print("collision \(t): \(distance2) \(closingSpeed2) dt: \(dt)")
+						let collisionTime2 = distance2 / closingSpeed2
+						hardcollisions.append((collisionTime2, object1.bmoo[k], object2.moo, object1))
+					}
+				}
+			}
+		}
+	}
+	for i in 0..<entities.count {
+		for j in i+1..<entities.count {
+			let object1 = entities[i]
+			let object2 = entities[j]
+			let (distance, closingSpeed) = collisionTest(object1.moo, object2.moo)
+			if closingSpeed > 0 && distance < (closingSpeed * dt) {
+				for k in 0..<object1.bmoo.count {
+					for l in k+1..<object2.bmoo.count {
+						let (distance2, closingSpeed2) = collisionTest(object1.bmoo[k], object2.bmoo[l])
+						if distance2 > 0 && closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
+							print("collision \(t): \(distance2) \(closingSpeed2) dt: \(dt)")
+							let collisionTime2 = distance2 / closingSpeed2
+							fmlcollisions.append((collisionTime2, object1.bmoo[k], object2.bmoo[l], object1, object2))
+						}
+					}
+				}
 			}
 		}
 	}
 
-	collisions.sort { $0.0 < $1.0 }
-	for (elapsedTime, object1, object2) in collisions {
+	let hpmult = 1000000.0
+	let invhpmult = 1.0/hpmult
+
+	// now we treat each composite as a sphere. would like to treat boxoids as spheres, rigidly connected.
+	hardcollisions.sort { $0.0 < $1.0 }
+	for (elapsedTime, object1, object2, ent1) in hardcollisions {
+		// elapsedTime is when the outer bounding sphere is crossed, not when the first inner collision happens
+		// when calculating momentum and moment of inertia use the entire composite
+		// when applying forces first check how much force the boxoid can transfer and destroy or dent it if needed
+		// after the boxoid has been destroyed the impulse needed to destroy it can be imparted to the composite
+		
+		// rewind this tick's movement and apply movement up to the time of collision
+		object1.position -= object1.velocity * (dt - elapsedTime)
+		object2.position -= object2.velocity * (dt - elapsedTime)
+		let deltaPosition = object2.position - object1.position
+		let deltaVelocity = object2.velocity - object1.velocity
+		let centerDistance = deltaPosition.length
+		let collisionNormal = deltaPosition / centerDistance
+		let normalVelocity = collisionNormal * (deltaVelocity.dot(collisionNormal))
+		let tangentVelocity = deltaVelocity - normalVelocity 
+		let closingSpeed = normalVelocity.length
+		var impulseMagnitude = abs(min(object1.mass, object2.mass) * closingSpeed * 2)
+		impulseMagnitude = min(object1.hp * hpmult / closingSpeed, object2.hp * hpmult / closingSpeed, impulseMagnitude)
+		object1.hp -= closingSpeed * impulseMagnitude * invhpmult
+		object2.hp -= closingSpeed * impulseMagnitude * invhpmult
+		let impulse = collisionNormal * impulseMagnitude
+		ent1.moo.velocity -= impulse / object1.mass
+		object2.velocity += impulse / object2.mass
+		let collisionPoint = object1.position + (collisionNormal * object1.radius)
+		let r1 = collisionPoint - object1.position
+		let r2 = collisionPoint - object2.position
+		let frictionCoefficient = (object1.frictionCoefficient * object2.frictionCoefficient)
+		let rotationVelocity1 = object1.spin.cross(r1) 
+		let rotationVelocity2 = object2.spin.cross(r2)
+		let totalRelativeTangentialVelocity = tangentVelocity + rotationVelocity2 - rotationVelocity1
+		let minLinearMomentum = min(object1.mass, object2.mass) * totalRelativeTangentialVelocity.length
+		let angularMomentum1 = object1.momentOfInertia * totalRelativeTangentialVelocity.length / object1.radius
+		let angularMomentum2 = object2.momentOfInertia * totalRelativeTangentialVelocity.length / object2.radius
+		let minAngularMomentum = min(angularMomentum1, angularMomentum2)
+		let magtanv = totalRelativeTangentialVelocity.length
+		var maxFrictionImpulseMagnitude = min(frictionCoefficient * impulseMagnitude * totalRelativeTangentialVelocity.length, minLinearMomentum + minAngularMomentum)
+		maxFrictionImpulseMagnitude = min(object1.hp * hpmult / magtanv, object2.hp * hpmult / magtanv, maxFrictionImpulseMagnitude)
+		object1.hp -= magtanv * impulseMagnitude * invhpmult
+		object2.hp -= magtanv * impulseMagnitude * invhpmult
+		let frictionImpulse = -totalRelativeTangentialVelocity.normalized() * maxFrictionImpulseMagnitude
+		object1.velocity -= frictionImpulse * 0.5 / object1.mass
+		object2.velocity += frictionImpulse * 0.5 / object2.mass
+		let torque1 = r1.cross(frictionImpulse * 0.5)
+		let torque2 = r2.cross(frictionImpulse * 0.5)
+		let deltaSpin1 = torque1 / object1.momentOfInertia
+		let deltaSpin2 = torque2 / object2.momentOfInertia
+		object1.spin -= deltaSpin1
+		object2.spin += deltaSpin2
+		if(object1.hp < 0.001) {
+			object1.hp = 0
+			object1.mass = 0
+		}
+		if(object2.hp < 0.001) {
+			object2.hp = 0
+			object2.mass = 0
+		}
+		// still missing: transform and transfer force and torque to the Entity
+
+		// undo the rewinding so we don't rewind way too much when many boxoids collide
+		object1.position += object1.velocity * (dt - elapsedTime)
+		object2.position += object2.velocity * (dt - elapsedTime)
+	}
+
+	// now we treat each composite as a sphere. would like to treat boxoids as spheres, rigidly connected.
+	easycollisions.sort { $0.0 < $1.0 }
+	for (elapsedTime, object1, object2) in easycollisions {
+		// elapsedTime is when the outer bounding sphere is crossed, not when the first inner collision happens
+		// need to find the first boxoid-boxoid or boxoid-sphere collision depending on what collided
+		// when calculating momentum and moment of inertia use the entire composite
+		// when applying forces first check how much force the boxoid can transfer and destroy or dent it if needed
+		// after the boxoid has been destroyed the impulse needed to destroy it can be imparted to the composite
+		// and the colliding object and we can check if any other boxoids collide within what remains of dt
+
 		// rewind this tick's movement and apply movement up to the time of collision
 		object1.position -= object1.velocity * (dt - elapsedTime)
 		object2.position -= object2.velocity * (dt - elapsedTime)
