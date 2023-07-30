@@ -1356,7 +1356,7 @@ extern "C" void updateComposite(Objref oref, Composite c) {
 	CompositeRenderObject cro = sd->cro[oref.id];
 	cro.c = c;
 	cro.tessellate();
-	printf("composite updated %f %f\n", c.b[0].curvature[0], c.b[0].curvature[1]);
+	printf("composite %ld updated: %ld boxoids\n", oref.id, c.nb);
 	
 	// swap out some pointers
 	pthread_mutex_lock(&sharedData.mutex);	

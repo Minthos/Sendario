@@ -237,7 +237,7 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 			let object2 = celestials[j].moo
 			let (distance, closingSpeed) = collisionTest(object1, object2)
 			if distance > 0 && closingSpeed > 0 && distance < (closingSpeed * dt) {
-				print("celestial-celestial collision \(t): \(distance) \(closingSpeed) dt: \(dt)")
+				//print("celestial-celestial collision \(t): \(distance) \(closingSpeed) dt: \(dt)")
 				let collisionTime = distance / closingSpeed
 				easycollisions.append((collisionTime, object1, object2))
 			}
@@ -252,7 +252,7 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 				for k in 0..<object1.sec.count {
 					let (distance2, closingSpeed2) = collisionTest(object1.sec[k].moo, object2.moo)
 					if distance2 > 0 && closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
-						print("ent-celestial collision \(t): \(distance2) \(closingSpeed2) dt: \(dt)")
+						//print("ent-celestial collision \(t): \(distance2) \(closingSpeed2) dt: \(dt)")
 						let collisionTime2 = distance2 / closingSpeed2
 						hardcollisions.append((collisionTime2, object1.sec[k].moo, object2.moo, object1))
 					}
@@ -270,7 +270,7 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 					for l in k+1..<object2.sec.count {
 						let (distance2, closingSpeed2) = collisionTest(object1.sec[k].moo, object2.sec[l].moo)
 						if distance2 > 0 && closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
-							print("ent-ent collision \(t): \(distance2) \(closingSpeed2) dt: \(dt)")
+							//print("ent-ent collision \(t): \(distance2) \(closingSpeed2) dt: \(dt)")
 							let collisionTime2 = distance2 / closingSpeed2
 							fmlcollisions.append((collisionTime2, object1.sec[k].moo, object2.sec[l].moo, object1, object2))
 						}
@@ -299,12 +299,12 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		let normalVelocity = collisionNormal * (deltaVelocity.dot(collisionNormal))
 		let tangentVelocity = deltaVelocity - normalVelocity 
 		let closingSpeed = normalVelocity.length
-		var impulseMagnitude = abs(min(object1.mass, object2.mass) * closingSpeed * 2)
+		var impulseMagnitude = abs(min(ent1.moo.mass, object2.mass) * closingSpeed * 2)
 		impulseMagnitude = min(object1.hp * hpmult / closingSpeed, object2.hp * hpmult / closingSpeed, impulseMagnitude)
 		object1.hp -= closingSpeed * impulseMagnitude * invhpmult
 		object2.hp -= closingSpeed * impulseMagnitude * invhpmult
 		let impulse = collisionNormal * impulseMagnitude
-		ent1.moo.velocity -= impulse / object1.mass
+		ent1.moo.velocity -= impulse / ent1.moo.mass
 		object2.velocity += impulse / object2.mass
 		let collisionPoint = object1.position + (collisionNormal * object1.radius)
 		let r1 = collisionPoint - object1.position
@@ -313,7 +313,7 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		let rotationVelocity1 = object1.spin.cross(r1) 
 		let rotationVelocity2 = object2.spin.cross(r2)
 		let totalRelativeTangentialVelocity = tangentVelocity + rotationVelocity2 - rotationVelocity1
-		let minLinearMomentum = min(object1.mass, object2.mass) * totalRelativeTangentialVelocity.length
+		let minLinearMomentum = min(ent1.moo.mass, object2.mass) * totalRelativeTangentialVelocity.length
 		let angularMomentum1 = object1.momentOfInertia * totalRelativeTangentialVelocity.length / object1.radius
 		let angularMomentum2 = object2.momentOfInertia * totalRelativeTangentialVelocity.length / object2.radius
 		let minAngularMomentum = min(angularMomentum1, angularMomentum2)
@@ -323,13 +323,13 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		object1.hp -= magtanv * impulseMagnitude * invhpmult
 		object2.hp -= magtanv * impulseMagnitude * invhpmult
 		let frictionImpulse = -totalRelativeTangentialVelocity.normalized() * maxFrictionImpulseMagnitude
-		object1.velocity -= frictionImpulse * 0.5 / object1.mass
+		ent1.moo.velocity -= frictionImpulse * 0.5 / ent1.moo.mass
 		object2.velocity += frictionImpulse * 0.5 / object2.mass
 		let torque1 = r1.cross(frictionImpulse * 0.5)
 		let torque2 = r2.cross(frictionImpulse * 0.5)
-		let deltaSpin1 = torque1 / object1.momentOfInertia
+		let deltaSpin1 = torque1 / ent1.moo.momentOfInertia
 		let deltaSpin2 = torque2 / object2.momentOfInertia
-		object1.spin -= deltaSpin1
+		ent1.moo.spin -= deltaSpin1
 		object2.spin += deltaSpin2
 		if(object1.hp < 0.001) {
 			object1.hp = 0

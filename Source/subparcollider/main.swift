@@ -84,10 +84,10 @@ var moon = Celestial(name: "Luna", SphericalCow(id: 4,
 						 spin: Vector(0, 0, 0),
 						 mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.2))
 var player1 = Entity(name: "Player 1", SphericalCow(id: 5,
-						 position: Vector(moon.moo.position.x + 50, moon.moo.position.y + 50, moon.moo.position.z + moon.moo.radius + 0.01),
-						 velocity: Vector(moon.moo.velocity.x, moon.moo.velocity.y + 0, moon.moo.velocity.z),
+						 position: Vector(earth.moo.position.x + 0.5, earth.moo.position.y + 0.5, earth.moo.position.z + earth.moo.radius + 1.05),
+						 velocity: Vector(earth.moo.velocity.x, earth.moo.velocity.y + 0, earth.moo.velocity.z),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
-						 spin: moon.moo.spin,
+						 spin: earth.moo.spin,
 						 mass: 10e3, radius:1.0, frictionCoefficient: 0.5))
 var camera = Celestial(name: "Camera", SphericalCow(id: -1,
 						  position: Vector(earth.moo.position.x, earth.moo.position.y + earth.moo.radius * 2.0, earth.moo.position.z - earth.moo.radius * 8.0),
@@ -277,26 +277,25 @@ func main() {
 								}
 							} else if interfaceMode == .workshop {
  								print("\(String(cString: getStringForButton(event.cbutton.button)!)) pressed")
-								if		event.cbutton.button == SDL_CONTROLLER_BUTTON_Y.rawValue {
-									s.sens *= sqrt(10.0)
+								if event.cbutton.button == SDL_CONTROLLER_BUTTON_Y.rawValue {
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_X.rawValue {
-									s.sens *= 1.0 / sqrt(10.0)
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_B.rawValue {
-									if(partsPickerIsOpen) {
-										pickedPart = CompositeCod.unit()
-									} else {
-										s.composites[curcom].b[curbox] = BoxoidCod.unit() // todo: undo
-									}
+									player1.c.b[curbox] = BoxoidCod.unit()
+									player1.createCows()
+									player1.recomputeCows()
+									player1.updateCows()
+									s.composites[curcom] = player1.c
+									updateComposite(objrefs[curcom], toC(s.composites[curcom]))
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_A.rawValue {
-									if(partsPickerIsOpen) {
-										s.composites[curcom].b.append(contentsOf: pickedPart.b)
-									} else {
-										s.composites[curcom].b.append(s.composites[curcom].b[curbox])
-									}
+									player1.c.b.append(s.composites[curcom].b[curbox])
+									player1.createCows()
+									player1.recomputeCows()
+									player1.updateCows()
+									s.composites[curcom] = player1.c
+									updateComposite(objrefs[curcom], toC(s.composites[curcom]))
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_LEFTSHOULDER.rawValue {
-									faceIndex = ((faceIndex + 1) % 6)// select next face/previous boxoid
+									faceIndex = ((faceIndex + 1) % 6)
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_RIGHTSHOULDER.rawValue {
-									// open/close parts picker
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_UP.rawValue {
 									dpad = .UP
 								} else if event.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_DOWN.rawValue {
@@ -319,6 +318,10 @@ func main() {
 							var val = Double(event.caxis.value) / TMAX
 							if(abs(val) < s.deadzone) {
 								val = 0
+							} else if val > 0 {
+								val -= s.deadzone
+							} else {
+								val += s.deadzone
 							}
 							if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_LEFTX.rawValue) {
 								thrustVector.x = s.sens * val
@@ -333,51 +336,6 @@ func main() {
 							} else if(event.caxis.axis ==  SDL_CONTROLLER_AXIS_RIGHTY.rawValue) {
 								cameraSpherical.phi = s.sens * val
 							}
-						// FIXME use glfw
-/*
-// Callback functions for key and mouse button events
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
-{
-	if (key == GLFW_KEY_W && action == GLFW_PRESS)
-		dt *= 10.0;
-	// And so on for other keys...
-}
-
-void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
-{
-	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
-		// Handle left mouse button press...
-}
-
-// In your initialization code:
-glfwSetKeyCallback(window, key_callback);
-glfwSetMouseButtonCallback(window, mouse_button_callback);
-*/
-						case SDL_KEYDOWN.rawValue:
-							let key = event.key.keysym.sym
-							if interfaceMode == .physicsSim {
-								if key == SDLK_w.rawValue { // Y button
-									dt *= 10.0
-								} else if key == SDLK_a.rawValue { // X button
-									dt *= 0.1 
-								} else if key == SDLK_s.rawValue { // B button
-									buttonPresses += 1;
-								} else if key == SDLK_d.rawValue { // A button
-									buttonPresses -= 1;
-								}
-							} else if interfaceMode == .workshop {
-								// put stuff here
-							}
-						case SDL_KEYUP.rawValue:
-							let key = event.key.keysym.sym
-							if key == SDLK_ESCAPE.rawValue { // START button
-								shouldExit = true
-							} else if key == SDLK_BACKSPACE.rawValue { // BACK button
-								rcsIsEnabled = !rcsIsEnabled
-							}
-						case SDL_MOUSEMOTION.rawValue:
-							let mouseX = Double(event.motion.x)
-							thrustVector.x = s.sens * mouseX / 1920.0 // adjust for your window width
 						default:
 							break
 						}
@@ -422,6 +380,7 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 			gravTick(center: sun.moo, celestials: &celestials, t: t, dt: dt)
 			tick(actions: actions, entities: &ships, celestials: &celestials, t: t, dt: dt)
 			if(player1.damageReport()) {
+				s.composites[curcom] = player1.c
 				updateComposite(objrefs[curcom], toC(s.composites[curcom]))
 			}
 			if(player1.moo.hp < 0.001) {
@@ -455,6 +414,15 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 						player1.recomputeCows()
 						player1.moo.radius = player1.moo.radius * 0.95 + 0.05 * s.composites[curcom].bbox.halfsize
 					}
+				case .UP:
+					// move
+				if(thrustVector.length > 0.05) {
+						s.composites[curcom].b[curbox].translate(thrustVector * 0.01)
+						updateComposite(objrefs[curcom], toC(s.composites[curcom]))
+						s.composites[curcom].bbox = s.composites[curcom].calculateBBox()
+						player1.recomputeCows()
+						player1.moo.radius = player1.moo.radius * 0.95 + 0.05 * s.composites[curcom].bbox.halfsize
+					}	
 				default:
 					break;
 			}

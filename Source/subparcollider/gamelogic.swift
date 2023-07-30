@@ -269,6 +269,7 @@ class Entity: Codable, Moo {
 	}
 
 	func damageReport() -> Bool {
+		let initialHp = moo.hp
 		moo.hp = 0
 		moo.mass = 0
 		var keepers: [Int] = []
@@ -279,7 +280,13 @@ class Entity: Codable, Moo {
 				moo.mass += sec[i].moo.mass
 			}
 		}
+		if(initialHp != moo.hp) {
+			print("damage report (\(sec.count) sections):\ninitial hp: \(initialHp)")
+			print("damage taken: \(initialHp - moo.hp)")
+			print("remaining hp: \(moo.hp)")
+		}
 		if keepers.count != sec.count {
+			print("lost \(sec.count - keepers.count) section(s)")
 			var newb: [BoxoidCod] = []
 			var news: [Section] = []
 			for i in 0..<keepers.count {

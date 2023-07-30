@@ -7,10 +7,6 @@ struct BoxoidCod: Codable {
 	var missing_faces: UInt = 0
 	var bbox: BBox
 
-	func clculateBBox() -> BBox {
-		return BBox(corners)
-	}
-
 	func elongationFactor(_ x: Double) -> Double {
 		if(x > 0){
 			return 1.0 + x
@@ -29,8 +25,16 @@ struct BoxoidCod: Codable {
 	mutating func elongate(_ v: Vector) {
 		let vx = Vector(elongationFactor(v.x), elongationFactor(v.y),  elongationFactor(v.z))
 		for i in 0..<8 {
-			corners[i] = corners[i] * vx
+			corners[i] = (corners[i] - bbox.center) * vx + bbox.center
 		}
+		bbox = BBox(corners)
+	}
+
+	mutating func translate(_ v: Vector) {
+		for i in 0..<8 {
+			corners[i] = corners[i] + v
+		}
+		bbox = BBox(corners)
 	}
 
 	static func unit() -> BoxoidCod {
