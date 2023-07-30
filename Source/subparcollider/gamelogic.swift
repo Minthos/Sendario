@@ -146,6 +146,21 @@ class Section: Codable, Moo {
 	var armorAmount: Double = 0.0
 	var hp: Double = 0.0
 
+	private enum CodingKeys: CodingKey {
+   		case moo
+		case bindex
+		case type
+		case level
+		case upgrades
+		case externalVolume
+		case internalVolume
+		case structureAmount
+		case armorUpgrades
+		case armorLevel
+		case armorAmount
+		case hp
+	}
+
 	init(_ pent: Entity, _ pbindex: Int, _ ptype: SectionType) {
 		ent = pent
 		bindex = pbindex
@@ -245,10 +260,38 @@ class Entity: Codable, Moo {
 	}
 
 	func recomputeCows() {
+		moo.hp = 0
 		for (i, box) in c.b.enumerated() {
 			sec[i].moo.radius = box.bbox.halfsize
 			sec[i].moo.hp = sec[i].hp
+			moo.hp += sec[i].hp
 		}
+	}
+
+	func damageReport() -> Bool {
+		moo.hp = 0
+		moo.mass = 0
+		var keepers: [Int] = []
+		for (i, box) in c.b.enumerated() {
+			if(sec[i].moo.hp >= 0.001) {
+				keepers.append(i)
+				moo.hp += sec[i].moo.hp
+				moo.mass += sec[i].moo.mass
+			}
+		}
+		if keepers.count != sec.count {
+			var newb: [BoxoidCod] = []
+			var news: [Section] = []
+			for i in 0..<keepers.count {
+				newb.append(c.b[keepers[i]])
+				news.append(sec[keepers[i]])
+			}
+			c.b = newb
+			sec = news
+			c.bbox = c.calculateBBox()
+			return true
+		}
+		return false
 	}
 
 	func updateCows() {

@@ -210,19 +210,24 @@ func main() {
 		s.composites.append(CompositeCod.unit())
 		s.composites[0].position = player1.moo.position
 		s.composites[0].orientation = player1.moo.orientation
-		player1.createCows()
-		player1.recomputeCows()
-		player1.updateCows()
 		//s.composites.append(CompositeCod.load("grid.json"))
 		//s.composites[1].orientation = Quaternion()
 	} else {
 		player1.moo.position = s.composites[0].position
 		player1.moo.orientation = s.composites[0].orientation
 	}
+	player1.c = s.composites[0]
+	player1.createCows()
+	player1.recomputeCows()
+	player1.updateCows()
+
+	for i in 0..<celestials.count {
+		celestials[i].moo.hp = celestials[i].moo.mass * 100.0
+	}
 
 	grid.append(CompositeCod.generateGrid(grid_size * 10.0))
-	let availableModes: [InterfaceMode] = [.flightMode, .workshop]
-	//let availableModes: [InterfaceMode] = [.workshop, .physicsSim, .flightMode]
+	//let availableModes: [InterfaceMode] = [.flightMode, .workshop]
+	let availableModes: [InterfaceMode] = [.workshop, .physicsSim, .flightMode]
 	interfaceMode = availableModes[s.interfaceModeIndex % availableModes.count]
 	
 
@@ -416,6 +421,17 @@ glfwSetMouseButtonCallback(window, mouse_button_callback);
 			}
 			gravTick(center: sun.moo, celestials: &celestials, t: t, dt: dt)
 			tick(actions: actions, entities: &ships, celestials: &celestials, t: t, dt: dt)
+			if(player1.damageReport()) {
+				updateComposite(objrefs[curcom], toC(s.composites[curcom]))
+			}
+			if(player1.moo.hp < 0.001) {
+				dt = 0.0
+				print("game over!")
+				shouldExit = true
+				let encoder = JSONEncoder()
+				encoder.outputFormatting = .prettyPrinted
+				//try! print((String(data: encoder.encode(player1), encoding: .utf8)!)
+			}
 			t += dt
 			s.composites[curcom].orientation = player1.moo.orientation
 			s.composites[curcom].position = player1.moo.position

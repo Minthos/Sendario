@@ -96,6 +96,8 @@ y: repeat last action, redo
 * more creative use of boxoids in the physics engine for things like explosions, magnetic fields, gas clouds, exhaust plumes
 * some refactoring of the physics engine
 * implement tidal effects on celestial spin and orbit
+* it would be fun to model centre of mass shifting as propellant moves around in the tank. workshop should at least
+  show dry and wet centres of mass. maybe we just assume tanks have built-in pistons or bladders to avoid slosh and cavitation.
 
 
 ## Ideas:

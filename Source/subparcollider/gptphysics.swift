@@ -237,7 +237,7 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 			let object2 = celestials[j].moo
 			let (distance, closingSpeed) = collisionTest(object1, object2)
 			if distance > 0 && closingSpeed > 0 && distance < (closingSpeed * dt) {
-				print("collision \(t): \(distance) \(closingSpeed) dt: \(dt)")
+				print("celestial-celestial collision \(t): \(distance) \(closingSpeed) dt: \(dt)")
 				let collisionTime = distance / closingSpeed
 				easycollisions.append((collisionTime, object1, object2))
 			}
@@ -252,7 +252,7 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 				for k in 0..<object1.sec.count {
 					let (distance2, closingSpeed2) = collisionTest(object1.sec[k].moo, object2.moo)
 					if distance2 > 0 && closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
-						print("collision \(t): \(distance2) \(closingSpeed2) dt: \(dt)")
+						print("ent-celestial collision \(t): \(distance2) \(closingSpeed2) dt: \(dt)")
 						let collisionTime2 = distance2 / closingSpeed2
 						hardcollisions.append((collisionTime2, object1.sec[k].moo, object2.moo, object1))
 					}
@@ -270,7 +270,7 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 					for l in k+1..<object2.sec.count {
 						let (distance2, closingSpeed2) = collisionTest(object1.sec[k].moo, object2.sec[l].moo)
 						if distance2 > 0 && closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
-							print("collision \(t): \(distance2) \(closingSpeed2) dt: \(dt)")
+							print("ent-ent collision \(t): \(distance2) \(closingSpeed2) dt: \(dt)")
 							let collisionTime2 = distance2 / closingSpeed2
 							fmlcollisions.append((collisionTime2, object1.sec[k].moo, object2.sec[l].moo, object1, object2))
 						}
@@ -283,10 +283,8 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 	let hpmult = 1000000.0
 	let invhpmult = 1.0/hpmult
 
-	// now we treat each composite as a sphere. would like to treat boxoids as spheres, rigidly connected.
 	hardcollisions.sort { $0.0 < $1.0 }
 	for (elapsedTime, object1, object2, ent1) in hardcollisions {
-		// elapsedTime is when the outer bounding sphere is crossed, not when the first inner collision happens
 		// when calculating momentum and moment of inertia use the entire composite
 		// when applying forces first check how much force the boxoid can transfer and destroy or dent it if needed
 		// after the boxoid has been destroyed the impulse needed to destroy it can be imparted to the composite
@@ -346,18 +344,12 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		// undo the rewinding so we don't rewind way too much when many boxoids collide
 		object1.position += object1.velocity * (dt - elapsedTime)
 		object2.position += object2.velocity * (dt - elapsedTime)
+
+		print("object1 remaining hp: \(object1.hp) object2 remaining hp: \(object2.hp)")
 	}
 
-	// now we treat each composite as a sphere. would like to treat boxoids as spheres, rigidly connected.
 	easycollisions.sort { $0.0 < $1.0 }
 	for (elapsedTime, object1, object2) in easycollisions {
-		// elapsedTime is when the outer bounding sphere is crossed, not when the first inner collision happens
-		// need to find the first boxoid-boxoid or boxoid-sphere collision depending on what collided
-		// when calculating momentum and moment of inertia use the entire composite
-		// when applying forces first check how much force the boxoid can transfer and destroy or dent it if needed
-		// after the boxoid has been destroyed the impulse needed to destroy it can be imparted to the composite
-		// and the colliding object and we can check if any other boxoids collide within what remains of dt
-
 		// rewind this tick's movement and apply movement up to the time of collision
 		object1.position -= object1.velocity * (dt - elapsedTime)
 		object2.position -= object2.velocity * (dt - elapsedTime)
