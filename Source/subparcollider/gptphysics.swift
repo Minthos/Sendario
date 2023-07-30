@@ -200,7 +200,7 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		}
 		object.moo.integrateForce(dt: dt)
 		object.moo.integrateTorque(dt: dt)
-		if(object.c.b.count != object.bmoo.count) {
+		if(object.c.b.count != object.sec.count) {
 			object.createCows()
 			object.recomputeCows()
 		}
@@ -249,12 +249,12 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 			let object2 = celestials[j]
 			let (distance, closingSpeed) = collisionTest(object1.moo, object2.moo)
 			if closingSpeed > 0 && distance < (closingSpeed * dt) {
-				for k in 0..<object1.bmoo.count {
-					let (distance2, closingSpeed2) = collisionTest(object1.bmoo[k], object2.moo)
+				for k in 0..<object1.sec.count {
+					let (distance2, closingSpeed2) = collisionTest(object1.sec[k].moo, object2.moo)
 					if distance2 > 0 && closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
 						print("collision \(t): \(distance2) \(closingSpeed2) dt: \(dt)")
 						let collisionTime2 = distance2 / closingSpeed2
-						hardcollisions.append((collisionTime2, object1.bmoo[k], object2.moo, object1))
+						hardcollisions.append((collisionTime2, object1.sec[k].moo, object2.moo, object1))
 					}
 				}
 			}
@@ -266,13 +266,13 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 			let object2 = entities[j]
 			let (distance, closingSpeed) = collisionTest(object1.moo, object2.moo)
 			if closingSpeed > 0 && distance < (closingSpeed * dt) {
-				for k in 0..<object1.bmoo.count {
-					for l in k+1..<object2.bmoo.count {
-						let (distance2, closingSpeed2) = collisionTest(object1.bmoo[k], object2.bmoo[l])
+				for k in 0..<object1.sec.count {
+					for l in k+1..<object2.sec.count {
+						let (distance2, closingSpeed2) = collisionTest(object1.sec[k].moo, object2.sec[l].moo)
 						if distance2 > 0 && closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
 							print("collision \(t): \(distance2) \(closingSpeed2) dt: \(dt)")
 							let collisionTime2 = distance2 / closingSpeed2
-							fmlcollisions.append((collisionTime2, object1.bmoo[k], object2.bmoo[l], object1, object2))
+							fmlcollisions.append((collisionTime2, object1.sec[k].moo, object2.sec[l].moo, object1, object2))
 						}
 					}
 				}

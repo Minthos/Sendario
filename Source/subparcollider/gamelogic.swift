@@ -25,58 +25,62 @@ protocol Moo {
 
 enum CargoType: Codable {
 	// standard cargo
-	case crudeGas
-	case crudeOre
-	case slag
-	case scrap
-	case gas
-	case mineral
-	case propellant
-	case heavy_isotopes
-	case light_isotopes
-	case antimatter
-	case components
-	case currency
-	case compute
-	case ACRound
-	case ultraACRound
-	case dumbMissile
-	case homingMissile
-	case proximityMine
-	case kineticWarhead
-	case explosiveWarhead
-	case flakWarhead
-	case smokeWarhead
-	case nuclearWarhead
-	case fusionWarhead
-	case antimatterWarhead
+	case regolith// minerals and slag
+	case mineral// iron, carbon, aluminium, calcium etc.
+	case scrap// broken items, can be refined for minerals and components
+	case slag// waste material with little value
+	case crudeIce// frozen mix of gas and regolith
+	case crudeGas// mixed gases
+	case gas// purified gas
+	case propellant// various liquids and gases with low reactivity
+	case oxidizer// usually oxygen
+	case fuel// hydrocarbons and other reactive liquids and gases
+	case heavy_isotopes// fissiles
+	case light_isotopes// fusiles
+	case antimatter// antimatter in magnetic confinement canisters. will release all its energy if any canister is damaged.
+	case components// various electronic and mechanical components
+	case currency// physical currency
+	case compute// powerful computer chips designed with redundancy to protect against bit errors
+	case ACRound// a cartridge with propellant, should be combined with a warhead before use
+	case ultraACRound// a cartridge with propellant, should be combined with a warhead before use
+	case dumbMissile// a missile with propellant, should be combined with a warhead before use
+	case homingMissile// a missile with propellant and guidance, should be combined with a warhead before use
+	case proximityMine// a mine, should be combined with a warhead before use
+	case kineticWarhead// kinetic penetrator, the only warhead mass drivers can use and a cheap warhead for autocannons
+	case explosiveWarhead// warhead with chemical explosives. explodes if destroyed.
+	case flakWarhead// warhead with chemical exploives and tiny kinetic/incendiary fragments. explodes if destroyed.
+	case smokeWarhead// releases smoke. good defense against beam weapons and enemy sensors
+	case nuclearWarhead// big boom. minimum size 20kg, maximum 1 t. a single blast can destroy a spaceship. big AOE.
+	case fusionWarhead// minimum size 100kg, maximum 10 t. when a big boom is too small. big AOE.
+	case antimatterWarhead// the biggest boom. minimum size 1kg. explodes if destoyed. big AOE.
 
-	// exotic ingredients
-	case melange
-	case unobtainium
-	case kryptonite
-	case fairy_dust
-	case spider_silk
-	case mithril
-	case angel_hair
-	case unicorn_farts
-	case dragon_scales
-	case plutonic_quartz
-	case happiness
-	case carebear_tears
-	case short_shorts
-	case schadenfreude
-	case albino_butterflies
-	case vampire_dust
-	case minotaur_hoof_clippings
-	case ectoplasm
-	case grey_goo
-	case dark_matter
-	case beholder_eyelashes
-	case shoggoth_poop
-	case alien_fossils
-	case antientropy
-	case classic_vinyl_records
+	// exotic ingredients: all can improve upgrades in addition to any other properties they have
+	case heisenbergite// crystal required for gaslight drives. found in small quantities in meteor craters in every star system (0 rarity)
+	case dark_matter// (1 rarity) most commonly found floating around in the interstellar medium
+	case alien_artifacts// (1 rarity)
+	case superconductors// (1 rarity) reduces waste heat
+	case classic_vinyl_records// (2 rarity)
+	case ectoplasm// (2 rarity) ghosts live underground
+	case albino_butterflies// (2 rarity) butterflies live aboveground
+	case alien_fossils// (2 rarity)
+	case mithril// weight reduction, strength increase (3 rarity)
+	case plutonic_quartz// increases ftl drive warp strength (3 rarity)
+	case shoggoth_poop// (3 rarity)
+	case grey_goo// (3 rarity)
+	case green_goop// (3 rarity)
+	case vampire_dust// (4 rarity) vampires live underground
+	case unobtainium// when used as nuclear fuel it lasts forever (4 rarity)
+	case fairy_dust// (4 rarity) fairies live aboveground
+	case spider_silk// weight reduction, strength increase (4 rarity)
+	case unicorn_farts// when used as fusion fuel it lasts forever (4 rarity)
+	case melange// hallucinogen. only found on the most arid desert planets. (5 rarity)
+	case kryptonite// strength increase, improves kinetic penetrator damage. (5 rarity)
+	case angel_hair// regenerative properties (5 rarity)
+	case dragon_scales// improves heat tolerance (5 rarity)
+	case minotaur_horns// (5 rarity) minotaurs live underground
+	case beholder_eyelashes// (5 rarity) beholders live underground
+	case antientropy// (5 rarity)
+	case gargoyle_skin// (5 rarity)
 }
 
 class Cargo: Codable {
@@ -90,8 +94,8 @@ struct Upgrade: Codable {
 	let blueprintType: SectionType
 	let level: Int
 	let ingredients: [Cargo]
-	let bonuses: [(String, Double)]
-	let maluses: [(String, Double)]
+	let bonuses: Dictionary<String, Double>
+	let maluses: Dictionary<String, Double>
 }
 
 enum SectionType: Codable {
@@ -103,9 +107,9 @@ enum SectionType: Codable {
 	case gaslightDrive
 	case nuclearReactor
 	case fusionReactor
+	case antimatterReactor
 	case heatSink
 	case battery
-	case antimatterBattery
 	case tank
 	case cargoHold
 	case hull
@@ -124,10 +128,11 @@ enum SectionType: Codable {
 	case VAB
 	case sensors
 	case lifeSupport
+	case spaceElevator
 }
 
 class Section: Codable, Moo {
-	weak var ent: Entity
+	weak var ent: Entity!
 	var moo: SphericalCow
 	var bindex: Int
 	var type: SectionType
@@ -141,17 +146,17 @@ class Section: Codable, Moo {
 	var armorAmount: Double = 0.0
 	var hp: Double = 0.0
 
-	init(pent: Entity, pbindex: Int, ptype: SectionType) {
+	init(_ pent: Entity, _ pbindex: Int, _ ptype: SectionType) {
 		ent = pent
 		bindex = pbindex
 		type = ptype
-		moo = ent.moo.copy() // TODO compute actual values instead
+		moo = ent.moo.copy() // this can be improved a lot
 		computeValues()
 	}
 
-	// TODO compute actual values instead
 	func computeValues() {
-		externalVolume = ent.b[bindex].bbox.halfsize ** 3
+		// this can be improved a lot
+		externalVolume = ent.c.b[bindex].bbox.halfsize ** 3
 		internalVolume = externalVolume - structureAmount - armorAmount
 		hp = externalVolume
 		switch(type) {
@@ -171,12 +176,12 @@ class Section: Codable, Moo {
 				hp *= 10.0
 			case .fusionReactor:
 				hp *= 20.0
+			case .antimatterReactor:
+				hp *= 5.0
 			case .heatSink:
 				hp *= 20.0
 			case .battery:
 				hp *= 20.0
-			case .antimatterBattery:
-				hp *= 5.0
 			case .tank:
 				hp *= 50.0
 			case .cargoHold:
@@ -213,6 +218,8 @@ class Section: Codable, Moo {
 				hp *= 20.0
 			case .lifeSupport:
 				hp *= 20.0
+			case .spaceElevator:
+				hp *= 200.0
 		}
 		hp = hp + armorAmount * 200 + structureAmount * 100
 	}
@@ -228,19 +235,19 @@ class Entity: Codable, Moo {
 		self.name = name
 		self.moo = moo
 		self.c = CompositeCod.unit()
-		self.bmoo = []
+		self.sec = []
 	}
 
 	func createCows() {
-		for i in bmoo.count..<c.b.count {
-			bmoo.append(moo.copy())
+		for i in sec.count..<c.b.count {
+			sec.append(Section(self, i, .hull))
 		}
 	}
 
 	func recomputeCows() {
 		for (i, box) in c.b.enumerated() {
-			bmoo[i].radius = box.bbox.halfsize
-			bmoo[i].hp = 100 * moo.mass / Double(c.b.count)
+			sec[i].moo.radius = box.bbox.halfsize
+			sec[i].moo.hp = sec[i].hp
 		}
 	}
 
@@ -248,10 +255,10 @@ class Entity: Codable, Moo {
 		for (i, box) in c.b.enumerated() {
 			// quaternion transforms incoming, bugs incoming
 			let boxCenterRotated = moo.orientation * Quaternion(w:0, x: box.bbox.center.x, y: box.bbox.center.y, z: box.bbox.center.z) * moo.orientation.conjugate
-			bmoo[i].position = moo.position + boxCenterRotated.xyz
-			bmoo[i].velocity = moo.velocity + moo.spin.cross(boxCenterRotated.xyz)
-			bmoo[i].spin = moo.spin
-			bmoo[i].orientation = moo.orientation
+			sec[i].moo.position = moo.position + boxCenterRotated.xyz
+			sec[i].moo.velocity = moo.velocity + moo.spin.cross(boxCenterRotated.xyz)
+			sec[i].moo.spin = moo.spin
+			sec[i].moo.orientation = moo.orientation
 		}
 	}
 }

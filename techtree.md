@@ -155,7 +155,7 @@ armored equipment and biological creatures. Large AOE.
 - Everything can be upgraded to level 3 if their prerequisites and ingredients are at level 3.
 
 ### Mineral refinery level 3 enables:
-- Space elevator 500 hp/t
+- Space elevator 200 hp/t
 - railgun -> plasma gun (30 km/s) 80% efficiency
 
 ### Hardware factory level 3 + both refineries level 3 enables:
@@ -164,7 +164,7 @@ armored equipment and biological creatures. Large AOE.
 ### Hardware factory level 3 + both refineries level 3 + chip fab level 3 + any reactor level 3 enables:
 - Antimatter beam 20 hp/t 1 GW/t input, 99% thermal efficiency, volatile
 - Antimatter warheads 10 hp/t small, extremely powerful, volatile. Large AOE.
-- Antimatter reactor 5 hp/t (250 GW/t power, 2% waste heat) volatile
+- Antimatter reactor 5 hp/t (250 GW/t power, 12% waste heat) volatile
 Antmatter is extremely expensive, usually not a cost effective way to fight.
 It also releases all its energy when the containment fails, unlike fusion and nuclear.
 
