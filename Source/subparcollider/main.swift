@@ -84,7 +84,7 @@ var moon = Celestial(name: "Luna", SphericalCow(id: 4,
 						 spin: Vector(0, 0, 0),
 						 mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.2))
 var player1 = Entity(name: "Player 1", SphericalCow(id: 5,
-						 position: Vector(earth.moo.position.x + 0.5, earth.moo.position.y + 0.5, earth.moo.position.z + earth.moo.radius + 1.05),
+						 position: Vector(earth.moo.position.x + 20.5, earth.moo.position.y + 20.5, earth.moo.position.z + earth.moo.radius + 10.05),
 						 velocity: Vector(earth.moo.velocity.x, earth.moo.velocity.y + 0, earth.moo.velocity.z),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
 						 spin: earth.moo.spin,
@@ -385,7 +385,7 @@ func main() {
 			}
 			if(player1.moo.hp < 0.001) {
 				dt = 0.0
-				print("game over!")
+				print("game over! to respawn: rm composites.json; ./subparcollider")
 				shouldExit = true
 				let encoder = JSONEncoder()
 				encoder.outputFormatting = .prettyPrinted
@@ -539,7 +539,7 @@ func main() {
 //		}
 
 		render(compositeArray, objrefs.count + 1, sphereArray, allTheThings.count + trajectory.count, renderMisc)
-
+		compositeArray.deallocate()
 		sphereArray.deallocate()
 	}
 	// end main game loop

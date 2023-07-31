@@ -979,7 +979,7 @@ struct CompositeRenderObject {
 	void copyToBuffers() {
 		// this function should only be called on the rendering thread
 		assert(sharedData.renderer_tid == pthread_self());
-		if(c.nb != update.nb) {
+		if(c.b != update.b) {
 			free(c.b);
 			c.b = update.b;
 			c.nb = update.nb;

@@ -261,10 +261,13 @@ class Entity: Codable, Moo {
 
 	func recomputeCows() {
 		moo.hp = 0
+		moo.mass = 0
 		for (i, box) in c.b.enumerated() {
 			sec[i].moo.radius = box.bbox.halfsize
+			sec[i].moo.mass = (box.bbox.halfsize * 2) ** 3
 			sec[i].moo.hp = sec[i].hp
 			moo.hp += sec[i].hp
+			moo.mass += sec[i].moo.mass
 		}
 	}
 

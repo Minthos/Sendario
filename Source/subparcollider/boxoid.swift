@@ -106,10 +106,7 @@ struct CompositeCod: Codable {
 		if(b.count == 0) {
 			return BBox(center: self.position, halfsize: 0)
 		}
-		var bbox = b[0].bbox
-		for i in 1..<b.count {
-			bbox = bbox.union(b[i].bbox)
-		}
+		var bbox = BBox.union(b.map { $0.bbox })
 		return bbox
 	}
 

@@ -518,6 +518,7 @@ struct BBox: Codable {
 	}
 	
 	init(_ points: [Vector]) {
+		assert(points.count > 0)
 		var top = points[0]
 		var bottom = points[0]
 		for i in 1..<points.count {
@@ -532,8 +533,9 @@ struct BBox: Codable {
 		self.halfsize = max(abs(top.x - bottom.x), abs(top.y - bottom.y), abs(top.z - bottom.z)) * 0.5
 	}
 
-	func union(_ bbox: BBox) -> BBox {
-		return	BBox([bbox.top, bbox.bottom, self.top, self.bottom])
+	static func union(_ bbox: [BBox]) -> BBox {
+		return BBox(bbox.flatMap { b in return [b.top, b.bottom] } )
+		//return	BBox([bbox.top, bbox.bottom, self.top, self.bottom])
 	}
 
 	// returns a (1/4, 1/4, 1/4) size section of a bounding box.
