@@ -1,10 +1,7 @@
 # To do
 ## Near term TODO:
 
-* Multiple boxoids. UI for adding a boxoid adjacent to another boxoid.
-* Boxoids each get a spherical cow. The Entity class can represent a single boxoid or a single composite.
-- Collision detection algo should first consider the composite's bounding sphere and if that collides
-  it can proceed to check which boxoid collides first.
+* fix bugs in rigid body collision code
 
 
 ## Medium term TODO:
@@ -16,11 +13,9 @@
  - logistics shouldn't be too tedious but scaling up should be time-consuming. we don't want players to get too big too fast.
 * merge in universe procgen stuff with resource deposits
 * Make a basic space exploration prototype
- - A solar system with the sun, some planets, a spaceship with a gaslight drive
 * deprioritized tasks
  - reactivate atmospheric drag but make it follow the celestial and not apply to the celestial
  - improve trajectory visualization: future trajectories with lines in colors of the rainbow with quadratic timestep to about 1 orbital period
-* Use redis to hold server state, json file to hold client configuration and backup of all the composites and random seeds.
 * more interesting celestials with textures and normal maps?
 * rendering text
 * rendering velocity vectors
@@ -35,22 +30,21 @@
  - rigid body physics with linked spherical cows
  - springs with adjustable rebound and compression damping
 * Use The Sims as inspration for the ship designing experience
- - two modes, one for editing boxoids and one for combining boxoids into composites
  - import/export json without restarting the client
- - editing interface shuld have a visual axis aligned grid and a button to snap to grid that snaps whatever you're doing to the grid
+ - snap to grid that snaps whatever you're doing to the grid
  - x and y shrinks/enlarges the grid size
-We can start coding an interface for building a spaceship using boxoids. Will have to get some json going. Swift is appropriate for that.
-3d crosshairs should intersect at the camera's target, aligned to world space or object space axis depending on context.
-lt and rt buttons to cycle between shapes
-a: save, edit, new, accept
-x: cancel, undo
-b: context-aware menu. Anything immediately useful easily accessible and more stuff in subtrees, user configurable with scripting "support" (i.e. we have documented where in the source code you can hardcode your own menu options into the menu).
+ - context-aware menu. Anything immediately useful easily accessible and more stuff in subtrees, user configurable with scripting "support" (i.e. we have documented where in the source code you can hardcode your own menu options into the menu).
 y: repeat last action, redo
+* Use redis to hold server state, json file to hold client configuration and backup of all the composites and random seeds.
 
 
 
 ## Recently done:
 
+* Multiple boxoids. UI for adding a boxoid adjacent to another boxoid.
+* Boxoids each get a spherical cow. The Entity class can represent a single boxoid or a single composite.
+- Collision detection algo should first consider the composite's bounding sphere and if that collides
+  it can proceed to check which boxoid collides first.
 * visual 3d grid (or maybe just a single planar surface) to see the scale of our spaceship while designing it
  - I'll make this a composite
  - 3d grid of boxes/spheres axis-aligned, optional lines connecting them
