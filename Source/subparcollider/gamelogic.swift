@@ -269,8 +269,12 @@ class Entity: Codable, Moo {
 			moo.hp += sec[i].hp
 			moo.mass += sec[i].moo.mass
 		}
+		c.bbox = c.calculateBBox()
+		moo.radius = c.bbox.halfsize
+		moo.momentOfInertia = 2 * moo.mass * moo.radius * moo.radius / 5
 	}
 
+	// this will run after a tick has completed
 	func damageReport() -> Bool {
 		let initialHp = moo.hp
 		moo.hp = 0
@@ -283,6 +287,7 @@ class Entity: Codable, Moo {
 				moo.mass += sec[i].moo.mass
 			}
 		}
+		moo.momentOfInertia = 2 * moo.mass * moo.radius * moo.radius / 5
 		if(initialHp != moo.hp) {
 			print("damage report (\(sec.count) sections):\ninitial hp: \(initialHp)")
 			print("damage taken: \(initialHp - moo.hp)")
