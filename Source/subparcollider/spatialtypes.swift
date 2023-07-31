@@ -358,6 +358,12 @@ func /=(lhs: inout Vector, rhs: Double) {
 }
 
 
+func *(left: Double, right: Vector) -> Vector {
+	right.sanityCheck()
+	assert(!left.isNaN)
+	return right * left
+}
+
 func *(left: Vector, right: Double) -> Vector {
 	return Vector(left.x * right, left.y * right, left.z * right)
 }
