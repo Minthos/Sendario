@@ -379,17 +379,19 @@ func main() {
 			}
 			gravTick(center: sun.moo, celestials: &celestials, t: t, dt: dt)
 			tick(actions: actions, entities: &ships, celestials: &celestials, t: t, dt: dt)
-			if(player1.damageReport()) {
-				s.composites[curcom] = player1.c
-				updateComposite(objrefs[curcom], toC(s.composites[curcom]))
-			}
-			if(player1.moo.hp < 0.001) {
-				dt = 0.0
-				print("game over! to respawn: rm composites.json; ./subparcollider")
-				shouldExit = true
-				let encoder = JSONEncoder()
-				encoder.outputFormatting = .prettyPrinted
-				//try! print((String(data: encoder.encode(player1), encoding: .utf8)!)
+			if(player1.dinged > 0) {
+				if(player1.damageReport()) {
+					s.composites[curcom] = player1.c
+					updateComposite(objrefs[curcom], toC(s.composites[curcom]))
+				}
+				if(player1.moo.hp < 0.001) {
+					dt = 0.0
+					print("game over! to respawn: rm composites.json; ./subparcollider")
+					shouldExit = true
+					let encoder = JSONEncoder()
+					encoder.outputFormatting = .prettyPrinted
+					//try! print((String(data: encoder.encode(player1), encoding: .utf8)!)
+				}
 			}
 			t += dt
 			s.composites[curcom].orientation = player1.moo.orientation

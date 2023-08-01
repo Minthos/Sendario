@@ -64,6 +64,10 @@ struct Vector: Codable {
 		z = potimizeDouble(z)
 	}
 
+	func ffs() -> (Double, Double, Double) {
+		return (x, y, z)
+	}
+	
 	func xyz() -> [Double] {
 		return [x, y, z]
 	}
@@ -280,6 +284,46 @@ struct Quaternion: Codable {
 		let resQuat = left * vecQuat * left.conjugate
 		return Vector(resQuat.x, resQuat.y, resQuat.z)
 	}
+}
+
+struct Matrix3: Codable {
+	var m: [[Double]] = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
+	
+	mutating func addInertiaTensorContribution(pos: Vector, mass: Double) {
+		m[0][0] += mass * (pos.y*pos.y + pos.z*pos.z)
+		m[1][1] += mass * (pos.x*pos.x + pos.z*pos.z)
+		m[2][2] += mass * (pos.x*pos.x + pos.y*pos.y)
+		m[0][1] -= mass * pos.x * pos.y
+		m[0][2] -= mass * pos.x * pos.z
+		m[1][2] -= mass * pos.y * pos.z
+		m[1][0] = m[0][1]
+		m[2][0] = m[0][2]
+		m[2][1] = m[1][2]
+	}
+
+	func inverse() -> Matrix3 {
+		let a = m[0][0], b = m[0][1], c = m[0][2]
+		let d = m[1][0], e = m[1][1], f = m[1][2]
+		let g = m[2][0], h = m[2][1], i = m[2][2]
+		let det = a*(e*i - f*h) - b*(d*i - f*g) + c*(d*h - e*g)
+		if det == 0 {
+			return Matrix3(m: [[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+		}
+		return Matrix3(m: [
+			[(e*i - f*h) / det, (c*h - b*i) / det, (b*f - c*e) / det],
+			[(f*g - d*i) / det, (a*i - c*g) / det, (c*d - a*f) / det],
+			[(d*h - e*g) / det, (b*g - a*h) / det, (a*e - b*d) / det]
+		])
+	}
+
+	static func *(left: Matrix3, right: Vector) -> Vector {
+		return Vector(
+			left.m[0][0]*right.x + left.m[0][1]*right.y + left.m[0][2]*right.z,
+			left.m[1][0]*right.x + left.m[1][1]*right.y + left.m[1][2]*right.z,
+			left.m[2][0]*right.x + left.m[2][1]*right.y + left.m[2][2]*right.z
+		)
+	}	
+	
 }
 
 prefix func --(value: inout Int) ->Int {

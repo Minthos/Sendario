@@ -243,14 +243,18 @@ class Section: Codable, Moo {
 class Entity: Codable, Moo {
 	var name: String
 	var moo: SphericalCow
+	var inertia: Matrix3
 	var c: CompositeCod
 	var sec: [Section]
+	var dinged: Int
 	
 	init(name: String, _ moo: SphericalCow) {
 		self.name = name
 		self.moo = moo
 		self.c = CompositeCod.unit()
 		self.sec = []
+		self.dinged = 0
+		self.inertia = Matrix3()
 	}
 
 	func createCows() {
@@ -276,6 +280,8 @@ class Entity: Codable, Moo {
 
 	// this will run after a tick has completed
 	func damageReport() -> Bool {
+		self.updateVelocityAndSpinAfterCollision()
+		self.updateCows()
 		let initialHp = moo.hp
 		moo.hp = 0
 		moo.mass = 0
@@ -285,6 +291,8 @@ class Entity: Codable, Moo {
 				keepers.append(i)
 				moo.hp += sec[i].moo.hp
 				moo.mass += sec[i].moo.mass
+			} else {
+				sec[i].moo.mass = 0
 			}
 		}
 		moo.momentOfInertia = 2 * moo.mass * moo.radius * moo.radius / 5
@@ -304,14 +312,36 @@ class Entity: Codable, Moo {
 			c.b = newb
 			sec = news
 			c.bbox = c.calculateBBox()
+			var spin = moo.spin
+			// if there are no bugs this should not alter velocity or spin 🙃
+			self.updateVelocityAndSpinAfterCollision()
+			assert((moo.spin - spin).length < 0.01)
+			self.updateCows()
 			return true
 		}
 		return false
 	}
 
+	func updateVelocityAndSpinAfterCollision() {
+		var inertiaTensor = Matrix3()
+		var overallMomentum = Vector()
+		var overallAngularMomentum = Vector()
+		for (i, section) in self.sec.enumerated() {
+			let pos = c.b[i].bbox.center
+			let mass = section.moo.mass
+			inertiaTensor.addInertiaTensorContribution(pos: pos, mass: mass)
+			let sectionMomentum = mass * section.moo.velocity
+			overallMomentum += sectionMomentum
+			overallAngularMomentum += pos.cross(sectionMomentum)
+		}
+		self.inertia = inertiaTensor
+		self.moo.velocity = overallMomentum / self.moo.mass
+		self.moo.spin = inertiaTensor.inverse() * overallAngularMomentum
+	}
+
 	func updateCows() {
 		for (i, box) in c.b.enumerated() {
-			// quaternion transforms incoming, bugs incoming
+			// quaternion transform, shiny!
 			let boxCenterRotated = moo.orientation * Quaternion(w:0, x: box.bbox.center.x, y: box.bbox.center.y, z: box.bbox.center.z) * moo.orientation.conjugate
 			sec[i].moo.position = moo.position + boxCenterRotated.xyz
 			sec[i].moo.velocity = moo.velocity + moo.spin.cross(boxCenterRotated.xyz)

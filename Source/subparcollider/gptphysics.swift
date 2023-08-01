@@ -290,6 +290,9 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 	// but the actual magnitude is less when the impact is off-center
 	hardcollisions.sort { $0.0 < $1.0 }
 	for (elapsedTime, object1, object2, ent1) in hardcollisions {
+		
+
+/*
 		let deltaPosition = object2.position - object1.position
 		let deltaVelocity = object2.velocity - object1.velocity
 		let centerDistance = deltaPosition.length
@@ -351,16 +354,44 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		let deltaSpin2 = torque2 / object2.momentOfInertia
 		ent1.moo.spin -= deltaSpin1
 		object2.spin += deltaSpin2
+*/
 
-		if(object1.hp < 0.001) {
-			object1.mass = 0
-		}
-		if(object2.hp < 0.001) {
-			object2.mass = 0
-		}
-		ent1.updateCows()
-
-		print("object1 remaining hp: \(object1.hp) object2 remaining hp: \(object2.hp) linear damage: \(closingSpeed * impulseMagnitude * invhpmult) rotation damage: \(magtanv * maxFrictionImpulseMagnitude * invhpmult)")
+		let deltaPosition = object2.position - object1.position
+		let deltaVelocity = object2.velocity - object1.velocity
+		let centerDistance = deltaPosition.length
+		let collisionNormal = deltaPosition / centerDistance
+		let normalVelocity = collisionNormal * (deltaVelocity.dot(collisionNormal))
+		let tangentVelocity = deltaVelocity - normalVelocity 
+		let closingSpeed = normalVelocity.length
+		let impulseMagnitude = abs(min(object1.mass, object2.mass) * closingSpeed * 2)
+		let impulse = collisionNormal * impulseMagnitude
+		object1.velocity -= impulse / object1.mass
+		object2.velocity += impulse / object2.mass
+		let collisionPoint = object1.position + (collisionNormal * object1.radius)
+		let r1 = collisionPoint - object1.position
+		let r2 = collisionPoint - object2.position
+		let frictionCoefficient = (object1.frictionCoefficient * object2.frictionCoefficient)
+		let rotationVelocity1 = object1.spin.cross(r1) 
+		let rotationVelocity2 = object2.spin.cross(r2)
+		let totalRelativeTangentialVelocity = tangentVelocity + rotationVelocity2 - rotationVelocity1
+		let minLinearMomentum = min(object1.mass, object2.mass) * totalRelativeTangentialVelocity.length
+		let angularMomentum1 = object1.momentOfInertia * totalRelativeTangentialVelocity.length / object1.radius
+		let angularMomentum2 = object2.momentOfInertia * totalRelativeTangentialVelocity.length / object2.radius
+		let minAngularMomentum = min(angularMomentum1, angularMomentum2)
+		let maxFrictionImpulseMagnitude = min(frictionCoefficient * impulseMagnitude * totalRelativeTangentialVelocity.length, minLinearMomentum + minAngularMomentum)
+		let frictionImpulse = -totalRelativeTangentialVelocity.normalized() * maxFrictionImpulseMagnitude
+		object1.velocity -= frictionImpulse * 0.5 / object1.mass
+		object2.velocity += frictionImpulse * 0.5 / object2.mass
+		let torque1 = r1.cross(frictionImpulse * 0.5)
+		let torque2 = r2.cross(frictionImpulse * 0.5)
+		let deltaSpin1 = torque1 / object1.momentOfInertia
+		let deltaSpin2 = torque2 / object2.momentOfInertia
+		object1.spin -= deltaSpin1
+		object2.spin += deltaSpin2
+		object1.hp -= closingSpeed * impulseMagnitude * invhpmult
+		object2.hp -= closingSpeed * impulseMagnitude * invhpmult
+		ent1.dinged++
+		print("object1 remaining hp: \(object1.hp) object2 remaining hp: \(object2.hp) ")
 	}
 
 	easycollisions.sort { $0.0 < $1.0 }
