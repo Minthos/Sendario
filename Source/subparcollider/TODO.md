@@ -2,7 +2,7 @@
 ## Near term TODO:
 
 * fix bugs in rigid body collision code
-
+* add autocannon
 
 ## Medium term TODO:
 
@@ -85,6 +85,7 @@ y: repeat last action, redo
 
 ## Low priority:
 
+* switch to Unreal Engine
 * render exhaust plumes
 * boxid support in the physics engine
 * more creative use of boxoids in the physics engine for things like explosions, magnetic fields, gas clouds, exhaust plumes
@@ -107,4 +108,31 @@ of course all of this will be procedurally generated but we still have to cache 
 ## New shit
 
 Spatial tree around a star: arranged by spherical coordinates with the star as centre. This way we make it easier to conduct intersection tests between objects and the star. The only inconvenience this causes us is that we must compute some spherical-cartesian conversions per object per frame. And we get to do the fun part which is to make a spatial tree and use it for ray casting.
+
+
+## PVP mechanics
+
+Smoke clouds will be an essential part of large fleet combat, they need to be first-class citizens of the physics engine
+They block beam weapons, which are the only weapons that can hit anything at any distance with no chance of evading or active countermeasures.
+They will have to be cleared by pressure waves from things like nuclear explosions, they will need temperature, pressure, velocity.
+
+Healing in combat in other games? Hah! In this game stuff is supposed to get blown up. You can repair if you survive the battle.
+
+
+## Planets
+
+Having plenty of boring, sterile planets with few resources is a feature. They are good hiding spots for players who want to avoid others. "Boring" doesn't have to be taken to an extreme, they can have interesting geological features and lots of variety in their chemical composition and aesthetics, but there shouldn't be any npcs, quests, lifeforms, exotic resources or anything like that on them. Just rock, meteor craters, optionally lakes and oceans.
+
+Habitable planets and moons are where the content is mainly supposed to be. I should make sure the procgen algorithm is really good. Having beautiful, varied, interesting planets to explore will add incredible value to the game. I don't want to just mimic reality, I want to have an alternative reality that's simplified but still offers great variety. For example the matter distribution between elements in a star system or on a planet. It can deviate from realism but it should still produce a wide variety of visually interesting results and be somewhat inspired by the laws of physics.
+
+## Deformable terrain
+
+YES! I want players to be able to dig caves underground, flatten terrain, build roads, tunnels, bridges and such. Allowing the players to alter the environment
+adds so much "free" gameplay and emotional attachment to the game world.
+
+
+## So in conclusion..
+
+I think realistically I should go back to UE and take the time to learn UE properly. Devote maybe a week to just watching and doing UE tutorials. Blender too I guess, at least enough to make some basic meshes. And that means Windows. And that means I can only do it when I get home. Until then I suppose I should continue with what I have.
+
 

@@ -8,6 +8,7 @@ Gather materials (mineral/gas deposits, salvage, trade), upgrade ship/base with 
 
 ### Sections:
 
+* Mainframe (this is the AI that runs the ship (i.e. you or someone like you. destroy it and die. upgrade it with more compute.)
 * Weapon turret (business end curvature determines aiming angle, aiming angle restricts barrel length. Barrel must be contained inside the shape of the section. Lower aiming angle allows for lighter servos and more space efficient layout.
 * Main thruster (rcs comes for free)
 * Reactor
@@ -222,7 +223,7 @@ Your ship can be a mobile base, big and heavy and fielding its own army of drone
 
 It would be interesting to try game modes where players can fill different roles, from piloting various machines in multiplayer combat to directing strategy to exploring and questing.
 
-I don't want to add too much complexity but it should be feasible to implement different game types by varying the resource amounts and time needed to build various things and the distance between player starting locations.
+I don't want to add too much complexity\* but it should be feasible to implement different game types by varying the resource amounts and time needed to build various things and the distance between player starting locations. (\*: but I will. r.i.p.)
 
 In a fast-research game with starting locations on different planets the game gets interesting when the gaslight drive is unlocked and until then it's about building up industry (econ + tech).
 
@@ -232,6 +233,8 @@ This tech tree is farly simplistic and linear. It will be interesting to see wha
 
 Lilliput world with 1/10 radius for all celestials and same density and orbital period, so the orbits have to be much closer to account for the very low gravity?
 
+Game mode where utility drones have to be controlled in first person and may have a humanoid body
+Utility drones get 2 electromagnet launcher/whinch mechanisms (one on each arm) that attach to the internal walls of the spaceship for rapid and efficient locomotion like the ninja rope in worms dual wielded.
 
 ## 2nd feature
 In an MMO persistent world I would like to have upgrades that players can research on specific ship designs or specific sections to tweak the stats. A system where players canspend experience points, R&D effort and compute cycles to get a random bonus after a random time. Applying multiple upgrades to the same item gives diminishing returns. Maybe use AI to generate a description of the upgrades based on the stats of the upgrade and the item/section's description and calculate overlap by having AI rate how much the descriptions sound like they should overlap. More similar = more stacking penalty.

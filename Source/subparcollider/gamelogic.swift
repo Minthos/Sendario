@@ -263,6 +263,7 @@ class Entity: Codable, Moo {
 		}
 	}
 
+	// this runs after the ship has been modified in the workshop
 	func recomputeCows() {
 		moo.hp = 0
 		moo.mass = 0
@@ -280,6 +281,7 @@ class Entity: Codable, Moo {
 
 	// this will run after a tick has completed
 	func damageReport() -> Bool {
+		var spin = moo.spin
 		self.updateVelocityAndSpinAfterCollision()
 		self.updateCows()
 		let initialHp = moo.hp
@@ -312,7 +314,7 @@ class Entity: Codable, Moo {
 			c.b = newb
 			sec = news
 			c.bbox = c.calculateBBox()
-			var spin = moo.spin
+			spin = moo.spin
 			// if there are no bugs this should not alter velocity or spin 🙃
 			self.updateVelocityAndSpinAfterCollision()
 			assert((moo.spin - spin).length < 0.01)

@@ -392,6 +392,7 @@ func main() {
 					encoder.outputFormatting = .prettyPrinted
 					//try! print((String(data: encoder.encode(player1), encoding: .utf8)!)
 				}
+				player1.dinged = 0
 			}
 			t += dt
 			s.composites[curcom].orientation = player1.moo.orientation
