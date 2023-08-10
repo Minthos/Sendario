@@ -13,11 +13,11 @@ INCDIR := -I/usr/local/include
 
 main_optimized: $(CPP_SRC) $(SWIFT_SRC)
 	g++ -O3 -c $(CPP_SRC) -fpermissive -fPIC $(LIBS)
-	swiftc -O -import-objc-header $(OBJC_HEADERS) $(SWIFT_SRC) $(CPP_SRC:.cpp=.o) -o subparcollider $(LIBDIR) $(INCDIR) $(LIBS)
+	swiftc -j8 -O -import-objc-header $(OBJC_HEADERS) $(SWIFT_SRC) $(CPP_SRC:.cpp=.o) -o subparcollider $(LIBDIR) $(INCDIR) $(LIBS)
 
 main_debug: $(CPP_SRC) $(SWIFT_SRC)
 	g++ -g -c $(CPP_SRC) -fpermissive -fPIC $(LIBS)
-	swiftc -g -D DEBUG -import-objc-header $(OBJC_HEADERS) $(SWIFT_SRC) $(CPP_SRC:.cpp=.o) -o subparcollider $(LIBDIR) $(INCDIR) $(LIBS)
+	swiftc -j8 -g -D DEBUG -import-objc-header $(OBJC_HEADERS) $(SWIFT_SRC) $(CPP_SRC:.cpp=.o) -o subparcollider $(LIBDIR) $(INCDIR) $(LIBS)
 
 optimized: main_optimized
 debug: main_debug

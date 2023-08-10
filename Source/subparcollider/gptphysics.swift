@@ -167,12 +167,12 @@ func gravTick(center: SphericalCow, celestials: inout [Celestial], t: Double, dt
 }
 
 func collisionTest(_ object1: SphericalCow, _ object2: SphericalCow) -> (Double, Double) {
-			let deltaPosition = object2.position - object1.position
-			let sumRadii = object1.radius + object2.radius
-			let distance = deltaPosition.length - sumRadii
-			let deltaVelocity = object2.velocity - object1.velocity
-			let closingSpeed = -(deltaVelocity.dot(deltaPosition.normalized()))
-			return (distance, closingSpeed)
+	let deltaPosition = object2.position - object1.position
+	let sumRadii = object1.radius + object2.radius
+	let distance = deltaPosition.length - sumRadii
+	let deltaVelocity = object2.velocity - object1.velocity
+	let closingSpeed = -(deltaVelocity.dot(deltaPosition.normalized()))
+	return (distance, closingSpeed)
 }
 
 // "frame of reference" is zoning in the physics engine.
@@ -286,12 +286,9 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 
 	// one thing is still broken.
 	// it was fine-ish when we ignored impulse angular component.
-	// impulseMagnitude counts the impact speed of the boxoid with the full mass of the entity behind it
-	// but the actual magnitude is less when the impact is off-center
 	hardcollisions.sort { $0.0 < $1.0 }
 	for (elapsedTime, object1, object2, ent1) in hardcollisions {
 		
-
 /*
 		let deltaPosition = object2.position - object1.position
 		let deltaVelocity = object2.velocity - object1.velocity

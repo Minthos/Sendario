@@ -315,7 +315,7 @@ class Entity: Codable, Moo {
 			sec = news
 			c.bbox = c.calculateBBox()
 			spin = moo.spin
-			// if there are no bugs this should not alter velocity or spin 🙃
+			// we do this to recompute the inertia tensor. if there are no bugs it should not alter velocity or spin 🙃
 			self.updateVelocityAndSpinAfterCollision()
 			assert((moo.spin - spin).length < 0.01)
 			self.updateCows()
@@ -324,17 +324,23 @@ class Entity: Codable, Moo {
 		return false
 	}
 
+    // progress report:
+    // overallAngularMomentum seems reasonable but we need to keep track of:
+    // ongoing collisions: elastic collisions and objects penetrating each other
+    // multiple boxoids from the same composite hitting the same object in the same tick
 	func updateVelocityAndSpinAfterCollision() {
 		var inertiaTensor = Matrix3()
 		var overallMomentum = Vector()
 		var overallAngularMomentum = Vector()
+        var avgSpin = Vector()
 		for (i, section) in self.sec.enumerated() {
 			let pos = c.b[i].bbox.center
 			let mass = section.moo.mass
 			inertiaTensor.addInertiaTensorContribution(pos: pos, mass: mass)
 			let sectionMomentum = mass * section.moo.velocity
 			overallMomentum += sectionMomentum
-			overallAngularMomentum += pos.cross(sectionMomentum)
+			let sectionRelativeMomentum = mass * (section.moo.velocity - self.moo.velocity)
+			overallAngularMomentum += pos.cross(sectionRelativeMomentum)// + (section.moo.spin * section.moo.momentOfInertia)
 		}
 		self.inertia = inertiaTensor
 		self.moo.velocity = overallMomentum / self.moo.mass
