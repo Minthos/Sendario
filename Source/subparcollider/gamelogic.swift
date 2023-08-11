@@ -328,6 +328,10 @@ class Entity: Codable, Moo {
     // overallAngularMomentum seems reasonable but we need to keep track of:
     // ongoing collisions: elastic collisions and objects penetrating each other
     // multiple boxoids from the same composite hitting the same object in the same tick
+
+    // actually this is probably a good place to do something with elasticity. The elastic force between a boxoid
+    // and its composite should be added to that boxoid's impulse calculation for the following tick so it repels
+    // the ground and other objects with a force that equals the force it exerts on the composite plus its own inertia
 	func updateVelocityAndSpinAfterCollision() {
 		var inertiaTensor = Matrix3()
 		var overallMomentum = Vector()
@@ -353,6 +357,7 @@ class Entity: Codable, Moo {
 			let boxCenterRotated = moo.orientation * Quaternion(w:0, x: box.bbox.center.x, y: box.bbox.center.y, z: box.bbox.center.z) * moo.orientation.conjugate
 			sec[i].moo.position = moo.position + boxCenterRotated.xyz
 			sec[i].moo.velocity = moo.velocity + moo.spin.cross(boxCenterRotated.xyz)
+            // should calculate centrifugal force and tear off boxoids whose centrifugal > centripetal
 			sec[i].moo.spin = moo.spin
 			sec[i].moo.orientation = moo.orientation
 		}
