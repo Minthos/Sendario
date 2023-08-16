@@ -1,0 +1,8 @@
+
+## End User License Agreement
+
+YOU HAVE NO RIGHTS
+
+I TAKE NO RESPONSIBILITY
+
+
