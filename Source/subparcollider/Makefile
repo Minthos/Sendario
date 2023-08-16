@@ -4,6 +4,12 @@
 lintedrender5.cpp: render5.cpp lintcpp.py
 	cat render5.cpp | ./lintcpp.py > lintedrender5.cpp
 
+rt: gl4.cpp
+	g++ -O2 gl4.cpp -o rt -lGL -lGLEW -lglut -lGLU -lm -L/usr/local/lib -I/usr/local/include
+
+rtdebug: gl4.cpp
+	g++ -g3 -DDEBUG gl4.cpp -o rtdebug -lGL -lGLEW -lglut -lGLU -lm -L/usr/local/lib -I/usr/local/include
+
 CPP_SRC := lintedrender5.cpp sdlwrapper.cpp
 SWIFT_SRC := main.swift gptphysics.swift spatialtypes.swift boxoid.swift gamelogic.swift
 OBJC_HEADERS := subparcollider-Bridging-Header.h
@@ -27,5 +33,5 @@ debug: main_debug
 .DEFAULT_GOAL := optimized
 
 clean:
-	rm *.o lintedrender5.cpp subparcollider
+	rm *.o lintedrender5.cpp subparcollider rt rtdebug
 
