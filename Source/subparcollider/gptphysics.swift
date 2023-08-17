@@ -1,14 +1,7 @@
 import Foundation
 
-/*
-
-After all the forces have been applied from collisions and other sources, propagate forces between connected boxoids
-to determine the forces acting on the composite itself and damage/deformation/disconnection/destruction of boxoids
-as appropriate.
-
-*/
-// 3. upgrade celestial class with reentry heat and drag
-// 4. upgrade collisions to be not instantaneous and handle multiple bodies colliding. 1 ms default timestep
+// leave the collision code as it is for now, elastic collisions will solve our problems
+// reentry heat and drag
 class SphericalCow: Codable {
 	let id: Int64
 	var referenceFrame: SphericalCow? = nil

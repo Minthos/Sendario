@@ -12,7 +12,7 @@ auto now = std::chrono::high_resolution_clock::now;
 
 int winW = 800;
 int winH = 600;
-float canvasScale = 0.666;
+float canvasScale = 1.0;// 0.666;
 int canvasW = winW * canvasScale;
 int canvasH = winH * canvasScale;
 unsigned int frameCount = 0;
@@ -28,10 +28,12 @@ GLuint quadVAO;
 GLuint sphereBuffer;
 GLuint lightBuffer;
 
-
+// material: diffuse, specular, reflective, refractive
 struct Sphere {
 	glm::vec3 center;
 	float radius;
+	glm::vec4 color;
+	glm::vec4 material;
 };
 
 struct Light {
@@ -41,7 +43,7 @@ struct Light {
 	int id;
 };
 
-const int MAXDEPTH = 3;
+const int MAXDEPTH = 2;
 float maxDepth = 3;
 int numSpheres = 4;
 Sphere* spheres = (Sphere*)malloc(sizeof(Sphere) * numSpheres);
@@ -62,12 +64,16 @@ uniform int maxDepth;
 
 struct Ray {
 	vec3 origin;
+	float alpha;
 	vec3 direction;
 };
 
+// material: diffuse, specular, reflective, refractive
 struct Sphere {
 	vec3 center;
 	float radius;
+	vec4 color;
+	vec4 material;
 };
 
 struct Light {
@@ -115,6 +121,9 @@ vec3 refract(vec3 L, vec3 N, float n1, float n2) {
 	return r * L + (r * cosI - cosT) * N;
 }
 
+// alpha channel: 1000.0 = mirror, 500.0 = marble, 0.0 = gas giant, -1000.0 = vacuum, -1100.0 = glass
+// marble is 50/50 reflective/diffuse
+// glass is 5% reflective, 5% opaque, 90% refractive
 
 void main() {
 	vec2 uv;
@@ -126,20 +135,20 @@ void main() {
 	const int MAXDEPTH = 3;
 	Ray ray[(1 << (MAXDEPTH +1)) - 1];
 	int ridx = 0;
+	int nrays = 1;
 	ray[ridx].origin = vec3(0);
 	ray[ridx].direction = normalize(vec3(aspectRatio * uv.x, uv.y, -1));
+	ray[ridx].alpha = 1.0;
 	vec4 accumulatedColor = vec4(0, 0, 0, 0);
 
-	float invdepth = 2.0;
 	for (int depth = 0; depth <= maxDepth; depth++) {
-		invdepth *= 0.5;
 		int dd = 1 << depth;
 		int ddd = dd << 1;
 		// to reduce the memory need we can reuse ray[ridx] but let's keep thing simple for now
 		for (int ridx = dd - 1; (ridx + 1) < ddd; ridx++) {
 			ray[ridx * 2 + 1].direction = vec3(0);
 			ray[ridx * 2 + 2].direction = vec3(0);
-			if(length(ray[ridx].direction) < 0.1) {
+			if(length(ray[ridx].direction) < 0.1 || ray[ridx].alpha < 0.01) {
 				continue;
 			}
 			float closestHit = 1000000000000.0;
@@ -157,7 +166,7 @@ void main() {
 				bool inside = oclen < spheres[i].radius;
 				float t = raySphere(ray[ridx], spheres[i].center, spheres[i].radius);
 				if (t > 0 && t < closestHit) {
-					color = vec4(0, 0, 0, 1);
+					color = vec4(0, 0, 0, 0);
 					closestHit = t;
 					vec3 hitPoint = ray[ridx].origin + t * ray[ridx].direction;
 					vec3 normal = (hitPoint - spheres[i].center) / spheres[i].radius;
@@ -168,36 +177,34 @@ void main() {
 						float lightDist = length(shadowRay.direction);
 						shadowRay.direction = shadowRay.direction / lightDist;
 						shadowRay.origin = origin;
-						bool inShadow = false;
+						float shadow = 0.0;
 						for (int s = 0; s < 3; s++) {
 							float shadow_t = raySphere(shadowRay, spheres[s].center, spheres[s].radius);
 							if (shadow_t > 0.0) {
-								inShadow = true;
-								break;
+								shadow += spheres[s].color.a;
 							}
 						}
-						if (!inShadow) {
-							float mattitude = 0.6;
-							float gloss = 32.0;
-							vec3 h = (-shadowRay.direction + ray[ridx].direction) * -0.5;
-							vec3 halfDir = normalize(-shadowRay.direction + ray[ridx].direction);
-							float specAngle = max(0.0, dot(halfDir, -normal));
-							float specular = pow(specAngle, gloss);
-							float lambertian = max(0.0, dot(normal, shadowRay.direction));
-							float contribution = lerp(specular, lambertian, mattitude);
-							color += vec4((contribution / lightDist) * lights[l].color, 1.0);
-							//float fresnel = max(0, min(1, bias + scale * (1.0 + dot(ray[ridx].direction, normal))));
-						}
+						shadow = max(0.0, min(1.0, 1.0 - shadow));
+						float gloss = 32.0;
+						vec3 h = (-shadowRay.direction + ray[ridx].direction) * -0.5;
+						vec3 halfDir = normalize(-shadowRay.direction + ray[ridx].direction);
+						float specAngle = max(0.0, dot(halfDir, -normal));
+						float specular = pow(specAngle, gloss) * spheres[i].material.y * ray[ridx].alpha * shadow / lightDist;
+						float lambertian = max(0.0, dot(normal, shadowRay.direction)) * spheres[i].material.x * shadow * ray[ridx].alpha / lightDist;
+						color += vec4(lambertian * lights[l].color * spheres[i].color.rgb + specular * lights[l].color, ray[ridx].alpha);
 					}
 					float refractiveIndexAir = 1.0;
 					float refractiveIndexSphere = 1.2;
 					ray[ridx * 2 + 1].origin = origin;
+					ray[ridx * 2 + 1].alpha = ray[ridx].alpha * spheres[i].material.z;
 					ray[ridx * 2 + 1].direction = reflect(ray[ridx].direction, normal);
+					refractiveIndexSphere = spheres[i].color.a / -1000.0;
 					ray[ridx * 2 + 2].origin = hitPoint - 0.0001 * normal;
+					ray[ridx * 2 + 2].alpha = ray[ridx].alpha * spheres[i].material.w;
 					ray[ridx * 2 + 2].direction = refract(ray[ridx].direction, normal, refractiveIndexAir, refractiveIndexSphere);
 				}
 			}
-			accumulatedColor += color * invdepth;
+			accumulatedColor += color;
 		}
 	}
 
@@ -316,13 +323,22 @@ void initQuadShader() {
 	glDeleteShader(fragmentShader);
 }
 
+// material: diffuse, specular, reflective, refractive
 void updateSpheres() {
 	for (int i = 0; i < 3; i++) {
 		spheres[i].center = glm::vec3(2.2f * i - 2.2f, 0.0f, -3.0f);
 		spheres[i].radius = 1.0f;
 	}
-	spheres[3].center = glm::vec3(0.0f, -10001.0f, 0.0f);
-	spheres[3].radius = 10000.0f;
+	spheres[3].center = glm::vec3(0.0f, -1001.0f, 0.0f);
+	spheres[3].radius = 1000.0f;
+	spheres[0].color = glm::vec4(1.0f, 0.95f, 0.7f, 1.0f);
+	spheres[0].material = glm::vec4(0.1f, 0.1f, 0.8f, 0.0f);
+	spheres[1].color = glm::vec4(0.8f, 0.8f, 1.0f, 1.0f);
+	spheres[1].material = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
+	spheres[2].color = glm::vec4(0.0f, 0.0f, 1.0f, 0.2f);
+	spheres[2].material = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	spheres[3].color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+	spheres[3].material = glm::vec4(0.6f, 0.2f, 0.2f, 0.0f);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, sphereBuffer);
 	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Sphere) * numSpheres, spheres, GL_STATIC_DRAW);
 }
