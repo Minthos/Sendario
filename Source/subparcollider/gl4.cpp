@@ -38,6 +38,8 @@ struct Light {
 	int id;
 };
 
+const int MAXDEPTH = 5;
+float maxDepth = 3;
 int numSpheres = 3;
 Sphere* spheres = (Sphere*)malloc(sizeof(Sphere) * numSpheres);
 int numLights = 6;
@@ -53,6 +55,7 @@ layout(rgba32f, location = 0) writeonly uniform image2D destTex;
 uniform vec2 screenSize;
 uniform int numSpheres;
 uniform int numLights;
+uniform int maxDepth;
 
 struct Ray {
 	vec3 origin;
@@ -117,26 +120,17 @@ void main() {
 	uv.y = (2.0 * float(storePos.y) / screenSize.y - 1.0);
 	float aspectRatio = screenSize.x / screenSize.y;
 
-	const int MAXDEPTH = 2;
-	Ray ray[32];
+	const int MAXDEPTH = 5;
+	Ray ray[1 << MAXDEPTH +1];
 	int ridx = 0;
 	ray[ridx].origin = vec3(0);
 	ray[ridx].direction = normalize(vec3(aspectRatio * uv.x, uv.y, -1));
 	vec4 color = vec4(0, 0, 0, 0); // transparent for miss
-	float closestHit = 1000000000000.0;
 
-	for (int i = 0; i < numLights; i++) {
-		float t = raySphere(ray[ridx], lights[i].position, lights[i].radius);
-		if (t > 0) {
-			color = vec4(lights[i].color, 1);
-			closestHit = t;
-			break;
-		}
-	}
+		float invdepth = 2.0; //(2.0 / 1.0 + maxDepth));
+		for (int depth = 0; depth <= maxDepth; depth++) {
+			invdepth *= 0.5;
 
-		float invdepth = 1.0;
-		for (int depth = 0; depth <= MAXDEPTH; depth++) {
-			invdepth *= 0.8;
 			int dd = 1 << depth;
 			int ddd = dd << 1;
 			for (int ridx = dd - 1; (ridx + 1) < ddd; ridx++) {
@@ -145,9 +139,19 @@ void main() {
 				if(length(ray[ridx].direction) < 0.1) {
 					continue;
 				}
+				float closestHit = 1000000000000.0;
+				for (int i = 0; i < numLights; i++) {
+					float t = raySphere(ray[ridx], lights[i].position, lights[i].radius);
+					if (t > 0) {
+						color += vec4(lights[i].color, 1) * invdepth;
+						closestHit = t;
+						break;
+					}
+				}
 				for (int i = 0; i < numSpheres; i++) {
 					float t = raySphere(ray[ridx], spheres[i].center, spheres[i].radius);
 					if (t > 0 && t < closestHit) {
+						closestHit = t;
 						if (depth == 0) {
 							color = vec4(0, 0, 0, 0);
 						}
@@ -177,7 +181,7 @@ void main() {
 								float specular = pow(specAngle, gloss);
 								float lambertian = max(0.0, dot(normal, shadowRay.direction));
 								float contribution = lerp(specular, lambertian, mattitude);
-								color += vec4((contribution / lightDist) * lights[l].color, 0.0) * 0.3 * invdepth;
+								color += vec4((contribution / lightDist) * lights[l].color, 0.0) * invdepth;
 								//float fresnel = max(0, min(1, bias + scale * (1.0 + dot(ray[ridx].direction, normal))));
 							}
 						}
@@ -404,6 +408,7 @@ void display() {
 	glUseProgram(computeProgram);
 	chkerr();
 	
+	glUniform1i(glGetUniformLocation(computeProgram, "maxDepth"), (int)maxDepth);
 	glUniform1i(glGetUniformLocation(computeProgram, "numSpheres"), numSpheres);
 	glUniform1i(glGetUniformLocation(computeProgram, "numLights"), numLights);
 	glUniform2f(glGetUniformLocation(computeProgram, "screenSize"), (float)winW, (float)winH);
@@ -454,9 +459,10 @@ void idle() {
 	auto frameDuration = std::chrono::duration_cast<std::chrono::microseconds>(now() - prevFrameTime).count();
 	busyTime += frameDuration;
 	auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(now() - startTime).count();
+	float fps = frameCount / (elapsed / 1000000.0);
 	if (elapsed >= 1000000) {
-		float fps = frameCount / (elapsed / 1000000.0);
-		std::cout << "FPS: " << fps << " Frame Time: " << busyTime/(1000.0 * frameCount) << " ms " << "CPU Busy: " << (1.0 - (idleTime / elapsed)) * 100.0f << "%" << std::endl;
+		
+		std::cout << "FPS: " << fps << " Frame Time: " << busyTime/(1000.0 * frameCount) << " ms " << "CPU Busy: " << (1.0 - (idleTime / elapsed)) * 100.0f << "%" << " maxDepth: " << maxDepth << std::endl;
 		idleTime = 0.0;
 		busyTime = 0.0;
 		frameCount = 0;
@@ -465,8 +471,13 @@ void idle() {
 	float frameTimeLimit = 1000000.0f / fps_limit;
 	if (frameDuration < frameTimeLimit) {
 		auto timeBeforeSleep = now();
-		//usleep(frameTimeLimit - frameDuration);
+		usleep(frameTimeLimit - frameDuration);
 		idleTime += std::chrono::duration_cast<std::chrono::microseconds>(now() - timeBeforeSleep).count();
+	}
+	if (maxDepth > 0.5 && fps < fps_limit * 0.5) {
+		maxDepth -= 0.1;
+	} else if((maxDepth + 0.1 < MAXDEPTH) && ((idleTime / elapsed) > 0.98)) {
+		maxDepth += 0.1;
 	}
 	prevFrameTime = now();
 	glutPostRedisplay();
