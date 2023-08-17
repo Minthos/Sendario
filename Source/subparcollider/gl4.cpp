@@ -12,7 +12,7 @@ auto now = std::chrono::high_resolution_clock::now;
 
 int winW = 800;
 int winH = 600;
-float canvasScale = 1.0;
+float canvasScale = 0.666;
 int canvasW = winW * canvasScale;
 int canvasH = winH * canvasScale;
 unsigned int frameCount = 0;
@@ -43,7 +43,7 @@ struct Light {
 
 const int MAXDEPTH = 3;
 float maxDepth = 3;
-int numSpheres = 3;
+int numSpheres = 4;
 Sphere* spheres = (Sphere*)malloc(sizeof(Sphere) * numSpheres);
 int numLights = 6;
 Light* lights = (Light*)malloc(sizeof(Light) * numLights);
@@ -152,16 +152,15 @@ void main() {
 				}
 			}
 			for (int i = 0; i < numSpheres; i++) {
+				vec3 originCenter = ray[ridx].origin - spheres[i].center;
+				float oclen = length(originCenter);
+				bool inside = oclen < spheres[i].radius;
 				float t = raySphere(ray[ridx], spheres[i].center, spheres[i].radius);
 				if (t > 0 && t < closestHit) {
 					color = vec4(0, 0, 0, 1);
 					closestHit = t;
 					vec3 hitPoint = ray[ridx].origin + t * ray[ridx].direction;
 					vec3 normal = (hitPoint - spheres[i].center) / spheres[i].radius;
-					bool inside = length(ray[ridx].origin - spheres[i].center) < spheres[i].radius;
-					if (inside){
-						normal = -normal;
-					}
 					vec3 origin = hitPoint + 0.0001 * normal;
 					for (int l = 0; l < numLights; l++) {
 						Ray shadowRay;
@@ -170,7 +169,7 @@ void main() {
 						shadowRay.direction = shadowRay.direction / lightDist;
 						shadowRay.origin = origin;
 						bool inShadow = false;
-						for (int s = 0; s < numSpheres; s++) {
+						for (int s = 0; s < 3; s++) {
 							float shadow_t = raySphere(shadowRay, spheres[s].center, spheres[s].radius);
 							if (shadow_t > 0.0) {
 								inShadow = true;
@@ -318,10 +317,12 @@ void initQuadShader() {
 }
 
 void updateSpheres() {
-	for (int i = 0; i < numSpheres; i++) {
+	for (int i = 0; i < 3; i++) {
 		spheres[i].center = glm::vec3(2.2f * i - 2.2f, 0.0f, -3.0f);
 		spheres[i].radius = 1.0f;
 	}
+	spheres[3].center = glm::vec3(0.0f, -10001.0f, 0.0f);
+	spheres[3].radius = 10000.0f;
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, sphereBuffer);
 	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Sphere) * numSpheres, spheres, GL_STATIC_DRAW);
 }
@@ -331,7 +332,7 @@ void updateLights() {
 		lights[i].id = i;
 		lights[i].radius = 0.05f;
 		auto time = (now() - tZero).count() / 1000000000.0;
-		lights[i].position = glm::vec3(2.2f * (i % 3) * sin(time * i), 1.9f * sin(time + i), -2.5f + 1.5 * cos(time + i));
+		lights[i].position = glm::vec3(1.2f * (i % 3) * sin(time / (i + 1)), 1.0f + 0.9f * sin(time + i), -1.5f + 1.0f * cos(time + i));
 	}
 	lights[0].color = glm::vec3(0.3f, 0.3f, 1.0f);
 	lights[1].color = glm::vec3(0.3f, 1.0f, 0.3f);
