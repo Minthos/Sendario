@@ -96,7 +96,18 @@ float lerp(float a, float b, float f) {
 	return a + f * (b - a);
 }
 
-// TODO: reflection and refraction
+vec3 reflect(vec3 L, vec3 N) {
+    return L - 2.0 * dot(L, N) * N;
+}
+
+vec3 refract(vec3 L, vec3 N, float n1, float n2) {
+    float r = n1 / n2;
+    float cosI = -dot(N, L);
+    float sinT2 = r * r * (1.0 - cosI * cosI);
+    if (sinT2 > 1.0) return vec3(0.0);  // Total internal reflection
+    float cosT = sqrt(1.0 - sinT2);
+    return r * L + (r * cosI - cosT) * N;
+}
 
 
 void main() {
@@ -106,57 +117,85 @@ void main() {
 	uv.y = (2.0 * float(storePos.y) / screenSize.y - 1.0);
 	float aspectRatio = screenSize.x / screenSize.y;
 
-	Ray ray;
-	ray.origin = vec3(0);
-	ray.direction = normalize(vec3(aspectRatio * uv.x, uv.y, -1));
+	const int MAXDEPTH = 2;
+	Ray ray[32];
+	int ridx = 0;
+	ray[ridx].origin = vec3(0);
+	ray[ridx].direction = normalize(vec3(aspectRatio * uv.x, uv.y, -1));
 	vec4 color = vec4(0, 0, 0, 0); // transparent for miss
 	float closestHit = 1000000000000.0;
 
 	for (int i = 0; i < numLights; i++) {
-		float t = raySphere(ray, lights[i].position, lights[i].radius);
+		float t = raySphere(ray[ridx], lights[i].position, lights[i].radius);
 		if (t > 0) {
 			color = vec4(lights[i].color, 1);
 			closestHit = t;
 			break;
 		}
 	}
-	
-	for (int i = 0; i < numSpheres; i++) {
-		float t = raySphere(ray, spheres[i].center, spheres[i].radius);
-		if (t > 0 && t < closestHit) {
-			color = vec4(0, 0, 0, 1);
-			vec3 hitPoint = ray.origin + t * ray.direction;
-			for (int l = 0; l < numLights; l++) {
-				Ray shadowRay;
-				shadowRay.direction = lights[l].position - hitPoint;
-				float lightDist = length(shadowRay.direction);
-				shadowRay.direction = shadowRay.direction / lightDist;
-				shadowRay.origin = hitPoint + 0.001 * shadowRay.direction;  // Offset a bit to prevent self-intersection
-				bool inShadow = false;
-				for (int s = 0; s < numSpheres; s++) {
-					float shadow_t = raySphere(shadowRay, spheres[s].center, spheres[s].radius);
-					if (shadow_t > 0.0) {
-						inShadow = true;
+
+		float invdepth = 1.0;
+		for (int depth = 0; depth <= MAXDEPTH; depth++) {
+			invdepth *= 0.8;
+			int dd = 1 << depth;
+			int ddd = dd << 1;
+			for (int ridx = dd - 1; (ridx + 1) < ddd; ridx++) {
+				ray[ridx * 2 + 1].direction = vec3(0);
+				ray[ridx * 2 + 2].direction = vec3(0);
+				if(length(ray[ridx].direction) < 0.1) {
+					continue;
+				}
+				for (int i = 0; i < numSpheres; i++) {
+					float t = raySphere(ray[ridx], spheres[i].center, spheres[i].radius);
+					if (t > 0 && t < closestHit) {
+						if (depth == 0) {
+							color = vec4(0, 0, 0, 0);
+						}
+						vec3 hitPoint = ray[ridx].origin + t * ray[ridx].direction;
+						vec3 normal = (hitPoint - spheres[i].center) / spheres[i].radius;
+						vec3 origin = hitPoint + 0.0001 * normal;
+						for (int l = 0; l < numLights; l++) {
+							Ray shadowRay;
+							shadowRay.direction = lights[l].position - hitPoint;
+							float lightDist = length(shadowRay.direction);
+							shadowRay.direction = shadowRay.direction / lightDist;
+							shadowRay.origin = origin;
+							bool inShadow = false;
+							for (int s = 0; s < numSpheres; s++) {
+								float shadow_t = raySphere(shadowRay, spheres[s].center, spheres[s].radius);
+								if (shadow_t > 0.0) {
+									inShadow = true;
+									break;
+								}
+							}
+							if (!inShadow) {
+								float mattitude = 0.6;
+								float gloss = 32.0;
+								vec3 h = (-shadowRay.direction + ray[ridx].direction) * -0.5;
+								vec3 halfDir = normalize(-shadowRay.direction + ray[ridx].direction);
+								float specAngle = max(0.0, dot(halfDir, -normal));
+								float specular = pow(specAngle, gloss);
+								float lambertian = max(0.0, dot(normal, shadowRay.direction));
+								float contribution = lerp(specular, lambertian, mattitude);
+								color += vec4((contribution / lightDist) * lights[l].color, 0.0) * 0.3 * invdepth;
+								//float fresnel = max(0, min(1, bias + scale * (1.0 + dot(ray[ridx].direction, normal))));
+							}
+						}
+						Ray reflectionRay;
+						reflectionRay.origin = origin;
+						reflectionRay.direction = reflect(ray[ridx].direction, normal);
+						float refractiveIndexAir = 1.0;
+						float refractiveIndexSphere = 1.5;
+						vec3 refractedDirection = refract(ray[ridx].direction, normal, refractiveIndexAir, refractiveIndexSphere);
+						ray[ridx * 2 + 1] = reflectionRay;
+						ray[ridx * 2 + 2].origin = origin;
+						ray[ridx * 2 + 2].direction = refractedDirection;
 						break;
 					}
 				}
-				if (!inShadow) {
-					vec3 normal = (hitPoint - spheres[i].center) / spheres[i].radius;
-					float mattitude = 0.6;
-					float gloss = 32.0;
-					vec3 h = (-shadowRay.direction + ray.direction) * -0.5;
-					vec3 halfDir = normalize(-shadowRay.direction + ray.direction);
-					float specAngle = max(0.0, dot(halfDir, -normal));
-					float specular = pow(specAngle, gloss);
-					float lambertian = max(0.0, dot(normal, shadowRay.direction));
-					float contribution = lerp(specular, lambertian, mattitude);
-					color += vec4((contribution / lightDist) * lights[l].color, 0.0);
-					//float fresnel = max(0, min(1, bias + scale * (1.0 + dot(ray.direction, normal))));
-				}
 			}
-			break;
 		}
-	}
+
 	if(color.r > 1.0) {
 		color.g += (color.r - 1.0) * 0.5;
 		color.b += (color.r - 1.0) * 0.5;
@@ -426,7 +465,7 @@ void idle() {
 	float frameTimeLimit = 1000000.0f / fps_limit;
 	if (frameDuration < frameTimeLimit) {
 		auto timeBeforeSleep = now();
-		usleep(frameTimeLimit - frameDuration);
+		//usleep(frameTimeLimit - frameDuration);
 		idleTime += std::chrono::duration_cast<std::chrono::microseconds>(now() - timeBeforeSleep).count();
 	}
 	prevFrameTime = now();
