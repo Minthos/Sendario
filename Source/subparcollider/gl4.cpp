@@ -28,7 +28,6 @@ GLuint quadVAO;
 GLuint sphereBuffer;
 GLuint lightBuffer;
 
-// material: diffuse, specular, reflective, refractive
 struct Sphere {
 	glm::vec3 center;
 	float radius;
@@ -47,7 +46,7 @@ const int MAXDEPTH = 7;
 float maxDepth = MAXDEPTH;
 int numSpheres = 4;
 Sphere* spheres = (Sphere*)malloc(sizeof(Sphere) * numSpheres);
-int numLights = 6;
+int numLights = 7;
 Light* lights = (Light*)malloc(sizeof(Light) * numLights);
 
 const int WORKGROUP_SIZE = 8;
@@ -61,6 +60,8 @@ uniform vec2 canvasSize;
 uniform int numSpheres;
 uniform int numLights;
 uniform int maxDepth;
+
+const int MAXDEPTH = 7;
 
 struct Ray {
 	vec3 origin;
@@ -214,7 +215,6 @@ void main() {
 	uv.y = (2.0 * float(storePos.y) / canvasSize.y - 1.0);
 	float aspectRatio = canvasSize.x / canvasSize.y;
 
-	const int MAXDEPTH = 7;
 	Ray ray[MAXDEPTH + 1];
 	int ridx = 0;
 	ray[ridx].origin = vec3(0);
@@ -351,6 +351,7 @@ void updateSpheres() {
 	spheres[0].material = glm::vec4(0.1f, 0.1f, 0.8f, 0.0f);
 	spheres[1].color = glm::vec4(0.0f, 0.0f, 1.0f, 0.1f);
 	spheres[1].material = glm::vec4(0.0f, 0.0f, 0.05f, 0.95f);
+	spheres[1].radius = 2.0f;
 	spheres[2].color = glm::vec4(0.8f, 0.8f, 1.0f, 1.0f);
 	spheres[2].material = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
 	spheres[3].color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -372,6 +373,8 @@ void updateLights() {
 	lights[3].color = glm::vec3(1.0f, 0.3f, 0.3f);
 	lights[4].color = glm::vec3(0.3f, 1.0f, 0.3f);
 	lights[5].color = glm::vec3(1.0f, 0.3f, 0.3f);
+	lights[6].color = glm::vec3(100.0f, 90.0f, 80.0f);
+	lights[6].position = glm::vec3(0.0f, 100.0f, 0.0f);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightBuffer);
 	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Light) * numLights, lights, GL_STATIC_DRAW);
 }
@@ -487,6 +490,7 @@ void reshape(int width, int height) {
 }
 
 
+int fps_strikes = 0;
 double fps_limit = 120.0;
 double idleTime = 0.0;
 double busyTime = 0.0;
@@ -499,7 +503,7 @@ void idle() {
 	float fps = frameCount / (elapsed / 1000000.0);
 	if (elapsed >= 1000000) {
 		
-		std::cout << "FPS: " << fps << " Frame Time: " << busyTime/(1000.0 * frameCount) << " ms " << "CPU Busy: " << (1.0 - (idleTime / elapsed)) * 100.0f << "%" << " maxDepth: " << maxDepth << std::endl;
+		std::cout << "FPS: " << fps << " Frame Time: " << busyTime/(1000.0 * frameCount) << " ms " << "CPU Busy: " << (1.0 - (idleTime / elapsed)) * 100.0f << "%" << " maxDepth: " << maxDepth << " scale: " << canvasScale << std::endl;
 		idleTime = 0.0;
 		busyTime = 0.0;
 		frameCount = 0;
@@ -511,11 +515,31 @@ void idle() {
 		usleep(frameTimeLimit - frameDuration);
 		idleTime += std::chrono::duration_cast<std::chrono::microseconds>(now() - timeBeforeSleep).count();
 	}
-	if (maxDepth > 0.5 && fps < fps_limit * 0.5) {
-		maxDepth -= 0.1;
-	} else if((maxDepth < MAXDEPTH) && ((idleTime / elapsed) > 0.98)) {
-		maxDepth += 0.1;
+	if(frameDuration > 100.0 * frameTimeLimit) {
+		maxDepth = 1;
+		canvasScale = 0.1;
+		reshape(winW, winH);
 	}
+	if (fps < fps_limit * 0.8) {
+		fps_strikes++;
+		if(fps_strikes > 10) {
+			canvasScale *= 0.9;
+			canvasScale = std::max(0.33f, canvasScale);
+			reshape(winW, winH);
+			fps_strikes = 0;
+		}
+	} else if((idleTime / elapsed) > 0.98) {
+		fps_strikes--;
+		if(fps_strikes < -10) {
+			maxDepth = std::min((float)MAXDEPTH, maxDepth + 1);
+			canvasScale *= 1.11;
+			canvasScale = std::min(1.0f, canvasScale);
+			reshape(winW, winH);
+			fps_strikes = 0;
+		}
+	}
+
+
 	prevFrameTime = now();
 	glutPostRedisplay();
 }
@@ -555,8 +579,6 @@ int main(int argc, char** argv) {
 	glEnable(GL_DEBUG_OUTPUT);
 	glDebugMessageCallback(MessageCallback, 0);
 
-	// render a frame manually since otherwise it would only render after a window resize event
-	display();
 	glutMainLoop();
 	free(spheres);
 	return 0;
