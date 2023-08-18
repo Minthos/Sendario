@@ -11,8 +11,8 @@
 auto now = std::chrono::high_resolution_clock::now;
 
 int winW = 800;
-int winH = 600;
-float canvasScale = 1.0;// 0.666;
+int winH = 1000;
+float canvasScale = 0.666;
 int canvasW = winW * canvasScale;
 int canvasH = winH * canvasScale;
 unsigned int frameCount = 0;
@@ -43,8 +43,8 @@ struct Light {
 	int id;
 };
 
-const int MAXDEPTH = 2;
-float maxDepth = 3;
+const int MAXDEPTH = 4;
+float maxDepth = 4;
 int numSpheres = 4;
 Sphere* spheres = (Sphere*)malloc(sizeof(Sphere) * numSpheres);
 int numLights = 6;
@@ -91,6 +91,14 @@ layout(std430, binding = 1) buffer LightBuffer {
 	Light lights[];
 };
 
+float random(vec2 v) {
+	return fract(sin(fract(cos(dot(v, vec2(22.235793, 4.742247)) * 69420.0))) * 43758.5453123);
+}
+
+float random(float x) {
+	return fract(sin(fract(cos(x * 69420.0))) * 43758.5453123);
+}
+
 float raySphere(Ray ray, vec3 center, float radius) {
 	vec3 oc = ray.origin - center;
 	float a = dot(ray.direction, ray.direction);
@@ -116,14 +124,26 @@ vec3 refract(vec3 L, vec3 N, float n1, float n2) {
 	float r = n1 / n2;
 	float cosI = -dot(N, L);
 	float sinT2 = r * r * (1.0 - cosI * cosI);
-	if (sinT2 > 1.0) return vec3(0.0);  // Total internal reflection
+	//if (sinT2 > 1.0) return vec3(0.0);  // Total internal reflection
 	float cosT = sqrt(1.0 - sinT2);
 	return r * L + (r * cosI - cosT) * N;
 }
 
-// alpha channel: 1000.0 = mirror, 500.0 = marble, 0.0 = gas giant, -1000.0 = vacuum, -1100.0 = glass
-// marble is 50/50 reflective/diffuse
-// glass is 5% reflective, 5% opaque, 90% refractive
+vec3 perturb(vec3 normal, float strength = 0.05) {
+	float offset = strength * 0.5;
+	return normalize(normal + vec3(random(normal.xy) * strength - offset, random(normal.yz) * strength - offset, random(normal.xz) * strength - offset));
+}
+
+// https://www.shadertoy.com/view/4dS3Wd
+vec3 waternormal() {
+	vec3 n = vec3(0.0, 1.0, 0.0);
+	float t = 0.0;
+	for (int i = 0; i < 5; i++) {
+		t += 0.1;
+		n += vec3(0.0, 0.1, 0.0) * sin(t * gl_GlobalInvocationID.x * 0.1);
+	}
+	return normalize(n);
+}
 
 void main() {
 	vec2 uv;
@@ -135,7 +155,6 @@ void main() {
 	const int MAXDEPTH = 3;
 	Ray ray[(1 << (MAXDEPTH +1)) - 1];
 	int ridx = 0;
-	int nrays = 1;
 	ray[ridx].origin = vec3(0);
 	ray[ridx].direction = normalize(vec3(aspectRatio * uv.x, uv.y, -1));
 	ray[ridx].alpha = 1.0;
@@ -148,7 +167,7 @@ void main() {
 		for (int ridx = dd - 1; (ridx + 1) < ddd; ridx++) {
 			ray[ridx * 2 + 1].direction = vec3(0);
 			ray[ridx * 2 + 2].direction = vec3(0);
-			if(length(ray[ridx].direction) < 0.1 || ray[ridx].alpha < 0.01) {
+			if(length(ray[ridx].direction) < 0.1 || ray[ridx].alpha < 0.05) {
 				continue;
 			}
 			float closestHit = 1000000000000.0;
@@ -161,9 +180,6 @@ void main() {
 				}
 			}
 			for (int i = 0; i < numSpheres; i++) {
-				vec3 originCenter = ray[ridx].origin - spheres[i].center;
-				float oclen = length(originCenter);
-				bool inside = oclen < spheres[i].radius;
 				float t = raySphere(ray[ridx], spheres[i].center, spheres[i].radius);
 				if (t > 0 && t < closestHit) {
 					color = vec4(0, 0, 0, 0);
@@ -191,15 +207,15 @@ void main() {
 						float specAngle = max(0.0, dot(halfDir, -normal));
 						float specular = pow(specAngle, gloss) * spheres[i].material.y * ray[ridx].alpha * shadow / lightDist;
 						float lambertian = max(0.0, dot(normal, shadowRay.direction)) * spheres[i].material.x * shadow * ray[ridx].alpha / lightDist;
-						color += vec4(lambertian * lights[l].color * spheres[i].color.rgb + specular * lights[l].color, ray[ridx].alpha);
+						vec3 contribution = lambertian * lights[l].color * spheres[i].color.rgb + specular * lights[l].color;
+						color += vec4(contribution, ray[ridx].alpha);
 					}
 					float refractiveIndexAir = 1.0;
 					float refractiveIndexSphere = 1.2;
 					ray[ridx * 2 + 1].origin = origin;
 					ray[ridx * 2 + 1].alpha = ray[ridx].alpha * spheres[i].material.z;
 					ray[ridx * 2 + 1].direction = reflect(ray[ridx].direction, normal);
-					refractiveIndexSphere = spheres[i].color.a / -1000.0;
-					ray[ridx * 2 + 2].origin = hitPoint - 0.0001 * normal;
+					ray[ridx * 2 + 2].origin = hitPoint - (0.001 * normal);
 					ray[ridx * 2 + 2].alpha = ray[ridx].alpha * spheres[i].material.w;
 					ray[ridx * 2 + 2].direction = refract(ray[ridx].direction, normal, refractiveIndexAir, refractiveIndexSphere);
 				}
@@ -326,17 +342,19 @@ void initQuadShader() {
 // material: diffuse, specular, reflective, refractive
 void updateSpheres() {
 	for (int i = 0; i < 3; i++) {
-		spheres[i].center = glm::vec3(2.2f * i - 2.2f, 0.0f, -3.0f);
+		float t = (now() - tZero).count() / 1000000000.0;
+		spheres[i].center = glm::vec3(1.6 * sin(t - ((float)i * 2.1)), 0.0f, 1.6 * cos(t - ((float)i * 2.1)) - 4.0f);
 		spheres[i].radius = 1.0f;
 	}
 	spheres[3].center = glm::vec3(0.0f, -1001.0f, 0.0f);
 	spheres[3].radius = 1000.0f;
 	spheres[0].color = glm::vec4(1.0f, 0.95f, 0.7f, 1.0f);
 	spheres[0].material = glm::vec4(0.1f, 0.1f, 0.8f, 0.0f);
-	spheres[1].color = glm::vec4(0.8f, 0.8f, 1.0f, 1.0f);
-	spheres[1].material = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
-	spheres[2].color = glm::vec4(0.0f, 0.0f, 1.0f, 0.2f);
-	spheres[2].material = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	spheres[1].center.z += sin((now() - tZero).count() / 1000000000.0);
+	spheres[1].color = glm::vec4(0.0f, 0.0f, 1.0f, 0.9f);
+	spheres[1].material = glm::vec4(0.05f, 0.05f, 0.1f, 0.8f);
+	spheres[2].color = glm::vec4(0.8f, 0.8f, 1.0f, 1.0f);
+	spheres[2].material = glm::vec4(0.9f, 0.0f, 0.0f, 0.1f);
 	spheres[3].color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 	spheres[3].material = glm::vec4(0.6f, 0.2f, 0.2f, 0.0f);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, sphereBuffer);
