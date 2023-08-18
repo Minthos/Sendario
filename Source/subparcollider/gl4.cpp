@@ -33,7 +33,7 @@ struct Sphere {
 	glm::vec3 center;
 	float radius;
 	glm::vec4 color;
-	glm::vec4 material;
+	glm::vec4 material; // material: diffuse, specular, reflective, refractive
 };
 
 struct Light {
@@ -235,21 +235,9 @@ void main() {
 		}
 	}
 
-	if(accumulatedColor.r > 1.0) {
-		accumulatedColor.g += (accumulatedColor.r - 1.0) * 0.5;
-		accumulatedColor.b += (accumulatedColor.r - 1.0) * 0.5;
-		accumulatedColor.r = 1.0;
-	}
-	if(accumulatedColor.g > 1.0) {
-		accumulatedColor.r += (accumulatedColor.g - 1.0) * 0.5;
-		accumulatedColor.b += (accumulatedColor.g - 1.0) * 0.5;
-		accumulatedColor.g = 1.0;
-	}
-	if(accumulatedColor.b > 1.0) {
-		accumulatedColor.r += (accumulatedColor.b - 1.0) * 0.5;
-		accumulatedColor.g += (accumulatedColor.b - 1.0) * 0.5;
-		accumulatedColor.b = 1.0;
-	}
+	accumulatedColor.r = tanh(accumulatedColor.r);
+	accumulatedColor.g = tanh(accumulatedColor.g);
+	accumulatedColor.b = tanh(accumulatedColor.b);
 	imageStore(destTex, storePos, accumulatedColor);
 }
 )";
