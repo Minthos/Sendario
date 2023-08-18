@@ -43,7 +43,7 @@ struct Light {
 	int id;
 };
 
-const int MAXDEPTH = 3;
+const int MAXDEPTH = 7;
 float maxDepth = MAXDEPTH;
 int numSpheres = 4;
 Sphere* spheres = (Sphere*)malloc(sizeof(Sphere) * numSpheres);
@@ -68,12 +68,11 @@ struct Ray {
 	vec3 direction;
 };
 
-// material: diffuse, specular, reflective, refractive
 struct Sphere {
 	vec3 center;
 	float radius;
 	vec4 color;
-	vec4 material;
+	vec4 material; // material: diffuse, specular, reflective, refractive
 };
 
 struct Light {
@@ -124,7 +123,7 @@ vec3 refract(vec3 L, vec3 N, float n1, float n2) {
 	float r = n1 / n2;
 	float cosI = -dot(N, L);
 	float sinT2 = r * r * (1.0 - cosI * cosI);
-	//if (sinT2 > 1.0) return vec3(0.0);  // Total internal reflection
+	if (sinT2 > 1.0) return vec3(0.0);  // Total internal reflection
 	float cosT = sqrt(1.0 - sinT2);
 	return r * L + (r * cosI - cosT) * N;
 }
@@ -145,6 +144,69 @@ vec3 waternormal() {
 	return normalize(n);
 }
 
+struct Result {
+	vec4 color;
+	Ray rays[2];
+};
+
+Result trace(Ray ray) {
+	float closestHit = 1000000000000.0;
+	Result result;
+	result.color = vec4(0, 0, 0, 0);
+	result.rays[0] = Ray(vec3(0), 0.0, vec3(0));
+	result.rays[1] = Ray(vec3(0), 0.0, vec3(0));
+	for (int i = 0; i < numLights; i++) {
+		float t = raySphere(ray, lights[i].position, lights[i].radius);
+		if (t > 0) {
+			result.color = vec4(lights[i].color, 1) * sqrt(ray.alpha);
+			closestHit = t;
+		}
+	}
+	for (int i = 0; i < numSpheres; i++) {
+		float t = raySphere(ray, spheres[i].center, spheres[i].radius);
+		if (t > 0 && t < closestHit) {
+			result.color = vec4(0, 0, 0, 0);
+			closestHit = t;
+			vec3 hitPoint = ray.origin + t * ray.direction;
+			vec3 normal = (hitPoint - spheres[i].center) / spheres[i].radius;
+			vec3 origin = hitPoint + 0.0001 * normal;
+			for (int l = 0; l < numLights; l++) {
+				Ray shadowRay;
+				shadowRay.direction = lights[l].position - hitPoint;
+				float lightDist = length(shadowRay.direction);
+				shadowRay.direction = shadowRay.direction / lightDist;
+				shadowRay.origin = origin;
+				float shadow = 0.0;
+				for (int s = 0; s < 3; s++) {
+					float shadow_t = raySphere(shadowRay, spheres[s].center, spheres[s].radius);
+					if (shadow_t > 0.0) {
+						shadow += spheres[s].color.a;
+					}
+				}
+				shadow = max(0.0, min(1.0, 1.0 - shadow));
+				float gloss = 32.0;
+				vec3 h = (-shadowRay.direction + ray.direction) * -0.5;
+				vec3 halfDir = normalize(-shadowRay.direction + ray.direction);
+				float specAngle = max(0.0, dot(halfDir, -normal));
+				float specular = pow(specAngle, gloss) * spheres[i].material.y * ray.alpha * shadow / lightDist;
+				float lambertian = max(0.0, dot(normal, shadowRay.direction)) * spheres[i].material.x * shadow * ray.alpha / lightDist;
+				vec3 contribution = lambertian * lights[l].color * spheres[i].color.rgb + specular * lights[l].color;
+				result.color += vec4(contribution, ray.alpha);
+			}
+			float refractiveIndexAir = 1.0;
+			float refractiveIndexSphere = 1.2;
+			float fresnel = max(0, min(1, (1.0 - spheres[i].material.x) * (1.0 + dot(ray.direction, normal))));
+			result.rays[0].origin = origin;
+			result.rays[0].alpha = ray.alpha * (spheres[i].material.z + fresnel);
+			result.rays[0].direction = reflect(ray.direction, normal);
+			result.rays[1].origin = hitPoint - (0.001 * normal);
+			result.rays[1].alpha = ray.alpha * spheres[i].material.w;
+			result.rays[1].direction = refract(ray.direction, normal, refractiveIndexAir, refractiveIndexSphere);
+		}
+	}
+	return result;
+}
+	
 void main() {
 	vec2 uv;
 	ivec2 storePos = ivec2(gl_GlobalInvocationID.xy);
@@ -152,76 +214,24 @@ void main() {
 	uv.y = (2.0 * float(storePos.y) / canvasSize.y - 1.0);
 	float aspectRatio = canvasSize.x / canvasSize.y;
 
-	const int MAXDEPTH = 3;
-	Ray ray[(1 << (MAXDEPTH +1)) - 1];
+	const int MAXDEPTH = 7;
+	Ray ray[MAXDEPTH + 1];
 	int ridx = 0;
 	ray[ridx].origin = vec3(0);
 	ray[ridx].direction = normalize(vec3(aspectRatio * uv.x, uv.y, -1));
 	ray[ridx].alpha = 1.0;
 	vec4 accumulatedColor = vec4(0, 0, 0, 0);
 
-	for (int depth = 0; depth <= maxDepth; depth++) {
-		int dd = 1 << depth;
-		int ddd = dd << 1;
-		// to reduce the memory need we can reuse ray[ridx] but let's keep thing simple for now
-		for (int ridx = dd - 1; (ridx + 1) < ddd; ridx++) {
-			ray[ridx * 2 + 1].direction = vec3(0);
-			ray[ridx * 2 + 2].direction = vec3(0);
-			if(length(ray[ridx].direction) < 0.1 || ray[ridx].alpha < 0.02) {
-				continue;
+	for (int ridx = 0; ridx >= 0; ridx--) {
+		Result result = trace(ray[ridx]);
+		accumulatedColor += result.color;
+		if (ridx < maxDepth) {
+			if(result.rays[0].alpha > 0.02) {
+				ray[ridx++] = result.rays[0];
 			}
-			float closestHit = 1000000000000.0;
-			vec4 color = vec4(0, 0, 0, 0);
-			for (int i = 0; i < numLights; i++) {
-				float t = raySphere(ray[ridx], lights[i].position, lights[i].radius);
-				if (t > 0) {
-					color = vec4(lights[i].color, 1) * sqrt(ray[ridx].alpha);
-					closestHit = t;
-				}
+			if(result.rays[1].alpha > 0.02) {
+				ray[ridx++] = result.rays[1];
 			}
-			for (int i = 0; i < numSpheres; i++) {
-				float t = raySphere(ray[ridx], spheres[i].center, spheres[i].radius);
-				if (t > 0 && t < closestHit) {
-					color = vec4(0, 0, 0, 0);
-					closestHit = t;
-					vec3 hitPoint = ray[ridx].origin + t * ray[ridx].direction;
-					vec3 normal = (hitPoint - spheres[i].center) / spheres[i].radius;
-					vec3 origin = hitPoint + 0.0001 * normal;
-					for (int l = 0; l < numLights; l++) {
-						Ray shadowRay;
-						shadowRay.direction = lights[l].position - hitPoint;
-						float lightDist = length(shadowRay.direction);
-						shadowRay.direction = shadowRay.direction / lightDist;
-						shadowRay.origin = origin;
-						float shadow = 0.0;
-						for (int s = 0; s < 3; s++) {
-							float shadow_t = raySphere(shadowRay, spheres[s].center, spheres[s].radius);
-							if (shadow_t > 0.0) {
-								shadow += spheres[s].color.a;
-							}
-						}
-						shadow = max(0.0, min(1.0, 1.0 - shadow));
-						float gloss = 32.0;
-						vec3 h = (-shadowRay.direction + ray[ridx].direction) * -0.5;
-						vec3 halfDir = normalize(-shadowRay.direction + ray[ridx].direction);
-						float specAngle = max(0.0, dot(halfDir, -normal));
-						float specular = pow(specAngle, gloss) * spheres[i].material.y * ray[ridx].alpha * shadow / lightDist;
-						float lambertian = max(0.0, dot(normal, shadowRay.direction)) * spheres[i].material.x * shadow * ray[ridx].alpha / lightDist;
-						vec3 contribution = lambertian * lights[l].color * spheres[i].color.rgb + specular * lights[l].color;
-						color += vec4(contribution, ray[ridx].alpha);
-					}
-					float refractiveIndexAir = 1.0;
-					float refractiveIndexSphere = 1.2;
-					float fresnel = max(0, min(1, (1.0 - spheres[i].material.x) * (1.0 + dot(ray[ridx].direction, normal))));
-					ray[ridx * 2 + 1].origin = origin;
-					ray[ridx * 2 + 1].alpha = ray[ridx].alpha * (spheres[i].material.z + fresnel);
-					ray[ridx * 2 + 1].direction = reflect(ray[ridx].direction, normal);
-					ray[ridx * 2 + 2].origin = hitPoint - (0.001 * normal);
-					ray[ridx * 2 + 2].alpha = ray[ridx].alpha * spheres[i].material.w;
-					ray[ridx * 2 + 2].direction = refract(ray[ridx].direction, normal, refractiveIndexAir, refractiveIndexSphere);
-				}
-			}
-			accumulatedColor += color;
 		}
 	}
 
