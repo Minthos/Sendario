@@ -12,7 +12,7 @@ auto now = std::chrono::high_resolution_clock::now;
 
 int winW = 800;
 int winH = 1000;
-float canvasScale = 0.666;
+float canvasScale = 1.0;
 int canvasW = winW * canvasScale;
 int canvasH = winH * canvasScale;
 unsigned int frameCount = 0;
@@ -43,8 +43,8 @@ struct Light {
 	int id;
 };
 
-const int MAXDEPTH = 4;
-float maxDepth = 4;
+const int MAXDEPTH = 3;
+float maxDepth = MAXDEPTH;
 int numSpheres = 4;
 Sphere* spheres = (Sphere*)malloc(sizeof(Sphere) * numSpheres);
 int numLights = 6;
@@ -167,7 +167,7 @@ void main() {
 		for (int ridx = dd - 1; (ridx + 1) < ddd; ridx++) {
 			ray[ridx * 2 + 1].direction = vec3(0);
 			ray[ridx * 2 + 2].direction = vec3(0);
-			if(length(ray[ridx].direction) < 0.1 || ray[ridx].alpha < 0.05) {
+			if(length(ray[ridx].direction) < 0.1 || ray[ridx].alpha < 0.02) {
 				continue;
 			}
 			float closestHit = 1000000000000.0;
@@ -175,7 +175,7 @@ void main() {
 			for (int i = 0; i < numLights; i++) {
 				float t = raySphere(ray[ridx], lights[i].position, lights[i].radius);
 				if (t > 0) {
-					color = vec4(lights[i].color, 1);
+					color = vec4(lights[i].color, 1) * sqrt(ray[ridx].alpha);
 					closestHit = t;
 				}
 			}
@@ -212,8 +212,9 @@ void main() {
 					}
 					float refractiveIndexAir = 1.0;
 					float refractiveIndexSphere = 1.2;
+					float fresnel = max(0, min(1, (1.0 - spheres[i].material.x) * (1.0 + dot(ray[ridx].direction, normal))));
 					ray[ridx * 2 + 1].origin = origin;
-					ray[ridx * 2 + 1].alpha = ray[ridx].alpha * spheres[i].material.z;
+					ray[ridx * 2 + 1].alpha = ray[ridx].alpha * (spheres[i].material.z + fresnel);
 					ray[ridx * 2 + 1].direction = reflect(ray[ridx].direction, normal);
 					ray[ridx * 2 + 2].origin = hitPoint - (0.001 * normal);
 					ray[ridx * 2 + 2].alpha = ray[ridx].alpha * spheres[i].material.w;
@@ -342,19 +343,18 @@ void initQuadShader() {
 // material: diffuse, specular, reflective, refractive
 void updateSpheres() {
 	for (int i = 0; i < 3; i++) {
-		float t = (now() - tZero).count() / 1000000000.0;
-		spheres[i].center = glm::vec3(1.6 * sin(t - ((float)i * 2.1)), 0.0f, 1.6 * cos(t - ((float)i * 2.1)) - 4.0f);
+		float t = 3.0 + (now() - tZero).count() / 2000000000.0;
+		spheres[i].center = glm::vec3(1.6 * cos(t - ((float)i * 2.1)), 0.0f, 1.6 * sin(t - ((float)i * 2.1)) - 4.0f);
 		spheres[i].radius = 1.0f;
 	}
 	spheres[3].center = glm::vec3(0.0f, -1001.0f, 0.0f);
 	spheres[3].radius = 1000.0f;
 	spheres[0].color = glm::vec4(1.0f, 0.95f, 0.7f, 1.0f);
 	spheres[0].material = glm::vec4(0.1f, 0.1f, 0.8f, 0.0f);
-	spheres[1].center.z += sin((now() - tZero).count() / 1000000000.0);
-	spheres[1].color = glm::vec4(0.0f, 0.0f, 1.0f, 0.9f);
-	spheres[1].material = glm::vec4(0.05f, 0.05f, 0.1f, 0.8f);
+	spheres[1].color = glm::vec4(0.0f, 0.0f, 1.0f, 0.1f);
+	spheres[1].material = glm::vec4(0.0f, 0.0f, 0.05f, 0.95f);
 	spheres[2].color = glm::vec4(0.8f, 0.8f, 1.0f, 1.0f);
-	spheres[2].material = glm::vec4(0.9f, 0.0f, 0.0f, 0.1f);
+	spheres[2].material = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
 	spheres[3].color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 	spheres[3].material = glm::vec4(0.6f, 0.2f, 0.2f, 0.0f);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, sphereBuffer);
@@ -427,10 +427,8 @@ void resizeTexture(GLuint &texture, int width, int height) {
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-//	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-//	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
