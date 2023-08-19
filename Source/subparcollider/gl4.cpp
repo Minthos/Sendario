@@ -120,6 +120,7 @@ vec3 refract(vec3 L, vec3 N, float n1, float n2) {
 struct Result {
 	vec4 color;
 	Ray rays[2];
+	float t;
 };
 
 Result trace(Ray ray) {
@@ -164,7 +165,7 @@ Result trace(Ray ray) {
 				float specular = pow(specAngle, gloss) * spheres[i].material.y * ray.alpha * shadow / lightDist;
 				float lambertian = max(0.0, dot(normal, shadowRay.direction)) * spheres[i].material.x * shadow * ray.alpha / lightDist;
 				vec3 contribution = lambertian * lights[l].color * spheres[i].color.rgb + specular * lights[l].color;
-				result.color += vec4(contribution, ray.alpha);
+				result.color += vec4(contribution, ray.alpha * spheres[i].color.a);
 			}
 			float refractiveIndexAir = 1.0;
 			float refractiveIndexSphere = 1.2;
@@ -177,9 +178,13 @@ Result trace(Ray ray) {
 			result.rays[1].direction = refract(ray.direction, normal, refractiveIndexAir, refractiveIndexSphere);
 		}
 	}
+	result.t = closestHit;
+	if(closestHit == 1000000000000.0) {
+		result.color = vec4(0.5, 0.5, 1.0, 1.0);
+	}
 	return result;
 }
-	
+
 void main() {
 	vec2 uv;
 	ivec2 storePos = ivec2(gl_GlobalInvocationID.xy);
@@ -317,11 +322,11 @@ void updateSpheres() {
 		spheres[i].center = glm::vec3(1.6 * cos(t - ((float)i * 2.1)), 0.0f, 1.6 * sin(t - ((float)i * 2.1)) - 4.0f);
 		spheres[i].radius = 1.0f;
 	}
-	spheres[3].center = glm::vec3(0.0f, -1001.5f, 0.0f);
+	spheres[3].center = glm::vec3(0.0f, -1001.5f * cos(0.1), -100.0f);
 	spheres[3].radius = 1000.0f;
 	spheres[0].color = glm::vec4(1.0f, 0.95f, 0.7f, 1.0f);
 	spheres[0].material = glm::vec4(0.1f, 0.1f, 0.8f, 0.0f);
-	spheres[1].color = glm::vec4(0.0f, 0.0f, 1.0f, 0.1f);
+	spheres[1].color = glm::vec4(0.0f, 0.0f, 1.0f, 0.05f);
 	spheres[1].material = glm::vec4(0.0f, 0.0f, 0.05f, 0.95f);
 	spheres[1].radius = 2.0f;
 	spheres[2].color = glm::vec4(0.8f, 0.8f, 1.0f, 1.0f);
@@ -414,6 +419,7 @@ void chkerr() {
 
 void display() {
 	chkerr();
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 	glUseProgram(computeProgram);
 	chkerr();
@@ -458,6 +464,9 @@ void reshape(int width, int height) {
 	glViewport(0, 0, width, height);
 	canvasW = winW * canvasScale;
 	canvasH = winH * canvasScale;
+	canvasW = (canvasW / WORKGROUP_SIZE) * WORKGROUP_SIZE;
+	canvasH = (canvasH / WORKGROUP_SIZE) * WORKGROUP_SIZE;
+
 	resizeTexture(outputTexture, canvasW, canvasH);
 }
 
@@ -549,6 +558,8 @@ int main(int argc, char** argv) {
 	initGL();
 	chkerr();
 
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_DEBUG_OUTPUT);
 	glDebugMessageCallback(MessageCallback, 0);
 	chkerr();
