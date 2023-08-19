@@ -91,14 +91,6 @@ layout(std430, binding = 1) buffer LightBuffer {
 	Light lights[];
 };
 
-float random(vec2 v) {
-	return fract(sin(fract(cos(dot(v, vec2(22.235793, 4.742247)) * 69420.0))) * 43758.5453123);
-}
-
-float random(float x) {
-	return fract(sin(fract(cos(x * 69420.0))) * 43758.5453123);
-}
-
 float raySphere(Ray ray, vec3 center, float radius) {
 	vec3 oc = ray.origin - center;
 	float a = dot(ray.direction, ray.direction);
@@ -112,10 +104,6 @@ float raySphere(Ray ray, vec3 center, float radius) {
 	}
 }
 
-float lerp(float a, float b, float f) {
-	return a + f * (b - a);
-}
-
 vec3 reflect(vec3 L, vec3 N) {
 	return L - 2.0 * dot(L, N) * N;
 }
@@ -127,22 +115,6 @@ vec3 refract(vec3 L, vec3 N, float n1, float n2) {
 	if (sinT2 > 1.0) return vec3(0.0);  // Total internal reflection
 	float cosT = sqrt(1.0 - sinT2);
 	return r * L + (r * cosI - cosT) * N;
-}
-
-vec3 perturb(vec3 normal, float strength = 0.05) {
-	float offset = strength * 0.5;
-	return normalize(normal + vec3(random(normal.xy) * strength - offset, random(normal.yz) * strength - offset, random(normal.xz) * strength - offset));
-}
-
-// https://www.shadertoy.com/view/4dS3Wd
-vec3 waternormal() {
-	vec3 n = vec3(0.0, 1.0, 0.0);
-	float t = 0.0;
-	for (int i = 0; i < 5; i++) {
-		t += 0.1;
-		n += vec3(0.0, 0.1, 0.0) * sin(t * gl_GlobalInvocationID.x * 0.1);
-	}
-	return normalize(n);
 }
 
 struct Result {
@@ -345,7 +317,7 @@ void updateSpheres() {
 		spheres[i].center = glm::vec3(1.6 * cos(t - ((float)i * 2.1)), 0.0f, 1.6 * sin(t - ((float)i * 2.1)) - 4.0f);
 		spheres[i].radius = 1.0f;
 	}
-	spheres[3].center = glm::vec3(0.0f, -1001.0f, 0.0f);
+	spheres[3].center = glm::vec3(0.0f, -1001.5f, 0.0f);
 	spheres[3].radius = 1000.0f;
 	spheres[0].color = glm::vec4(1.0f, 0.95f, 0.7f, 1.0f);
 	spheres[0].material = glm::vec4(0.1f, 0.1f, 0.8f, 0.0f);
@@ -575,9 +547,11 @@ int main(int argc, char** argv) {
 	}
 
 	initGL();
+	chkerr();
 
 	glEnable(GL_DEBUG_OUTPUT);
 	glDebugMessageCallback(MessageCallback, 0);
+	chkerr();
 
 	glutMainLoop();
 	free(spheres);
