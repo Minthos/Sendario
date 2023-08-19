@@ -65,8 +65,9 @@ const int MAXDEPTH = 7;
 
 struct Ray {
 	vec3 origin;
-	float alpha;
+	int inside;
 	vec3 direction;
+	vec4 alpha;
 };
 
 struct Sphere {
@@ -125,62 +126,93 @@ struct Result {
 
 Result trace(Ray ray) {
 	float closestHit = 1000000000000.0;
+	float t = 0.0;
+	int hitIdx = -1;
 	Result result;
 	result.color = vec4(0, 0, 0, 0);
-	result.rays[0] = Ray(vec3(0), 0.0, vec3(0));
-	result.rays[1] = Ray(vec3(0), 0.0, vec3(0));
+	result.rays[0] = Ray(vec3(0), -1, vec3(0), vec4(0));
+	result.rays[1] = Ray(vec3(0), -1, vec3(0), vec4(0));
 	for (int i = 0; i < numLights; i++) {
 		float t = raySphere(ray, lights[i].position, lights[i].radius);
 		if (t > 0) {
-			result.color = vec4(lights[i].color, 1) * sqrt(ray.alpha);
+			result.color = vec4(lights[i].color, 1);
 			closestHit = t;
 		}
 	}
 	for (int i = 0; i < numSpheres; i++) {
-		float t = raySphere(ray, spheres[i].center, spheres[i].radius);
+		t = raySphere(ray, spheres[i].center, spheres[i].radius);
 		if (t > 0 && t < closestHit) {
 			result.color = vec4(0, 0, 0, 0);
 			closestHit = t;
-			vec3 hitPoint = ray.origin + t * ray.direction;
-			vec3 normal = (hitPoint - spheres[i].center) / spheres[i].radius;
-			vec3 origin = hitPoint + 0.0001 * normal;
+			hitIdx = i;
+		}
+	}
+	if(hitIdx >= 0) {
+		int i = hitIdx;
+		t = closestHit;
+		vec3 hitPoint = ray.origin + t * ray.direction;
+		vec3 normal = (hitPoint - spheres[i].center) / spheres[i].radius;
+		vec3 origin = hitPoint + 0.001 * normal;
+		// diffuse and specular: x, y
+		if(spheres[i].material.x > 0.0 || spheres[i].material.y > 0.0) {
 			for (int l = 0; l < numLights; l++) {
 				Ray shadowRay;
 				shadowRay.direction = lights[l].position - hitPoint;
 				float lightDist = length(shadowRay.direction);
 				shadowRay.direction = shadowRay.direction / lightDist;
 				shadowRay.origin = origin;
+				vec3 light = lights[l].color;
 				float shadow = 0.0;
 				for (int s = 0; s < 3; s++) {
 					float shadow_t = raySphere(shadowRay, spheres[s].center, spheres[s].radius);
 					if (shadow_t > 0.0) {
-						shadow += spheres[s].color.a;
+						light = mix(light, spheres[s].color.rgb, spheres[s].color.a) * (1.0 - spheres[s].color.a);
 					}
 				}
-				shadow = max(0.0, min(1.0, 1.0 - shadow));
+				light = light * (1.0 / (0.1 + lightDist));
+				float lambertian = max(0.0, dot(normal, shadowRay.direction)) * spheres[i].material.x;
 				float gloss = 32.0;
 				vec3 h = (-shadowRay.direction + ray.direction) * -0.5;
 				vec3 halfDir = normalize(-shadowRay.direction + ray.direction);
 				float specAngle = max(0.0, dot(halfDir, -normal));
-				float specular = pow(specAngle, gloss) * spheres[i].material.y * ray.alpha * shadow / lightDist;
-				float lambertian = max(0.0, dot(normal, shadowRay.direction)) * spheres[i].material.x * shadow * ray.alpha / lightDist;
-				vec3 contribution = lambertian * lights[l].color * spheres[i].color.rgb + specular * lights[l].color;
-				result.color += vec4(contribution, ray.alpha * spheres[i].color.a);
+				float specular = pow(specAngle, gloss) * spheres[i].material.y;
+				vec3 contribution = lambertian * light * spheres[i].color.rgb + specular * light;
+				result.color += vec4(contribution * 4.0, spheres[i].color.a);
 			}
-			float refractiveIndexAir = 1.0;
-			float refractiveIndexSphere = 1.2;
-			float fresnel = max(0, min(1, (1.0 - spheres[i].material.x) * (1.0 + dot(ray.direction, normal))));
-			result.rays[0].origin = origin;
-			result.rays[0].alpha = ray.alpha * (spheres[i].material.z + fresnel);
-			result.rays[0].direction = reflect(ray.direction, normal);
-			result.rays[1].origin = hitPoint - (0.001 * normal);
-			result.rays[1].alpha = ray.alpha * spheres[i].material.w;
-			result.rays[1].direction = refract(ray.direction, normal, refractiveIndexAir, refractiveIndexSphere);
+		}
+		// reflection and refraction: z, w
+		float refractiveIndexAir = 1.0;
+		float refractiveIndexSphere = 1.2;
+		float fresnel = max(0, min(1, (1.0 - spheres[i].material.x) * (1.0 + dot(ray.direction, normal))));
+		result.rays[0].origin = origin;
+		result.rays[0].alpha = ray.alpha * fresnel + ray.alpha * spheres[i].color * spheres[i].material.z;
+		result.rays[0].direction = reflect(ray.direction, normal);
+		result.rays[1].origin = hitPoint - (0.001 * normal);
+		result.rays[1].direction = refract(ray.direction, normal, refractiveIndexAir, refractiveIndexSphere);
+		if(spheres[i].material.w > 0.0) {
+			if(ray.inside == -1) { // entering sphere
+				float t_inside = abs(raySphere(result.rays[1], spheres[i].center, spheres[i].radius));
+				if(t_inside > 0) {
+					result.rays[1].alpha = ray.alpha * vec4(pow(spheres[i].color.rgb, vec3(t_inside)), 1.0);
+					result.rays[1].inside = i;
+				} else {
+					result.rays[1].alpha = vec4(100.0);
+				}
+			} else { // already inside sphere
+				result.rays[1].alpha = ray.alpha;
+				if(ray.inside == i) { // exiting sphere
+					result.rays[1].inside = -1;
+				} else {
+					result.rays[1].inside = i;
+				}
+			}
+		} else {
+			result.rays[1].alpha = vec4(0.0);
 		}
 	}
 	result.t = closestHit;
 	if(closestHit == 1000000000000.0) {
-		result.color = vec4(0.5, 0.5, 1.0, 1.0);
+		result.color = vec4(0.7, 0.7, 1.0, 1.0);
 	}
 	return result;
 }
@@ -195,23 +227,30 @@ void main() {
 	Ray ray[MAXDEPTH + 1];
 	int ridx = 0;
 	ray[ridx].origin = vec3(0);
+	ray[ridx].inside = -1;
+	for(int i = 0; i < numSpheres; i++) {
+		if( (spheres[i].center).length() < spheres[i].radius) {
+			ray[ridx].inside = i;
+		}
+	}
 	ray[ridx].direction = normalize(vec3(aspectRatio * uv.x, uv.y, -1));
-	ray[ridx].alpha = 1.0;
+	ray[ridx].alpha = vec4(1.0);
 	vec4 accumulatedColor = vec4(0, 0, 0, 0);
 
 	for (int ridx = 0; ridx >= 0; ridx--) {
 		Result result = trace(ray[ridx]);
-		accumulatedColor += result.color;
+		accumulatedColor += result.color * ray[ridx].alpha;
 		if (ridx < maxDepth) {
-			if(result.rays[0].alpha > 0.02) {
+			if(result.rays[0].alpha.a > 0.02) {
 				ray[ridx++] = result.rays[0];
 			}
-			if(result.rays[1].alpha > 0.02) {
+			if(result.rays[1].alpha.a > 0.02) {
 				ray[ridx++] = result.rays[1];
 			}
 		}
 	}
 
+	accumulatedColor = accumulatedColor / accumulatedColor.a;
 	accumulatedColor.r = tanh(accumulatedColor.r);
 	accumulatedColor.g = tanh(accumulatedColor.g);
 	accumulatedColor.b = tanh(accumulatedColor.b);
@@ -322,17 +361,18 @@ void updateSpheres() {
 		spheres[i].center = glm::vec3(1.6 * cos(t - ((float)i * 2.1)), 0.0f, 1.6 * sin(t - ((float)i * 2.1)) - 4.0f);
 		spheres[i].radius = 1.0f;
 	}
-	spheres[3].center = glm::vec3(0.0f, -1001.5f * cos(0.1), -100.0f);
-	spheres[3].radius = 1000.0f;
-	spheres[0].color = glm::vec4(1.0f, 0.95f, 0.7f, 1.0f);
+	spheres[3].center = glm::vec3(0.0f, -10001.5f * cos(0.1), -1000.0f);
+	spheres[3].radius = 10000.0f;
+	spheres[0].color = glm::vec4(1.0f, 0.95f, 0.0f, 0.8f);
 	spheres[0].material = glm::vec4(0.1f, 0.1f, 0.8f, 0.0f);
-	spheres[1].color = glm::vec4(0.0f, 0.0f, 1.0f, 0.05f);
-	spheres[1].material = glm::vec4(0.0f, 0.0f, 0.05f, 0.95f);
-	spheres[1].radius = 2.0f;
-	spheres[2].color = glm::vec4(0.8f, 0.8f, 1.0f, 1.0f);
+	spheres[1].color = glm::vec4(1.0f, 0.0f, 1.0f, 0.3f);
+	spheres[1].material = glm::vec4(0.0f, 0.0f, 0.0f, 0.7f);
+	spheres[1].radius = 1.5f;// * cos((now() - tZero).count() / 10000000000.0);
+	//spheres[1].center = glm::vec3(0.0f, 0.0f, -1.5f);
+	spheres[2].color = glm::vec4(0.8f, 0.8f, 1.0f, 0.8f);
 	spheres[2].material = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
 	spheres[3].color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-	spheres[3].material = glm::vec4(0.6f, 0.2f, 0.2f, 0.0f);
+	spheres[3].material = glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, sphereBuffer);
 	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Sphere) * numSpheres, spheres, GL_STATIC_DRAW);
 }
