@@ -10,8 +10,8 @@
 
 auto now = std::chrono::high_resolution_clock::now;
 
-int winW = 800;
-int winH = 1000;
+int winW = 1920;
+int winH = 1080;
 float canvasScale = 1.0;
 int canvasW = winW * canvasScale;
 int canvasH = winH * canvasScale;
@@ -142,17 +142,18 @@ Result trace(Ray ray) {
 	for (int i = 0; i < numSpheres; i++) {
 		t = raySphere(ray, spheres[i].center, spheres[i].radius);
 		if ((t > 0 && t < closestHit) || (ray.inside == i && -t < closestHit)) {
-			result.color = vec4(0, 0, 0, 0);
 			closestHit = t;
 			hitIdx = i;
 		}
 	}
 	if(hitIdx >= 0) {
+		result.color = vec4(0, 0, 0, 0);
 		int i = hitIdx;
 		t = closestHit;
 		vec3 hitPoint = ray.origin + t * ray.direction;
 		vec3 normal = (hitPoint - spheres[i].center) / spheres[i].radius;
 		vec3 origin = hitPoint + 0.001 * normal;
+		
 		// diffuse and specular: x, y
 		if(spheres[i].material.x > 0.0 || spheres[i].material.y > 0.0) {
 			for (int l = 0; l < numLights; l++) {
@@ -180,27 +181,28 @@ Result trace(Ray ray) {
 				result.color += vec4(contribution, spheres[i].color.a);
 			}
 		}
-		// reflection and refraction: z, w
-		float refractiveIndexAir = 1.0;
-		float refractiveIndexSphere = 1.2;
-		float fresnel = max(0, min(1, (1.0 - spheres[i].material.x) * (1.0 + dot(ray.direction, normal))));
+		// reflection: z
+		float fresnel = 0;//max(0.0, min(1, 0.5 * (0.5 - spheres[i].material.x) * (1.0 + dot(ray.direction, normal))));
 		result.rays[0].origin = origin;
 		result.rays[0].alpha = ray.alpha * fresnel + ray.alpha * spheres[i].color * spheres[i].material.z;
 		result.rays[0].direction = reflect(ray.direction, normal);
+
+		// refraction: w, color.a
+		float refractiveIndexAir = 1.0;
 		result.rays[1].origin = hitPoint - (0.001 * normal);
 		result.rays[1].direction = refract(ray.direction, normal, refractiveIndexAir, spheres[i].material.w);
-		
 		// exiting sphere
 		if(ray.inside == i) {
 			result.rays[1].inside = -1;
-			float transparency = pow(spheres[ray.inside].color.a, t);
-			result.rays[1].alpha = ray.alpha * spheres[i].color * transparency;
-			result.rays[0].alpha = result.rays[0].alpha * spheres[i].color * transparency;
+			float transparency = pow(spheres[i].color.a, t);
+			vec4 c = mix(spheres[i].color, vec4(1), transparency);
+			result.rays[1].alpha = ray.alpha * c;
+			result.rays[0].alpha = result.rays[0].alpha * c;
 		}
 		// hit something while inside sphere
 		else if (ray.inside >= 0) {
-			float transparency = pow(spheres[ray.inside].color.a, t);
-			vec4 c = spheres[ray.inside].color * transparency;
+			float transparency = pow(spheres[ray.inside].color.a, t * 2);
+			vec4 c = mix(spheres[ray.inside].color, vec4(1), transparency);
 			result.rays[0].alpha = result.rays[0].alpha * c;
 			result.rays[0].inside = ray.inside;
 			result.color = result.color * c;
@@ -208,7 +210,7 @@ Result trace(Ray ray) {
 		// entering sphere
 		else if(ray.inside == -1 && spheres[i].color.a < 1.0) {
 			result.rays[1].inside = i;
-			result.rays[1].alpha = mix(ray.alpha, spheres[i].color, spheres[i].material.x);
+			result.rays[1].alpha = vec4(mix(ray.alpha.rgb, spheres[i].color.rgb, spheres[i].material.x), ray.alpha.a);
 		}
 		// is outide, stay outside
 		else {
@@ -217,8 +219,9 @@ Result trace(Ray ray) {
 	}
 	result.t = closestHit;
 	if(closestHit == 1000000000000.0) {
-		result.color = vec4(0.0, 0.0, 0.0, 1.0);
-		result.color = vec4(0.7, 0.7, 1.0, 1.0);
+		//result.color = vec4(0.0, 0.0, 0.0, 1.0);
+		// sky color
+		result.color = mix(vec4(0.6, 0.3, 0.2, 1.0), vec4(0.8, 0.8, 1.0, 1.0), sqrt(lights[6].position.y / 100.0)) * ray.alpha.a;
 	}
 	return result;
 }
@@ -371,23 +374,23 @@ void updateSpheres() {
 	spheres[3].radius = 10000.0f;
 	spheres[0].color = glm::vec4(1.0f, 0.95f, 0.5f, 1.0f);
 	spheres[0].material = glm::vec4(0.1f, 0.1f, 0.8f, 1.0f);
-	spheres[1].color = glm::vec4(1.0f, 0.5f, 1.0f, 0.05f);
-	spheres[1].material = glm::vec4(0.0f, 0.0f, 0.0f, 1.2f);
-	spheres[1].radius = 2.0f;// * cos((now() - tZero).count() / 10000000000.0);
+	spheres[1].color = glm::vec4(1.0f, 0.5f, 1.0f, 0.5f);
+	spheres[1].material = glm::vec4(0.0f, 0.0f, 0.0f, 1.03f);
+	spheres[1].radius = 1.5f;// * cos((now() - tZero).count() / 10000000000.0);
 	//spheres[1].center = glm::vec3(0.0f, 0.0f, -1.5f);
-	spheres[2].color = glm::vec4(0.8f, 0.8f, 1.0f, 0.9f);
-	spheres[2].material = glm::vec4(0.5f, 0.0f, 0.0f, 1.07f);
+	spheres[2].color = glm::vec4(0.8f, 0.8f, 1.0f, 1.0f);
+	spheres[2].material = glm::vec4(1.0f, 0.5f, 0.0f, 1.07f);
 	spheres[3].color = glm::vec4(0.4f, 0.1f, 0.2f, 1.0f);
-	spheres[3].material = glm::vec4(0.1f, 0.0f, 0.9f, 1.0f);
+	spheres[3].material = glm::vec4(0.8f, 0.7f, 0.2f, 1.0f);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, sphereBuffer);
 	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Sphere) * numSpheres, spheres, GL_STATIC_DRAW);
 }
 
 void updateLights() {
+	auto time = (now() - tZero).count() / -1230000000.0;
 	for (int i = 0; i < numLights; i++) {
 		lights[i].id = i;
 		lights[i].radius = 0.05f;
-		auto time = (now() - tZero).count() / 1230000000.0;
 		lights[i].position = glm::vec3(1.2f * (i % 3) * sin(time / (i + 1)), 1.0f + 0.9f * sin(time + i), -1.5f + 1.0f * cos(time + i));
 	}
 	lights[0].color = glm::vec3(0.3f, 0.3f, 1.0f);
@@ -397,7 +400,7 @@ void updateLights() {
 	lights[4].color = glm::vec3(0.3f, 1.0f, 0.3f);
 	lights[5].color = glm::vec3(1.0f, 0.3f, 0.3f);
 	lights[6].color = glm::vec3(100.0f, 90.0f, 80.0f);
-	lights[6].position = glm::vec3(0.0f, 100.0f, 0.0f);
+	lights[6].position = glm::vec3(100.0f * sin(time / 5.0), 100.0f * abs(cos(time / 5.0)), 0.0f);
 	lights[6].radius = 5.0f;
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightBuffer);
 	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Light) * numLights, lights, GL_STATIC_DRAW);
