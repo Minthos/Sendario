@@ -42,7 +42,7 @@ struct Light {
 	int id;
 };
 
-const int MAXDEPTH = 7;
+const int MAXDEPTH = 3;
 float maxDepth = MAXDEPTH;
 int numSpheres = 4;
 Sphere* spheres = (Sphere*)malloc(sizeof(Sphere) * numSpheres);
@@ -61,7 +61,7 @@ uniform int numSpheres;
 uniform int numLights;
 uniform int maxDepth;
 
-const int MAXDEPTH = 7;
+const int MAXDEPTH = 3;
 
 struct Ray {
 	vec3 origin;
@@ -113,7 +113,7 @@ vec3 refract(vec3 L, vec3 N, float n1, float n2) {
 	float r = n1 / n2;
 	float cosI = -dot(N, L);
 	float sinT2 = r * r * (1.0 - cosI * cosI);
-	if (sinT2 > 1.0) return vec3(0.0);  // Total internal reflection
+	//if (sinT2 > 1.0) return vec3(0.0);  // Total internal reflection
 	float cosT = sqrt(1.0 - sinT2);
 	return r * L + (r * cosI - cosT) * N;
 }
@@ -141,7 +141,7 @@ Result trace(Ray ray) {
 	}
 	for (int i = 0; i < numSpheres; i++) {
 		t = raySphere(ray, spheres[i].center, spheres[i].radius);
-		if (t > 0 && t < closestHit) {
+		if ((t > 0 && t < closestHit) || (ray.inside == i && -t < closestHit)) {
 			result.color = vec4(0, 0, 0, 0);
 			closestHit = t;
 			hitIdx = i;
@@ -177,7 +177,7 @@ Result trace(Ray ray) {
 				float specAngle = max(0.0, dot(halfDir, -normal));
 				float specular = pow(specAngle, gloss) * spheres[i].material.y;
 				vec3 contribution = lambertian * light * spheres[i].color.rgb + specular * light;
-				result.color += vec4(contribution * 4.0, spheres[i].color.a);
+				result.color += vec4(contribution, spheres[i].color.a);
 			}
 		}
 		// reflection and refraction: z, w
@@ -188,30 +188,36 @@ Result trace(Ray ray) {
 		result.rays[0].alpha = ray.alpha * fresnel + ray.alpha * spheres[i].color * spheres[i].material.z;
 		result.rays[0].direction = reflect(ray.direction, normal);
 		result.rays[1].origin = hitPoint - (0.001 * normal);
-		result.rays[1].direction = refract(ray.direction, normal, refractiveIndexAir, refractiveIndexSphere);
-		if(spheres[i].material.w > 0.0) {
-			if(ray.inside == -1) { // entering sphere
-				float t_inside = abs(raySphere(result.rays[1], spheres[i].center, spheres[i].radius));
-				if(t_inside > 0) {
-					result.rays[1].alpha = ray.alpha * vec4(pow(spheres[i].color.rgb, vec3(t_inside)), 1.0);
-					result.rays[1].inside = i;
-				} else {
-					result.rays[1].alpha = vec4(100.0);
-				}
-			} else { // already inside sphere
-				result.rays[1].alpha = ray.alpha;
-				if(ray.inside == i) { // exiting sphere
-					result.rays[1].inside = -1;
-				} else {
-					result.rays[1].inside = i;
-				}
-			}
-		} else {
-			result.rays[1].alpha = vec4(0.0);
+		result.rays[1].direction = refract(ray.direction, normal, refractiveIndexAir, spheres[i].material.w);
+		
+		// exiting sphere
+		if(ray.inside == i) {
+			result.rays[1].inside = -1;
+			float transparency = pow(spheres[ray.inside].color.a, t);
+			result.rays[1].alpha = ray.alpha * spheres[i].color * transparency;
+			result.rays[0].alpha = result.rays[0].alpha * spheres[i].color * transparency;
+		}
+		// hit something while inside sphere
+		else if (ray.inside >= 0) {
+			float transparency = pow(spheres[ray.inside].color.a, t);
+			vec4 c = spheres[ray.inside].color * transparency;
+			result.rays[0].alpha = result.rays[0].alpha * c;
+			result.rays[0].inside = ray.inside;
+			result.color = result.color * c;
+		}
+		// entering sphere
+		else if(ray.inside == -1 && spheres[i].color.a < 1.0) {
+			result.rays[1].inside = i;
+			result.rays[1].alpha = mix(ray.alpha, spheres[i].color, spheres[i].material.x);
+		}
+		// is outide, stay outside
+		else {
+			;
 		}
 	}
 	result.t = closestHit;
 	if(closestHit == 1000000000000.0) {
+		result.color = vec4(0.0, 0.0, 0.0, 1.0);
 		result.color = vec4(0.7, 0.7, 1.0, 1.0);
 	}
 	return result;
@@ -229,7 +235,7 @@ void main() {
 	ray[ridx].origin = vec3(0);
 	ray[ridx].inside = -1;
 	for(int i = 0; i < numSpheres; i++) {
-		if( (spheres[i].center).length() < spheres[i].radius) {
+		if( length(spheres[i].center) < spheres[i].radius) {
 			ray[ridx].inside = i;
 		}
 	}
@@ -250,7 +256,7 @@ void main() {
 		}
 	}
 
-	accumulatedColor = accumulatedColor / accumulatedColor.a;
+	//accumulatedColor = accumulatedColor / accumulatedColor.a;
 	accumulatedColor.r = tanh(accumulatedColor.r);
 	accumulatedColor.g = tanh(accumulatedColor.g);
 	accumulatedColor.b = tanh(accumulatedColor.b);
@@ -363,16 +369,16 @@ void updateSpheres() {
 	}
 	spheres[3].center = glm::vec3(0.0f, -10001.5f * cos(0.1), -1000.0f);
 	spheres[3].radius = 10000.0f;
-	spheres[0].color = glm::vec4(1.0f, 0.95f, 0.0f, 0.8f);
-	spheres[0].material = glm::vec4(0.1f, 0.1f, 0.8f, 0.0f);
-	spheres[1].color = glm::vec4(1.0f, 0.0f, 1.0f, 0.3f);
-	spheres[1].material = glm::vec4(0.0f, 0.0f, 0.0f, 0.7f);
-	spheres[1].radius = 1.5f;// * cos((now() - tZero).count() / 10000000000.0);
+	spheres[0].color = glm::vec4(1.0f, 0.95f, 0.5f, 1.0f);
+	spheres[0].material = glm::vec4(0.1f, 0.1f, 0.8f, 1.0f);
+	spheres[1].color = glm::vec4(1.0f, 0.5f, 1.0f, 0.05f);
+	spheres[1].material = glm::vec4(0.0f, 0.0f, 0.0f, 1.2f);
+	spheres[1].radius = 2.0f;// * cos((now() - tZero).count() / 10000000000.0);
 	//spheres[1].center = glm::vec3(0.0f, 0.0f, -1.5f);
-	spheres[2].color = glm::vec4(0.8f, 0.8f, 1.0f, 0.8f);
-	spheres[2].material = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
-	spheres[3].color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-	spheres[3].material = glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
+	spheres[2].color = glm::vec4(0.8f, 0.8f, 1.0f, 0.9f);
+	spheres[2].material = glm::vec4(0.5f, 0.0f, 0.0f, 1.07f);
+	spheres[3].color = glm::vec4(0.4f, 0.1f, 0.2f, 1.0f);
+	spheres[3].material = glm::vec4(0.1f, 0.0f, 0.9f, 1.0f);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, sphereBuffer);
 	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Sphere) * numSpheres, spheres, GL_STATIC_DRAW);
 }
@@ -381,7 +387,7 @@ void updateLights() {
 	for (int i = 0; i < numLights; i++) {
 		lights[i].id = i;
 		lights[i].radius = 0.05f;
-		auto time = (now() - tZero).count() / 1000000000.0;
+		auto time = (now() - tZero).count() / 1230000000.0;
 		lights[i].position = glm::vec3(1.2f * (i % 3) * sin(time / (i + 1)), 1.0f + 0.9f * sin(time + i), -1.5f + 1.0f * cos(time + i));
 	}
 	lights[0].color = glm::vec3(0.3f, 0.3f, 1.0f);
@@ -392,6 +398,7 @@ void updateLights() {
 	lights[5].color = glm::vec3(1.0f, 0.3f, 0.3f);
 	lights[6].color = glm::vec3(100.0f, 90.0f, 80.0f);
 	lights[6].position = glm::vec3(0.0f, 100.0f, 0.0f);
+	lights[6].radius = 5.0f;
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightBuffer);
 	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Light) * numLights, lights, GL_STATIC_DRAW);
 }
