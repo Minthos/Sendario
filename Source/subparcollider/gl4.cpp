@@ -1,10 +1,12 @@
-#include <iostream>
+#include <algorithm>
+#include <bitset>
+#include <chrono>
+#include <cstdlib>
 #include <GL/glew.h>
 #include <GL/gl.h>
 #include <GL/freeglut.h>
 #include <glm/glm.hpp>
-#include <cstdlib>
-#include <chrono>
+#include <iostream>
 #include <thread>
 #include <unistd.h>
 
@@ -42,6 +44,135 @@ struct Light {
 	int id;
 };
 
+struct MortonPrimitive {
+	GLuint index;
+	GLuint mortonCode;
+};
+
+struct AABB {
+	glm::vec3 min;
+	glm::vec3 max;
+};
+
+struct BVHNode
+{
+	glm::vec3 bmin;
+	uint leftFirst;
+	glm::vec3 bmax;
+	uint count;
+
+	void setBounds(AABB bounds) {
+		bmin = bounds.min;
+		bmax = bounds.max;
+	}
+
+	void subdivide(BVHNode* nodes, uint* poolPtr, Sphere* primitives, MortonPrimitive* mortonPrims, uint first, uint last);
+};
+
+AABB calculateBounds(Sphere* p, GLuint N) {
+	AABB bounds;
+	bounds.min = glm::vec3(FLT_MAX);
+	bounds.max = glm::vec3(-FLT_MAX);
+	for (GLuint i = 0; i < N; ++i) {
+		bounds.min = glm::min(bounds.min, p[i].center - glm::vec3(p[i].radius));
+		bounds.max = glm::max(bounds.max, p[i].center + glm::vec3(p[i].radius));
+	}
+	return bounds;
+}
+
+GLuint expandBits(GLuint v) {
+	v = (v * 0x00010001u) & 0xFF0000FFu;
+	v = (v * 0x00000101u) & 0x0F00F00Fu;
+	v = (v * 0x00000011u) & 0xC30C30C3u;
+	v = (v * 0x00000005u) & 0x49249249u;
+	return v;
+}
+
+GLuint morton3D(glm::vec3 v) {
+	GLuint xx = expandBits((GLuint)(v.x * 1024.0f));
+	GLuint yy = expandBits((GLuint)(v.y * 1024.0f));
+	GLuint zz = expandBits((GLuint)(v.z * 1024.0f));
+	return (xx << 2) + (yy << 1) + zz;
+}
+
+GLuint findSplit(MortonPrimitive* mortonPrims, GLuint first, GLuint last) {
+	GLuint firstCode = mortonPrims[first].mortonCode;
+	GLuint lastCode = mortonPrims[last].mortonCode;
+	if (firstCode == lastCode) return (first + last) >> 1;
+	GLuint commonPrefix = __builtin_clz(firstCode ^ lastCode);
+	GLuint split = first;
+	for (GLuint i = first + 1; i < last; ++i) {
+		GLuint bit = 31 - __builtin_clz(mortonPrims[i].mortonCode ^ firstCode);
+		if (bit > commonPrefix) {
+			split = i;
+		}
+	}
+	return split;
+}
+
+void printBVHNode(const BVHNode* node, GLuint index, int level) {
+	for(int i = 0; i < level; ++i) {
+		std::cout << "--";
+	}
+	std::cout << "Node " << index << " (" << node->bmin.x << ", " << node->bmin.y << ", " << node->bmin.z << "), ";
+	std::cout << "(" << node->bmax.x << ", " << node->bmax.y << ", " << node->bmax.z << "), ";
+	if (node->count == 1) {
+		std::cout << "Leaf, Object Index: " << node->leftFirst << std::endl;
+	} else {
+		std::cout << "Internal, Children: " << node->leftFirst << ", " << node->leftFirst + 1 << std::endl;
+	}
+}
+
+void printBVHTree(const BVHNode* nodes, int index, int level) {
+	if (index == -1) return;
+	const BVHNode& node = nodes[index];
+	printBVHNode(&node, index, level);
+	if(node.count == 0) {
+		printBVHTree(nodes, node.leftFirst, level + 1);
+		printBVHTree(nodes, node.leftFirst + 1, level + 1);
+	}
+}
+
+void BVHNode::subdivide(BVHNode* nodes, uint* poolPtr, Sphere* primitives, MortonPrimitive* mortonPrims, uint first, uint last) {
+	if (first == last) {
+		// Leaf node
+		this->leftFirst = mortonPrims[first].index;
+		this->count = 1;
+		return;
+	}
+	this->leftFirst = *poolPtr;
+	*poolPtr += 2;
+	BVHNode *left = &nodes[leftFirst];
+	BVHNode *right = &nodes[leftFirst + 1];
+	uint split = findSplit(mortonPrims, first, last);
+	left->setBounds(calculateBounds(&primitives[mortonPrims[first].index], split - first + 1));
+	left->subdivide(nodes, poolPtr, primitives, mortonPrims, first, split);
+	right->setBounds(calculateBounds(&primitives[mortonPrims[split + 1].index], last - split));
+	right->subdivide(nodes, poolPtr, primitives, mortonPrims, split + 1, last);
+	this->count = 0;
+}
+
+void constructBVH(Sphere* primitives, int N) {
+	MortonPrimitive* mortonPrims = new MortonPrimitive[N];
+	AABB globalBounds = calculateBounds(primitives, N);
+	for(int i = 0; i < N; ++i) {
+		glm::vec3 normalized = (primitives[i].center - globalBounds.min) / (globalBounds.max - globalBounds.min);
+		mortonPrims[i].index = i;
+		mortonPrims[i].mortonCode = morton3D(normalized);
+	}
+	std::sort(mortonPrims, mortonPrims + N, [](const MortonPrimitive& a, const MortonPrimitive& b) {
+		return a.mortonCode < b.mortonCode;
+	});
+	BVHNode* nodes = (BVHNode*) malloc(sizeof(BVHNode) * (2 * N));
+	BVHNode& root = nodes[0];
+	root.setBounds(globalBounds);
+	root.count = 0;
+	uint poolPtr = 1;
+	root.subdivide(nodes, &poolPtr, primitives, mortonPrims, 0, N - 1);
+	printBVHTree(nodes, 0, 0);
+	delete[] mortonPrims;
+}
+
 const int MAXDEPTH = 3;
 float maxDepth = MAXDEPTH;
 int numSpheres = 4;
@@ -63,6 +194,14 @@ uniform int maxDepth;
 
 const int MAXDEPTH = 3;
 
+struct BVHNode
+{
+	vec3 bmin;
+	uint leftFirst;
+	vec3 bmax;
+	uint count;
+};
+
 struct Ray {
 	vec3 origin;
 	int inside;
@@ -82,6 +221,10 @@ struct Light {
 	float radius;
 	vec3 color;
 	int id;
+};
+
+layout(std430, binding = 0) buffer TLASBuffer {
+	BVHNode nodes[];
 };
 
 layout(std430, binding = 0) buffer SphereBuffer {
@@ -391,7 +534,7 @@ void updateSpheres() {
 	spheres[0].material = glm::vec4(0.1f, 0.1f, 0.8f, 1.0f);
 	spheres[1].color = glm::vec4(1.0f, 0.5f, 1.0f, 0.5f);
 	spheres[1].material = glm::vec4(0.0f, 0.0f, 0.0f, 1.03f);
-	spheres[1].radius = 1.5f;// * cos((now() - tZero).count() / 10000000000.0);
+	spheres[1].radius = 3.0f;// * cos((now() - tZero).count() / 10000000000.0);
 	//spheres[1].center = glm::vec3(0.0f, 0.0f, -1.5f);
 	spheres[2].color = glm::vec4(0.8f, 0.8f, 1.0f, 1.0f);
 	spheres[2].material = glm::vec4(1.0f, 0.5f, 0.0f, 1.07f);
@@ -505,6 +648,9 @@ void display() {
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, lightBuffer);
 	chkerr();
 	
+	// construct BVH
+	constructBVH(spheres, numSpheres);
+	
 	// TRACE ALL THE RAYS!
 	glDispatchCompute(canvasW / WORKGROUP_SIZE, canvasH / WORKGROUP_SIZE, 1);
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -522,6 +668,8 @@ void display() {
 	glutSwapBuffers();
 	chkerr();
 	frameCount++;
+
+	exit(0);
 }
 
 void reshape(int width, int height) {
