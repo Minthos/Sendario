@@ -29,6 +29,7 @@ GLuint quadVAO;
 
 GLuint sphereBuffer;
 GLuint lightBuffer;
+GLuint TLASBuffer;
 
 struct Sphere {
 	glm::vec3 center;
@@ -69,17 +70,6 @@ struct BVHNode
 	void subdivide(BVHNode* nodes, uint* poolPtr, Sphere* primitives, MortonPrimitive* mortonPrims, uint first, uint last);
 };
 
-AABB calculateBounds(Sphere* p, GLuint N) {
-	AABB bounds;
-	bounds.min = glm::vec3(FLT_MAX);
-	bounds.max = glm::vec3(-FLT_MAX);
-	for (GLuint i = 0; i < N; ++i) {
-		bounds.min = glm::min(bounds.min, p[i].center - glm::vec3(p[i].radius));
-		bounds.max = glm::max(bounds.max, p[i].center + glm::vec3(p[i].radius));
-	}
-	return bounds;
-}
-
 GLuint expandBits(GLuint v) {
 	v = (v * 0x00010001u) & 0xFF0000FFu;
 	v = (v * 0x00000101u) & 0x0F00F00Fu;
@@ -93,6 +83,29 @@ GLuint morton3D(glm::vec3 v) {
 	GLuint yy = expandBits((GLuint)(v.y * 1024.0f));
 	GLuint zz = expandBits((GLuint)(v.z * 1024.0f));
 	return (xx << 2) + (yy << 1) + zz;
+}
+
+AABB calculateBounds(Sphere* p, GLuint N) {
+	AABB bounds;
+	bounds.min = glm::vec3(FLT_MAX);
+	bounds.max = glm::vec3(-FLT_MAX);
+	for (GLuint i = 0; i < N; ++i) {
+		bounds.min = glm::min(bounds.min, p[i].center - glm::vec3(p[i].radius));
+		bounds.max = glm::max(bounds.max, p[i].center + glm::vec3(p[i].radius));
+	}
+	return bounds;
+}
+
+AABB calculateBounds(Sphere* p, MortonPrimitive* mortonPrims, GLuint first, GLuint last) {
+    AABB bounds;
+    bounds.min = glm::vec3(FLT_MAX);
+    bounds.max = glm::vec3(-FLT_MAX);
+    for (GLuint i = first; i <= last; ++i) {
+        GLuint idx = mortonPrims[i].index;
+        bounds.min = glm::min(bounds.min, p[idx].center - glm::vec3(p[idx].radius));
+        bounds.max = glm::max(bounds.max, p[idx].center + glm::vec3(p[idx].radius));
+    }
+    return bounds;
 }
 
 GLuint findSplit(MortonPrimitive* mortonPrims, GLuint first, GLuint last) {
@@ -114,12 +127,15 @@ void printBVHNode(const BVHNode* node, GLuint index, int level) {
 	for(int i = 0; i < level; ++i) {
 		std::cout << "--";
 	}
+	for(int i = level; i < 6; i++) {
+		std::cout << "  ";
+	}
 	std::cout << "Node " << index << " (" << node->bmin.x << ", " << node->bmin.y << ", " << node->bmin.z << "), ";
 	std::cout << "(" << node->bmax.x << ", " << node->bmax.y << ", " << node->bmax.z << "), ";
 	if (node->count == 1) {
 		std::cout << "Leaf, Object Index: " << node->leftFirst << std::endl;
 	} else {
-		std::cout << "Internal, Children: " << node->leftFirst << ", " << node->leftFirst + 1 << std::endl;
+		std::cout << "Internal, count: " << node->count << " Children: " << node->leftFirst << ", " << node->leftFirst + 1 << std::endl;
 	}
 }
 
@@ -127,33 +143,32 @@ void printBVHTree(const BVHNode* nodes, int index, int level) {
 	if (index == -1) return;
 	const BVHNode& node = nodes[index];
 	printBVHNode(&node, index, level);
-	if(node.count == 0) {
+	if(node.count > 1) {
 		printBVHTree(nodes, node.leftFirst, level + 1);
 		printBVHTree(nodes, node.leftFirst + 1, level + 1);
 	}
 }
 
 void BVHNode::subdivide(BVHNode* nodes, uint* poolPtr, Sphere* primitives, MortonPrimitive* mortonPrims, uint first, uint last) {
-	if (first == last) {
-		// Leaf node
-		this->leftFirst = mortonPrims[first].index;
-		this->count = 1;
-		return;
-	}
-	this->leftFirst = *poolPtr;
-	*poolPtr += 2;
-	BVHNode *left = &nodes[leftFirst];
-	BVHNode *right = &nodes[leftFirst + 1];
-	uint split = findSplit(mortonPrims, first, last);
-	left->setBounds(calculateBounds(&primitives[mortonPrims[first].index], split - first + 1));
-	left->subdivide(nodes, poolPtr, primitives, mortonPrims, first, split);
-	right->setBounds(calculateBounds(&primitives[mortonPrims[split + 1].index], last - split));
-	right->subdivide(nodes, poolPtr, primitives, mortonPrims, split + 1, last);
-	this->count = 0;
+    if (first == last) {
+        this->leftFirst = mortonPrims[first].index;
+        this->count = 1;
+        return;
+    }
+    this->leftFirst = *poolPtr;
+    *poolPtr += 2;
+    BVHNode *left = &nodes[leftFirst];
+    BVHNode *right = &nodes[leftFirst + 1];
+    uint split = findSplit(mortonPrims, first, last);
+    left->setBounds(calculateBounds(primitives, mortonPrims, first, split));
+    right->setBounds(calculateBounds(primitives, mortonPrims, split + 1, last));
+    left->subdivide(nodes, poolPtr, primitives, mortonPrims, first, split);
+    right->subdivide(nodes, poolPtr, primitives, mortonPrims, split + 1, last);
+    this->count = last - first + 1;
 }
 
-void constructBVH(Sphere* primitives, int N) {
-	MortonPrimitive* mortonPrims = new MortonPrimitive[N];
+void constructBVH(Sphere* primitives, int N, bool letsPrint) {
+	MortonPrimitive* mortonPrims = (MortonPrimitive *)malloc(sizeof(MortonPrimitive) * N);
 	AABB globalBounds = calculateBounds(primitives, N);
 	for(int i = 0; i < N; ++i) {
 		glm::vec3 normalized = (primitives[i].center - globalBounds.min) / (globalBounds.max - globalBounds.min);
@@ -166,11 +181,16 @@ void constructBVH(Sphere* primitives, int N) {
 	BVHNode* nodes = (BVHNode*) malloc(sizeof(BVHNode) * (2 * N));
 	BVHNode& root = nodes[0];
 	root.setBounds(globalBounds);
-	root.count = 0;
+	root.count = N;
 	uint poolPtr = 1;
 	root.subdivide(nodes, &poolPtr, primitives, mortonPrims, 0, N - 1);
-	printBVHTree(nodes, 0, 0);
-	delete[] mortonPrims;
+	if(letsPrint) { printBVHTree(nodes, 0, 0); }
+	
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, TLASBuffer);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(BVHNode) * poolPtr, nodes, GL_STATIC_DRAW);
+
+	free(mortonPrims);
+	free(nodes);
 }
 
 const int MAXDEPTH = 3;
@@ -194,14 +214,6 @@ uniform int maxDepth;
 
 const int MAXDEPTH = 3;
 
-struct BVHNode
-{
-	vec3 bmin;
-	uint leftFirst;
-	vec3 bmax;
-	uint count;
-};
-
 struct Ray {
 	vec3 origin;
 	int inside;
@@ -223,8 +235,12 @@ struct Light {
 	int id;
 };
 
-layout(std430, binding = 0) buffer TLASBuffer {
-	BVHNode nodes[];
+struct BVHNode
+{
+	vec3 bmin;
+	uint leftFirst;
+	vec3 bmax;
+	uint count;
 };
 
 layout(std430, binding = 0) buffer SphereBuffer {
@@ -233,6 +249,10 @@ layout(std430, binding = 0) buffer SphereBuffer {
 
 layout(std430, binding = 1) buffer LightBuffer {
 	Light lights[];
+};
+
+layout(std430, binding = 2) buffer TLASBuffer {
+	BVHNode nodes[];
 };
 
 float raySphere(Ray ray, vec3 center, float radius) {
@@ -245,6 +265,43 @@ float raySphere(Ray ray, vec3 center, float radius) {
 		return -1.0;
 	} else {
 		return (b + sqrt(discriminant)) / (-2.0 * a);
+	}
+}
+
+bool rayAABB(vec3 O, vec3 rDinv, vec3 bmin, vec3 bmax) {
+    float tmin = -1e38;
+	float tmax = 1e38;
+	vec3 t1 = (bmin - O)*rDinv;
+	vec3 t2 = (bmax - O)*rDinv;
+	for (int i = 0; i < 3; i++) {
+		tmin = max(tmin, min(t1[i], t2[i]));
+		tmax = min(tmax, max(t1[i], t2[i]));
+	}
+    return tmax >= max(tmin, 0.0);
+}
+
+void traverseBVH(Ray ray, inout int hitIdx, inout float closestHit) {
+	uint stack[16];
+	//uint stack[32];
+	uint stackPtr = 0;
+	stack[stackPtr++] = 0;
+	vec3 rD = vec3(1) / ray.direction;
+	while (stackPtr > 0) {
+		uint nodeIdx = stack[--stackPtr];
+		BVHNode node = nodes[nodeIdx];
+		if (rayAABB(ray.origin, rD, node.bmin, node.bmax)) {
+			if (node.count == 1) {
+				int i = int(node.leftFirst);
+				float t = raySphere(ray, spheres[i].center, spheres[i].radius);
+				if (t > 0 && t < closestHit) {
+					hitIdx = i;
+					closestHit = t;
+				}
+			} else {
+				stack[stackPtr++] = node.leftFirst;
+				stack[stackPtr++] = node.leftFirst + 1;
+			}
+		}
 	}
 }
 
@@ -268,10 +325,9 @@ struct Result {
 };
 
 Result trace(Ray ray) {
-	float closestHit = 1000000000000.0;
+	float closestHit = 1e38;
 	float t = 0.0;
 	int hitIdx = -1;
-	float fu = 0.0;
 	Result result;
 	result.color = vec4(0, 0, 0, 0);
 	result.rays[0] = Ray(vec3(0), -1, vec3(0), vec4(0));
@@ -283,16 +339,7 @@ Result trace(Ray ray) {
 			closestHit = t;
 		}
 	}
-	for (int i = 0; i < numSpheres; i++) {
-		t = raySphere(ray, spheres[i].center, spheres[i].radius);
-		//if ((t > 0 && t < closestHit) || (ray.inside == i && -t < closestHit)) {
-		if (t > 0 && t < closestHit) {
-			closestHit = t;
-			hitIdx = i;
-		} else if (ray.inside == i) {
-			fu = t;
-		}
-	}
+	traverseBVH(ray, hitIdx, closestHit);
 	if(hitIdx >= 0) {
 		result.color = vec4(0, 0, 0, 0);
 		int i = hitIdx;
@@ -365,7 +412,7 @@ Result trace(Ray ray) {
 			;
 		}
 	} else {
-		if(closestHit == 1000000000000.0) {
+		if(closestHit == 1e38) {
 			// sky color
 			if(lights[6].position.y > 0.0) {
 				result.color = mix(vec4(0.6, 0.3, 0.2, 1.0), vec4(0.8, 0.8, 1.0, 1.0), sqrt(lights[6].position.y / 100.0)) * ray.alpha.a;
@@ -577,6 +624,10 @@ void initGL() {
 	updateLights();
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, lightBuffer);
 
+	glGenBuffers(1, &TLASBuffer);
+	constructBVH(spheres, numSpheres, true);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, TLASBuffer);
+
 	glGenTextures(1, &outputTexture);
 	glBindTexture(GL_TEXTURE_2D, outputTexture);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, winW, winH, 0, GL_RGBA, GL_FLOAT, NULL);
@@ -647,9 +698,9 @@ void display() {
 	updateLights();
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, lightBuffer);
 	chkerr();
-	
-	// construct BVH
-	constructBVH(spheres, numSpheres);
+	constructBVH(spheres, numSpheres, false);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, TLASBuffer);
+	chkerr();
 	
 	// TRACE ALL THE RAYS!
 	glDispatchCompute(canvasW / WORKGROUP_SIZE, canvasH / WORKGROUP_SIZE, 1);
@@ -669,7 +720,7 @@ void display() {
 	chkerr();
 	frameCount++;
 
-	exit(0);
+//	exit(0);
 }
 
 void reshape(int width, int height) {
@@ -680,10 +731,8 @@ void reshape(int width, int height) {
 	canvasH = winH * canvasScale;
 	canvasW = (canvasW / WORKGROUP_SIZE) * WORKGROUP_SIZE;
 	canvasH = (canvasH / WORKGROUP_SIZE) * WORKGROUP_SIZE;
-
 	resizeTexture(outputTexture, canvasW, canvasH);
 }
-
 
 int fps_strikes = 0;
 double fps_limit = 120.0;
