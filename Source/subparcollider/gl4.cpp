@@ -281,8 +281,7 @@ bool rayAABB(vec3 O, vec3 rDinv, vec3 bmin, vec3 bmax) {
 }
 
 void traverseBVH(Ray ray, inout int hitIdx, inout float closestHit) {
-	uint stack[16];
-	//uint stack[32];
+	uint stack[32];
 	uint stackPtr = 0;
 	stack[stackPtr++] = 0;
 	vec3 rD = vec3(1) / ray.direction;
@@ -357,12 +356,11 @@ Result trace(Ray ray) {
 				shadowRay.direction = shadowRay.direction / lightDist;
 				shadowRay.origin = origin;
 				vec3 light = lights[l].color;
-				float shadow = 0.0;
-				for (int s = 0; s < 3; s++) {
-					float shadow_t = raySphere(shadowRay, spheres[s].center, spheres[s].radius);
-					if (shadow_t > 0.0) {
-						light = mix(light, spheres[s].color.rgb, spheres[s].color.a) * (1.0 - spheres[s].color.a);
-					}
+				int s = -1;
+				float shadow_t = lightDist;
+				traverseBVH(shadowRay, s, shadow_t);
+				if(s >= 0) {
+					light = mix(light, spheres[s].color.rgb, spheres[s].color.a) * (1.0 - spheres[s].color.a);
 				}
 				light = light * (1.0 / (0.1 + lightDist));
 				float lambertian = max(0.0, dot(normal, shadowRay.direction)) * spheres[i].material.x;
@@ -580,8 +578,8 @@ void updateSpheres() {
 	spheres[0].color = glm::vec4(1.0f, 0.95f, 0.5f, 1.0f);
 	spheres[0].material = glm::vec4(0.1f, 0.1f, 0.8f, 1.0f);
 	spheres[1].color = glm::vec4(1.0f, 0.5f, 1.0f, 0.5f);
-	spheres[1].material = glm::vec4(0.0f, 0.0f, 0.0f, 1.03f);
-	spheres[1].radius = 3.0f;// * cos((now() - tZero).count() / 10000000000.0);
+	spheres[1].material = glm::vec4(0.0f, 0.0f, 0.0f, 1.73f);
+	spheres[1].radius = 1.0f;// * cos((now() - tZero).count() / 10000000000.0);
 	//spheres[1].center = glm::vec3(0.0f, 0.0f, -1.5f);
 	spheres[2].color = glm::vec4(0.8f, 0.8f, 1.0f, 1.0f);
 	spheres[2].material = glm::vec4(1.0f, 0.5f, 0.0f, 1.07f);
