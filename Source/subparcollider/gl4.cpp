@@ -14,7 +14,7 @@ auto now = std::chrono::high_resolution_clock::now;
 
 int winW = 1920;
 int winH = 1080;
-float canvasScale = 1.0;
+float canvasScale = 0.25;
 int canvasW = winW * canvasScale;
 int canvasH = winH * canvasScale;
 unsigned int frameCount = 0;
@@ -312,7 +312,7 @@ vec3 refract(vec3 L, vec3 N, float n1, float n2) {
 	float r = n1 / n2;
 	float cosI = -dot(N, L);
 	float sinT2 = r * r * (1.0 - cosI * cosI);
-	//if (sinT2 > 1.0) return vec3(0.0);  // Total internal reflection
+	if (sinT2 > 1.0) return vec3(0.0);  // Total internal reflection
 	float cosT = sqrt(1.0 - sinT2);
 	return r * L + (r * cosI - cosT) * N;
 }
@@ -578,7 +578,7 @@ void updateSpheres() {
 	spheres[0].color = glm::vec4(1.0f, 0.95f, 0.5f, 1.0f);
 	spheres[0].material = glm::vec4(0.1f, 0.1f, 0.8f, 1.0f);
 	spheres[1].color = glm::vec4(1.0f, 0.5f, 1.0f, 0.5f);
-	spheres[1].material = glm::vec4(0.0f, 0.0f, 0.0f, 1.73f);
+	spheres[1].material = glm::vec4(0.0f, 0.0f, 0.0f, 1.52f);
 	spheres[1].radius = 1.0f;// * cos((now() - tZero).count() / 10000000000.0);
 	//spheres[1].center = glm::vec3(0.0f, 0.0f, -1.5f);
 	spheres[2].color = glm::vec4(0.8f, 0.8f, 1.0f, 1.0f);
@@ -732,6 +732,7 @@ void reshape(int width, int height) {
 	resizeTexture(outputTexture, canvasW, canvasH);
 }
 
+int downscale = 4;
 int fps_strikes = 0;
 double fps_limit = 120.0;
 double idleTime = 0.0;
@@ -744,9 +745,9 @@ void idle() {
 	auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(now() - startTime).count();
 	float fps = frameCount / (elapsed / 1000000.0);
 	if (elapsed >= 1000000) {
-		if(fps < fps_limit * 0.8) {
+		//if(fps < fps_limit * 0.8) {
 			std::cout << "FPS: " << fps << " Frame Time: " << busyTime/(1000.0 * frameCount) << " ms " << "CPU Busy: " << (1.0 - (idleTime / elapsed)) * 100.0f << "%" << " maxDepth: " << maxDepth << " scale: " << canvasScale << std::endl;
-		}
+		//`}
 		idleTime = 0.0;
 		busyTime = 0.0;
 		frameCount = 0;
@@ -763,25 +764,25 @@ void idle() {
 		canvasScale = 0.1;
 		reshape(winW, winH);
 	}
-	if (fps < fps_limit * 0.8) {
+	
+	if((frameDuration / frameTimeLimit) > 0.5) {
 		fps_strikes++;
 		if(fps_strikes > 10) {
-			canvasScale *= 0.9;
-			canvasScale = std::max(0.33f, canvasScale);
+			downscale++;
+			canvasScale = 2.0 / downscale;
 			reshape(winW, winH);
 			fps_strikes = 0;
 		}
-	} else if((idleTime / elapsed) > 0.98) {
+	} else if((idleTime / elapsed) < 0.01) {
 		fps_strikes--;
 		if(fps_strikes < -10) {
-			maxDepth = std::min((float)MAXDEPTH, maxDepth + 1);
-			canvasScale *= 1.11;
-			canvasScale = std::min(1.0f, canvasScale);
+			downscale = std::max(1, downscale - 1);
+			canvasScale = 2.0 / downscale;
 			reshape(winW, winH);
 			fps_strikes = 0;
 		}
 	}
-
+	
 
 	prevFrameTime = now();
 	glutPostRedisplay();
