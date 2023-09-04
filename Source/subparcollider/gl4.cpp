@@ -14,9 +14,11 @@ auto now = std::chrono::high_resolution_clock::now;
 
 int winW = 1920;
 int winH = 1080;
-float canvasScale = 0.25;
-int canvasW = winW * canvasScale;
-int canvasH = winH * canvasScale;
+float canvasScale = 0.33;
+int canvasW = 640;
+int canvasH = 480;
+//int canvasW = winW * canvasScale;
+//int canvasH = winH * canvasScale;
 unsigned int frameCount = 0;
 auto startTime = now();
 auto tZero = now();
@@ -374,7 +376,8 @@ Result trace(Ray ray) {
 			}
 		}
 		// reflection: z
-		float fresnel = 0;//max(0.0, min(1, 0.5 * (0.5 - spheres[i].material.x) * (1.0 + dot(ray.direction, normal))));
+		//float fresnel = 0;
+		float fresnel = max(0.0, min(1, 0.5 * (0.5 - spheres[i].material.x) * (1.0 + dot(ray.direction, normal))));
 		result.rays[0].origin = origin;
 		result.rays[0].alpha = ray.alpha * fresnel + ray.alpha * spheres[i].color * spheres[i].material.z;
 		result.rays[0].direction = reflect(ray.direction, normal);
@@ -725,8 +728,10 @@ void reshape(int width, int height) {
 	winW = width;
 	winH = height;
 	glViewport(0, 0, width, height);
-	canvasW = winW * canvasScale;
-	canvasH = winH * canvasScale;
+//	canvasW = winW * canvasScale;
+//	canvasH = winH * canvasScale;
+	canvasH = std::min(480, height);
+	canvasW = canvasH * (float)winW / (float)winH;
 	canvasW = (canvasW / WORKGROUP_SIZE) * WORKGROUP_SIZE;
 	canvasH = (canvasH / WORKGROUP_SIZE) * WORKGROUP_SIZE;
 	resizeTexture(outputTexture, canvasW, canvasH);
@@ -764,7 +769,7 @@ void idle() {
 		canvasScale = 0.1;
 		reshape(winW, winH);
 	}
-	
+/*	
 	if((frameDuration / frameTimeLimit) > 0.5) {
 		fps_strikes++;
 		if(fps_strikes > 10) {
@@ -782,8 +787,7 @@ void idle() {
 			fps_strikes = 0;
 		}
 	}
-	
-
+*/
 	prevFrameTime = now();
 	glutPostRedisplay();
 }
