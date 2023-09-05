@@ -99,15 +99,15 @@ AABB calculateBounds(Sphere* p, GLuint N) {
 }
 
 AABB calculateBounds(Sphere* p, MortonPrimitive* mortonPrims, GLuint first, GLuint last) {
-    AABB bounds;
-    bounds.min = glm::vec3(FLT_MAX);
-    bounds.max = glm::vec3(-FLT_MAX);
-    for (GLuint i = first; i <= last; ++i) {
-        GLuint idx = mortonPrims[i].index;
-        bounds.min = glm::min(bounds.min, p[idx].center - glm::vec3(p[idx].radius));
-        bounds.max = glm::max(bounds.max, p[idx].center + glm::vec3(p[idx].radius));
-    }
-    return bounds;
+	AABB bounds;
+	bounds.min = glm::vec3(FLT_MAX);
+	bounds.max = glm::vec3(-FLT_MAX);
+	for (GLuint i = first; i <= last; ++i) {
+		GLuint idx = mortonPrims[i].index;
+		bounds.min = glm::min(bounds.min, p[idx].center - glm::vec3(p[idx].radius));
+		bounds.max = glm::max(bounds.max, p[idx].center + glm::vec3(p[idx].radius));
+	}
+	return bounds;
 }
 
 GLuint findSplit(MortonPrimitive* mortonPrims, GLuint first, GLuint last) {
@@ -152,21 +152,21 @@ void printBVHTree(const BVHNode* nodes, int index, int level) {
 }
 
 void BVHNode::subdivide(BVHNode* nodes, uint* poolPtr, Sphere* primitives, MortonPrimitive* mortonPrims, uint first, uint last) {
-    if (first == last) {
-        this->leftFirst = mortonPrims[first].index;
-        this->count = 1;
-        return;
-    }
-    this->leftFirst = *poolPtr;
-    *poolPtr += 2;
-    BVHNode *left = &nodes[leftFirst];
-    BVHNode *right = &nodes[leftFirst + 1];
-    uint split = findSplit(mortonPrims, first, last);
-    left->setBounds(calculateBounds(primitives, mortonPrims, first, split));
-    right->setBounds(calculateBounds(primitives, mortonPrims, split + 1, last));
-    left->subdivide(nodes, poolPtr, primitives, mortonPrims, first, split);
-    right->subdivide(nodes, poolPtr, primitives, mortonPrims, split + 1, last);
-    this->count = last - first + 1;
+	if (first == last) {
+		this->leftFirst = mortonPrims[first].index;
+		this->count = 1;
+		return;
+	}
+	this->leftFirst = *poolPtr;
+	*poolPtr += 2;
+	BVHNode *left = &nodes[leftFirst];
+	BVHNode *right = &nodes[leftFirst + 1];
+	uint split = findSplit(mortonPrims, first, last);
+	left->setBounds(calculateBounds(primitives, mortonPrims, first, split));
+	right->setBounds(calculateBounds(primitives, mortonPrims, split + 1, last));
+	left->subdivide(nodes, poolPtr, primitives, mortonPrims, first, split);
+	right->subdivide(nodes, poolPtr, primitives, mortonPrims, split + 1, last);
+	this->count = last - first + 1;
 }
 
 void constructBVH(Sphere* primitives, int N, bool letsPrint) {
@@ -207,6 +207,8 @@ const int WORKGROUP_SIZE = 8;
 const GLchar* computeShaderSrc = R"(
 #version 430
 
+const float LOCAL_SIZE = 2.0;
+
 layout(local_size_x = 2, local_size_y = 2) in;
 layout(rgba32f, location = 0) writeonly uniform image2D destTex;
 uniform vec2 canvasSize;
@@ -214,7 +216,7 @@ uniform int numSpheres;
 uniform int numLights;
 uniform int maxDepth;
 
-const int MAXDEPTH = 3;
+const int MAXDEPTH = 6;
 const int PKTDIM = 4;
 const int PKTSIZE = 16;
 
@@ -284,7 +286,7 @@ float raySphere(Ray ray, vec3 center, float radius) {
 }
 
 bool rayAABB(vec3 O, vec3 rDinv, vec3 bmin, vec3 bmax) {
-    float tmin = -1e38;
+	float tmin = -1e38;
 	float tmax = 1e38;
 	vec3 t1 = (bmin - O)*rDinv;
 	vec3 t2 = (bmax - O)*rDinv;
@@ -292,7 +294,7 @@ bool rayAABB(vec3 O, vec3 rDinv, vec3 bmin, vec3 bmax) {
 		tmin = max(tmin, min(t1[i], t2[i]));
 		tmax = min(tmax, max(t1[i], t2[i]));
 	}
-    return tmax >= max(tmin, 0.0);
+	return tmax >= max(tmin, 0.0);
 }
 
 void traverseBVH(Ray ray, inout int hitIdx, inout float closestHit) {
@@ -441,65 +443,73 @@ Result trace(Ray ray) {
 }
 
 void main() {
-    vec2 uvBase;
-    ivec2 storePosBase = ivec2(gl_GlobalInvocationID.xy) * PKTDIM;
-    uvBase.x = (2.0 * float(storePosBase.x) / canvasSize.x - 1.0);
-    uvBase.y = (2.0 * float(storePosBase.y) / canvasSize.y - 1.0);
-    float aspectRatio = canvasSize.x / canvasSize.y;
-    RayPacket rayPacket;
-    rayPacket.nrays = PKTSIZE;
+	vec2 uvBase;
+	ivec2 storePosBase = ivec2(gl_GlobalInvocationID.xy) * PKTDIM;
+	uvBase.x = (2.0 * float(storePosBase.x) / canvasSize.x - 1.0);
+	uvBase.y = (2.0 * float(storePosBase.y) / canvasSize.y - 1.0);
+	float aspectRatio = canvasSize.x / canvasSize.y;
+	vec4 accumulatedColors[PKTSIZE];
+	for(int i = 0; i < PKTSIZE; i++) {
+		accumulatedColors[i] = vec4(0.0);
+	}
+	RayPacket packets[MAXDEPTH];
+	int top = 0;
 	for(int x = 0; x < PKTDIM; x++) {
 		for(int y = 0; y < PKTDIM; y++) {
-            int pktIdx = y * PKTDIM + x;
-            vec2 uvOffset = vec2(
-                float(x) / (canvasSize.x / 2),
-                float(y) / (canvasSize.y / 2)
-            );
-            vec2 uv = uvBase + uvOffset;
-            rayPacket.rays[pktIdx].origin = vec3(0);
-            rayPacket.rays[pktIdx].inside = -1;
-            for(int i = 0; i < numSpheres; i++) {
-                if(length(spheres[i].center) < spheres[i].radius) {
-                    rayPacket.rays[pktIdx].inside = i;
-                }
-            }
-            rayPacket.rays[pktIdx].direction = normalize(vec3(aspectRatio * uv.x, uv.y, -1));
-            rayPacket.rays[pktIdx].alpha = vec4(1.0);
-        }
-    }
-    vec4 accumulatedColors[PKTSIZE];
-    for(int pktIdx = 0; pktIdx < PKTSIZE; pktIdx++) {
-        accumulatedColors[pktIdx] = vec4(0);
-        int ridx = 0;
-        while (ridx >= 0) {
-            Result result = trace(rayPacket.rays[pktIdx]);
-            accumulatedColors[pktIdx] += result.color * rayPacket.rays[pktIdx].alpha;
-            if (ridx < maxDepth) {
-                if(result.rays[0].alpha.a > 0.02) {
-                    rayPacket.rays[pktIdx] = result.rays[0];
-                    ridx++;
-                }
-                if(result.rays[1].alpha.a > 0.02) {
-                    rayPacket.rays[pktIdx] = result.rays[1];
-                    ridx++;
-                }
-            }
-            ridx--;
-        }
-    }
-	for(int x = 0; x < PKTDIM; x++) {
-		for(int y = 0; y < PKTDIM; y++) {
-            int pktIdx = y * PKTDIM + x;
-            ivec2 storePos = storePosBase + ivec2(x, y);
-            vec4 color = accumulatedColors[pktIdx];
-            color.r = tanh(color.r);
-            color.g = tanh(color.g);
-            color.b = tanh(color.b);
-            imageStore(destTex, storePos, color);
-        }
-    }
-}
+			int pktIdx = y * PKTDIM + x;
+			vec2 uvOffset = vec2(x,y) * 2.0 / canvasSize.xy;
+			vec2 uv = uvBase + uvOffset;
+			packets[top].rays[pktIdx].origin = vec3(0);
+			packets[top].rays[pktIdx].inside = -1;
+			for(int i = 0; i < numSpheres; i++) {
+				if(length(spheres[i].center) < spheres[i].radius) {
+					packets[top].rays[pktIdx].inside = i;
+				}
+			}
+			packets[top].rays[pktIdx].direction = normalize(vec3(aspectRatio * uv.x, uv.y, -1));
+			packets[top].rays[pktIdx].alpha = vec4(1.0);
+		}
+	}
+	packets[top].nrays = PKTSIZE;
+	top++;
+	while(top-- > 0) {
+		Result results[PKTSIZE];
+		for(int i = 0; i < packets[top].nrays; i++) {
+			results[i] = trace(packets[top].rays[i]);
+		}
+		RayPacket reflectionPacket;
+		reflectionPacket.nrays = 0;
+		RayPacket refractionPacket;
+		refractionPacket.nrays = 0;
+		for(int i = 0; i < packets[top].nrays; i++) {
+			accumulatedColors[i] += results[i].color * packets[top].rays[i].alpha;
+			if(results[i].rays[0].alpha.a > 0.02) {
+				reflectionPacket.rays[reflectionPacket.nrays++] = results[i].rays[0];
+			}
+			if(results[i].rays[1].alpha.a > 0.02) {
+				refractionPacket.rays[refractionPacket.nrays++] = results[i].rays[1];
+			}
+		}
+		if(reflectionPacket.nrays > 0 && top < MAXDEPTH) {
+			packets[top++] = reflectionPacket;
+		}
+		if(refractionPacket.nrays > 0 && top < MAXDEPTH) {
+			packets[top++] = refractionPacket;
+		}
+	}
 
+	for(int x = 0; x < PKTDIM; x++) {
+		for(int y = 0; y < PKTDIM; y++) {
+			int pktIdx = y * PKTDIM + x;
+			ivec2 storePos = storePosBase + ivec2(x, y);
+			vec4 color = accumulatedColors[pktIdx];
+			color.r = tanh(color.r);
+			color.g = tanh(color.g);
+			color.b = tanh(color.b);
+			imageStore(destTex, storePos, color);
+		}
+	}
+}
 
 )";
 
