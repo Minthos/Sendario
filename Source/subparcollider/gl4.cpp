@@ -207,9 +207,7 @@ const int WORKGROUP_SIZE = 8;
 const GLchar* computeShaderSrc = R"(
 #version 430
 
-const float LOCAL_SIZE = 2.0;
-
-layout(local_size_x = 2, local_size_y = 2) in;
+layout(local_size_x = 4, local_size_y = 4) in;
 layout(rgba32f, location = 0) writeonly uniform image2D destTex;
 uniform vec2 canvasSize;
 uniform int numSpheres;
@@ -217,8 +215,8 @@ uniform int numLights;
 uniform int maxDepth;
 
 const int MAXDEPTH = 6;
-const int PKTDIM = 4;
-const int PKTSIZE = 16;
+const int PKTDIM = 2;
+const int PKTSIZE = 4;
 
 struct Sphere {
 	vec3 center;
@@ -386,8 +384,8 @@ Result trace(Ray ray) {
 			}
 		}
 		// reflection: z
-		//float fresnel = 0;
-		float fresnel = max(0.0, min(1, 0.5 * (0.5 - spheres[i].material.x) * (1.0 + dot(ray.direction, normal))));
+		// FIXME: the fresnel calculation causes a slight shadow on the glass sphere
+		float fresnel = max(0, min(1, 0.5 * (0.5 - spheres[i].material.x) * (1.0 + dot(ray.direction, normal))));
 		result.rays[0].origin = origin;
 		result.rays[0].alpha = ray.alpha * fresnel + ray.alpha * spheres[i].color * spheres[i].material.z;
 		result.rays[0].direction = reflect(ray.direction, normal);
@@ -474,20 +472,32 @@ void main() {
 	top++;
 	while(top-- > 0) {
 		Result results[PKTSIZE];
-		for(int i = 0; i < packets[top].nrays; i++) {
-			results[i] = trace(packets[top].rays[i]);
+		for(int i = 0; i < PKTSIZE; i++) {
+			if(packets[top].rays[i].alpha.a <= 0.02) {
+				results[i].color = vec4(0.0);
+				results[i].rays[0] = Ray(vec3(0), -1, vec3(0), vec4(0));
+				results[i].rays[1] = Ray(vec3(0), -1, vec3(0), vec4(0));
+			} else {
+				results[i] = trace(packets[top].rays[i]);
+			}
 		}
 		RayPacket reflectionPacket;
 		reflectionPacket.nrays = 0;
 		RayPacket refractionPacket;
 		refractionPacket.nrays = 0;
-		for(int i = 0; i < packets[top].nrays; i++) {
+		for(int i = 0; i < PKTSIZE; i++) {
 			accumulatedColors[i] += results[i].color * packets[top].rays[i].alpha;
 			if(results[i].rays[0].alpha.a > 0.02) {
-				reflectionPacket.rays[reflectionPacket.nrays++] = results[i].rays[0];
+				reflectionPacket.rays[i] = results[i].rays[0];
+				reflectionPacket.nrays++;
+			} else {
+				reflectionPacket.rays[i] = Ray(vec3(0), -1, vec3(0), vec4(0));
 			}
 			if(results[i].rays[1].alpha.a > 0.02) {
-				refractionPacket.rays[refractionPacket.nrays++] = results[i].rays[1];
+				refractionPacket.rays[i] = results[i].rays[1];
+				refractionPacket.nrays++;
+			} else {
+				refractionPacket.rays[i] = Ray(vec3(0), -1, vec3(0), vec4(0));
 			}
 		}
 		if(reflectionPacket.nrays > 0 && top < MAXDEPTH) {
