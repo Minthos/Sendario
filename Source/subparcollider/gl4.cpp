@@ -16,7 +16,7 @@ int winW = 1920;
 int winH = 1080;
 float canvasScale = 0.33;
 int canvasW = 640;
-int canvasH = 480;
+int canvasH = 360;
 //int canvasW = winW * canvasScale;
 //int canvasH = winH * canvasScale;
 unsigned int frameCount = 0;
@@ -207,7 +207,7 @@ const int WORKGROUP_SIZE = 8;
 const GLchar* computeShaderSrc = R"(
 #version 430
 
-layout(local_size_x = 8, local_size_y = 8) in;
+layout(local_size_x = 2, local_size_y = 2) in;
 layout(rgba32f, location = 0) writeonly uniform image2D destTex;
 uniform vec2 canvasSize;
 uniform int numSpheres;
@@ -215,13 +215,8 @@ uniform int numLights;
 uniform int maxDepth;
 
 const int MAXDEPTH = 3;
-
-struct Ray {
-	vec3 origin;
-	int inside;
-	vec3 direction;
-	vec4 alpha;
-};
+const int PKTDIM = 4;
+const int PKTSIZE = 16;
 
 struct Sphere {
 	vec3 center;
@@ -255,6 +250,24 @@ layout(std430, binding = 1) buffer LightBuffer {
 
 layout(std430, binding = 2) buffer TLASBuffer {
 	BVHNode nodes[];
+};
+
+struct Ray {
+	vec3 origin;
+	int inside;
+	vec3 direction;
+	vec4 alpha;
+};
+
+struct RayPacket {
+	Ray rays[PKTSIZE];
+	int nrays;
+};
+
+struct Result {
+	vec4 color;
+	Ray rays[2];
+	float t;
 };
 
 float raySphere(Ray ray, vec3 center, float radius) {
@@ -319,11 +332,6 @@ vec3 refract(vec3 L, vec3 N, float n1, float n2) {
 	return r * L + (r * cosI - cosT) * N;
 }
 
-struct Result {
-	vec4 color;
-	Ray rays[2];
-	float t;
-};
 
 Result trace(Ray ray) {
 	float closestHit = 1e38;
@@ -433,44 +441,66 @@ Result trace(Ray ray) {
 }
 
 void main() {
-	vec2 uv;
-	ivec2 storePos = ivec2(gl_GlobalInvocationID.xy);
-	uv.x = (2.0 * float(storePos.x) / canvasSize.x - 1.0);
-	uv.y = (2.0 * float(storePos.y) / canvasSize.y - 1.0);
-	float aspectRatio = canvasSize.x / canvasSize.y;
-
-	Ray ray[MAXDEPTH + 1];
-	int ridx = 0;
-	ray[ridx].origin = vec3(0);
-	ray[ridx].inside = -1;
-	for(int i = 0; i < numSpheres; i++) {
-		if(length(spheres[i].center) < spheres[i].radius) {
-			ray[ridx].inside = i;
-		}
-	}
-	ray[ridx].direction = normalize(vec3(aspectRatio * uv.x, uv.y, -1));
-	ray[ridx].alpha = vec4(1.0);
-	vec4 accumulatedColor = vec4(0, 0, 0, 0);
-
-	for (int ridx = 0; ridx >= 0; ridx--) {
-		Result result = trace(ray[ridx]);
-		accumulatedColor += result.color * ray[ridx].alpha;
-		if (ridx < maxDepth) {
-			if(result.rays[0].alpha.a > 0.02) {
-				ray[ridx++] = result.rays[0];
-			}
-			if(result.rays[1].alpha.a > 0.02) {
-				ray[ridx++] = result.rays[1];
-			}
-		}
-	}
-
-	//accumulatedColor = accumulatedColor / accumulatedColor.a;
-	accumulatedColor.r = tanh(accumulatedColor.r);
-	accumulatedColor.g = tanh(accumulatedColor.g);
-	accumulatedColor.b = tanh(accumulatedColor.b);
-	imageStore(destTex, storePos, accumulatedColor);
+    vec2 uvBase;
+    ivec2 storePosBase = ivec2(gl_GlobalInvocationID.xy) * PKTDIM;
+    uvBase.x = (2.0 * float(storePosBase.x) / canvasSize.x - 1.0);
+    uvBase.y = (2.0 * float(storePosBase.y) / canvasSize.y - 1.0);
+    float aspectRatio = canvasSize.x / canvasSize.y;
+    RayPacket rayPacket;
+    rayPacket.nrays = PKTSIZE;
+	for(int x = 0; x < PKTDIM; x++) {
+		for(int y = 0; y < PKTDIM; y++) {
+            int pktIdx = y * PKTDIM + x;
+            vec2 uvOffset = vec2(
+                float(x) / (canvasSize.x / 2),
+                float(y) / (canvasSize.y / 2)
+            );
+            vec2 uv = uvBase + uvOffset;
+            rayPacket.rays[pktIdx].origin = vec3(0);
+            rayPacket.rays[pktIdx].inside = -1;
+            for(int i = 0; i < numSpheres; i++) {
+                if(length(spheres[i].center) < spheres[i].radius) {
+                    rayPacket.rays[pktIdx].inside = i;
+                }
+            }
+            rayPacket.rays[pktIdx].direction = normalize(vec3(aspectRatio * uv.x, uv.y, -1));
+            rayPacket.rays[pktIdx].alpha = vec4(1.0);
+        }
+    }
+    vec4 accumulatedColors[PKTSIZE];
+    for(int pktIdx = 0; pktIdx < PKTSIZE; pktIdx++) {
+        accumulatedColors[pktIdx] = vec4(0);
+        int ridx = 0;
+        while (ridx >= 0) {
+            Result result = trace(rayPacket.rays[pktIdx]);
+            accumulatedColors[pktIdx] += result.color * rayPacket.rays[pktIdx].alpha;
+            if (ridx < maxDepth) {
+                if(result.rays[0].alpha.a > 0.02) {
+                    rayPacket.rays[pktIdx] = result.rays[0];
+                    ridx++;
+                }
+                if(result.rays[1].alpha.a > 0.02) {
+                    rayPacket.rays[pktIdx] = result.rays[1];
+                    ridx++;
+                }
+            }
+            ridx--;
+        }
+    }
+	for(int x = 0; x < PKTDIM; x++) {
+		for(int y = 0; y < PKTDIM; y++) {
+            int pktIdx = y * PKTDIM + x;
+            ivec2 storePos = storePosBase + ivec2(x, y);
+            vec4 color = accumulatedColors[pktIdx];
+            color.r = tanh(color.r);
+            color.g = tanh(color.g);
+            color.b = tanh(color.b);
+            imageStore(destTex, storePos, color);
+        }
+    }
 }
+
+
 )";
 
 const GLchar* vertexShaderSrc = R"(
@@ -730,7 +760,7 @@ void reshape(int width, int height) {
 	glViewport(0, 0, width, height);
 //	canvasW = winW * canvasScale;
 //	canvasH = winH * canvasScale;
-	canvasH = std::min(480, height);
+	canvasH = std::min(360, height);
 	canvasW = canvasH * (float)winW / (float)winH;
 	canvasW = (canvasW / WORKGROUP_SIZE) * WORKGROUP_SIZE;
 	canvasH = (canvasH / WORKGROUP_SIZE) * WORKGROUP_SIZE;
