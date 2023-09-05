@@ -261,6 +261,7 @@ struct Ray {
 
 struct RayPacket {
 	Ray rays[PKTSIZE];
+	int indices[PKTSIZE];
 	int nrays;
 };
 
@@ -333,186 +334,180 @@ vec3 refract(vec3 L, vec3 N, float n1, float n2) {
 }
 
 
-Result trace(Ray ray) {
-	float closestHit = 1e38;
-	float t = 0.0;
-	int hitIdx = -1;
-	Result result;
-	result.color = vec4(0, 0, 0, 0);
-	result.rays[0] = Ray(vec3(0), -1, vec3(0), vec4(0));
-	result.rays[1] = Ray(vec3(0), -1, vec3(0), vec4(0));
-	for (int i = 0; i < numLights; i++) {
-		float t = raySphere(ray, lights[i].position, lights[i].radius);
-		if (t > 0) {
-			result.color = vec4(lights[i].color, 1);
-			closestHit = t;
+void trace(RayPacket pkt, out Result result[PKTSIZE]) {
+	for(int ridx = 0; ridx < pkt.nrays; ridx++){
+		float closestHit = 1e38;
+		float t = 0.0;
+		int hitIdx = -1;
+		result[ridx].color = vec4(0, 0, 0, 0);
+		result[ridx].rays[0] = Ray(vec3(0), -1, vec3(0), vec4(0));
+		result[ridx].rays[1] = Ray(vec3(0), -1, vec3(0), vec4(0));
+		for (int i = 0; i < numLights; i++) {
+			float t = raySphere(pkt.rays[ridx], lights[i].position, lights[i].radius);
+			if (t > 0) {
+				result[ridx].color = vec4(lights[i].color, 1);
+				closestHit = t;
+			}
 		}
-	}
-	traverseBVH(ray, hitIdx, closestHit);
-	if(hitIdx >= 0) {
-		result.color = vec4(0, 0, 0, 0);
-		int i = hitIdx;
-		t = closestHit;
-		vec3 hitPoint = ray.origin + t * ray.direction;
-		vec3 normal = (hitPoint - spheres[i].center) / spheres[i].radius;
-		vec3 origin = hitPoint + 0.001 * normal;
-		
-		// diffuse and specular: x, y
-		if(spheres[i].material.x > 0.0 || spheres[i].material.y > 0.0) {
-			for (int l = 0; l < numLights; l++) {
-				Ray shadowRay;
-				shadowRay.direction = lights[l].position - hitPoint;
-				float lightDist = length(shadowRay.direction);
-				shadowRay.direction = shadowRay.direction / lightDist;
-				shadowRay.origin = origin;
-				vec3 light = lights[l].color;
-				int s = -1;
-				float shadow_t = lightDist;
-				traverseBVH(shadowRay, s, shadow_t);
-				if(s >= 0) {
-					light = mix(light, spheres[s].color.rgb, spheres[s].color.a) * (1.0 - spheres[s].color.a);
+		traverseBVH(pkt.rays[ridx], hitIdx, closestHit);
+		if(hitIdx >= 0) {
+			result[ridx].color = vec4(0, 0, 0, 0);
+			int i = hitIdx;
+			t = closestHit;
+			vec3 hitPoint = pkt.rays[ridx].origin + t * pkt.rays[ridx].direction;
+			vec3 normal = (hitPoint - spheres[i].center) / spheres[i].radius;
+			vec3 origin = hitPoint + 0.001 * normal;
+			
+			// diffuse and specular: x, y
+			if(spheres[i].material.x > 0.0 || spheres[i].material.y > 0.0) {
+				for (int l = 0; l < numLights; l++) {
+					Ray shadowRay;
+					shadowRay.direction = lights[l].position - hitPoint;
+					float lightDist = length(shadowRay.direction);
+					shadowRay.direction = shadowRay.direction / lightDist;
+					shadowRay.origin = origin;
+					vec3 light = lights[l].color;
+					int s = -1;
+					float shadow_t = lightDist;
+					traverseBVH(shadowRay, s, shadow_t);
+					if(s >= 0) {
+						light = mix(light, spheres[s].color.rgb, spheres[s].color.a) * (1.0 - spheres[s].color.a);
+					}
+					light = light * (1.0 / (0.1 + lightDist));
+					float lambertian = max(0.0, dot(normal, shadowRay.direction)) * spheres[i].material.x;
+					float gloss = 32.0;
+					vec3 h = (-shadowRay.direction + pkt.rays[ridx].direction) * -0.5;
+					vec3 halfDir = normalize(-shadowRay.direction + pkt.rays[ridx].direction);
+					float specAngle = max(0.0, dot(halfDir, -normal));
+					float specular = pow(specAngle, gloss) * spheres[i].material.y;
+					vec3 contribution = lambertian * light * spheres[i].color.rgb + specular * light;
+					result[ridx].color += vec4(contribution, spheres[i].color.a);
 				}
-				light = light * (1.0 / (0.1 + lightDist));
-				float lambertian = max(0.0, dot(normal, shadowRay.direction)) * spheres[i].material.x;
-				float gloss = 32.0;
-				vec3 h = (-shadowRay.direction + ray.direction) * -0.5;
-				vec3 halfDir = normalize(-shadowRay.direction + ray.direction);
-				float specAngle = max(0.0, dot(halfDir, -normal));
-				float specular = pow(specAngle, gloss) * spheres[i].material.y;
-				vec3 contribution = lambertian * light * spheres[i].color.rgb + specular * light;
-				result.color += vec4(contribution, spheres[i].color.a);
 			}
-		}
-		// reflection: z
-		// FIXME: the fresnel calculation causes a slight shadow on the glass sphere
-		float fresnel = max(0, min(1, 0.5 * (0.5 - spheres[i].material.x) * (1.0 + dot(ray.direction, normal))));
-		result.rays[0].origin = origin;
-		result.rays[0].alpha = ray.alpha * fresnel + ray.alpha * spheres[i].color * spheres[i].material.z;
-		result.rays[0].direction = reflect(ray.direction, normal);
+			// reflection: z
+			// FIXME: the fresnel calculation causes a slight shadow on the glass sphere
+			float fresnel = max(0, min(1, 0.5 * (0.5 - spheres[i].material.x) * (1.0 + dot(pkt.rays[ridx].direction, normal))));
+			result[ridx].rays[0].origin = origin;
+			result[ridx].rays[0].alpha = pkt.rays[ridx].alpha * fresnel + pkt.rays[ridx].alpha * spheres[i].color * spheres[i].material.z;
+			result[ridx].rays[0].direction = reflect(pkt.rays[ridx].direction, normal);
 
-		// refraction: w, color.a
-		float refractiveIndexAir = 1.0;
-		result.rays[1].origin = hitPoint - (0.001 * normal);
-		result.rays[1].direction = refract(ray.direction, normal, refractiveIndexAir, spheres[i].material.w);
+			// refraction: w, color.a
+			float refractiveIndexAir = 1.0;
+			result[ridx].rays[1].origin = hitPoint - (0.001 * normal);
+			result[ridx].rays[1].direction = refract(pkt.rays[ridx].direction, normal, refractiveIndexAir, spheres[i].material.w);
 
-		if (ray.inside != -1) {
-			if (ray.inside == i) {
-				result.rays[1].inside = -1;
-				float transparency = pow(spheres[i].color.a, abs(t));
-				vec4 c = mix(spheres[i].color, vec4(1), transparency);
-				result.rays[1].alpha = ray.alpha * c;
-				result.rays[0].alpha = result.rays[0].alpha * c;
+			if (pkt.rays[ridx].inside != -1) {
+				if (pkt.rays[ridx].inside == i) {
+					result[ridx].rays[1].inside = -1;
+					float transparency = pow(spheres[i].color.a, abs(t));
+					vec4 c = mix(spheres[i].color, vec4(1), transparency);
+					result[ridx].rays[1].alpha = pkt.rays[ridx].alpha * c;
+					result[ridx].rays[0].alpha = result[ridx].rays[0].alpha * c;
+				}
+				else {
+					float transparency = pow(spheres[pkt.rays[ridx].inside].color.a, abs(t * 2));
+					vec4 c = mix(spheres[pkt.rays[ridx].inside].color, vec4(1), transparency);
+					result[ridx].rays[0].alpha = result[ridx].rays[0].alpha * c;
+					result[ridx].rays[0].inside = pkt.rays[ridx].inside;
+					result[ridx].color = result[ridx].color * c;
+				}
 			}
+			// entering sphere
+			else if(pkt.rays[ridx].inside == -1 && spheres[i].color.a < 1.0) {
+				result[ridx].rays[1].inside = i;
+				result[ridx].rays[1].alpha = vec4(mix(pkt.rays[ridx].alpha.rgb, spheres[i].color.rgb, spheres[i].material.x), pkt.rays[ridx].alpha.a);
+			}
+			// is outide, stay outside
 			else {
-				float transparency = pow(spheres[ray.inside].color.a, abs(t * 2));
-				vec4 c = mix(spheres[ray.inside].color, vec4(1), transparency);
-				result.rays[0].alpha = result.rays[0].alpha * c;
-				result.rays[0].inside = ray.inside;
-				result.color = result.color * c;
+				;
+			}
+		} else {
+			if(closestHit == 1e38) {
+				// sky color
+				if(lights[6].position.y > 0.0) {
+					result[ridx].color = mix(vec4(0.6, 0.3, 0.2, 1.0), vec4(0.8, 0.8, 1.0, 1.0), sqrt(lights[6].position.y / 100.0)) * pkt.rays[ridx].alpha.a;
+				}
+				else {
+					result[ridx].color = mix(vec4(0.6, 0.3, 0.2, 1.0), vec4(0.0, 0.0, 0.02, 1.0), sqrt(-lights[6].position.y / 100.0)) * pkt.rays[ridx].alpha.a;
+				}
+			}
+			if (pkt.rays[ridx].inside != -1) {
+				float transparency = pow(spheres[pkt.rays[ridx].inside].color.a, spheres[pkt.rays[ridx].inside].radius);
+				vec4 c = mix(spheres[pkt.rays[ridx].inside].color, vec4(1), transparency);
+				result[ridx].color = result[ridx].color * c;
 			}
 		}
-		// entering sphere
-		else if(ray.inside == -1 && spheres[i].color.a < 1.0) {
-			result.rays[1].inside = i;
-			result.rays[1].alpha = vec4(mix(ray.alpha.rgb, spheres[i].color.rgb, spheres[i].material.x), ray.alpha.a);
-		}
-		// is outide, stay outside
-		else {
-			;
-		}
-	} else {
-		if(closestHit == 1e38) {
-			// sky color
-			if(lights[6].position.y > 0.0) {
-				result.color = mix(vec4(0.6, 0.3, 0.2, 1.0), vec4(0.8, 0.8, 1.0, 1.0), sqrt(lights[6].position.y / 100.0)) * ray.alpha.a;
-			}
-			else {
-				result.color = mix(vec4(0.6, 0.3, 0.2, 1.0), vec4(0.0, 0.0, 0.02, 1.0), sqrt(-lights[6].position.y / 100.0)) * ray.alpha.a;
-			}
-		}
-		if (ray.inside != -1) {
-			float transparency = pow(spheres[ray.inside].color.a, spheres[ray.inside].radius);
-			vec4 c = mix(spheres[ray.inside].color, vec4(1), transparency);
-			result.color = result.color * c;
-		}
+		result[ridx].t = closestHit;
 	}
-	result.t = closestHit;
-	return result;
+	return;
 }
 
 void main() {
 	vec2 uvBase;
-	ivec2 storePosBase = ivec2(gl_GlobalInvocationID.xy) * PKTDIM;
-	uvBase.x = (2.0 * float(storePosBase.x) / canvasSize.x - 1.0);
-	uvBase.y = (2.0 * float(storePosBase.y) / canvasSize.y - 1.0);
+	ivec2 screenSpace = ivec2(gl_GlobalInvocationID.xy) * PKTDIM;
+	uvBase.x = (2.0 * float(screenSpace.x) / canvasSize.x - 1.0);
+	uvBase.y = (2.0 * float(screenSpace.y) / canvasSize.y - 1.0);
 	float aspectRatio = canvasSize.x / canvasSize.y;
 	vec4 accumulatedColors[PKTSIZE];
 	for(int i = 0; i < PKTSIZE; i++) {
 		accumulatedColors[i] = vec4(0.0);
 	}
 	RayPacket packets[MAXDEPTH];
-	int top = 0;
+	int stackPtr = 0;
 	for(int x = 0; x < PKTDIM; x++) {
 		for(int y = 0; y < PKTDIM; y++) {
-			int pktIdx = y * PKTDIM + x;
-			vec2 uvOffset = vec2(x,y) * 2.0 / canvasSize.xy;
-			vec2 uv = uvBase + uvOffset;
-			packets[top].rays[pktIdx].origin = vec3(0);
-			packets[top].rays[pktIdx].inside = -1;
+			int ridx = y * PKTDIM + x;
+			vec2 uv = uvBase + vec2(x,y) * 2.0 / canvasSize.xy;
+			packets[stackPtr].rays[ridx].origin = vec3(0);
+			packets[stackPtr].rays[ridx].inside = -1;
 			for(int i = 0; i < numSpheres; i++) {
 				if(length(spheres[i].center) < spheres[i].radius) {
-					packets[top].rays[pktIdx].inside = i;
+					packets[stackPtr].rays[ridx].inside = i;
 				}
 			}
-			packets[top].rays[pktIdx].direction = normalize(vec3(aspectRatio * uv.x, uv.y, -1));
-			packets[top].rays[pktIdx].alpha = vec4(1.0);
+			packets[stackPtr].rays[ridx].direction = normalize(vec3(aspectRatio * uv.x, uv.y, -1));
+			packets[stackPtr].rays[ridx].alpha = vec4(1.0);
+			packets[stackPtr].indices[ridx] = ridx;
 		}
 	}
-	packets[top].nrays = PKTSIZE;
-	top++;
-	while(top-- > 0) {
+	packets[stackPtr].nrays = PKTSIZE;
+	stackPtr++;
+
+	// let the tracing begin
+	while(stackPtr-- > 0) {
 		Result results[PKTSIZE];
-		for(int i = 0; i < PKTSIZE; i++) {
-			if(packets[top].rays[i].alpha.a <= 0.02) {
-				results[i].color = vec4(0.0);
-				results[i].rays[0] = Ray(vec3(0), -1, vec3(0), vec4(0));
-				results[i].rays[1] = Ray(vec3(0), -1, vec3(0), vec4(0));
-			} else {
-				results[i] = trace(packets[top].rays[i]);
-			}
-		}
+		trace(packets[stackPtr], results);
 		RayPacket reflectionPacket;
 		reflectionPacket.nrays = 0;
 		RayPacket refractionPacket;
 		refractionPacket.nrays = 0;
-		for(int i = 0; i < PKTSIZE; i++) {
-			accumulatedColors[i] += results[i].color * packets[top].rays[i].alpha;
-			if(results[i].rays[0].alpha.a > 0.02) {
-				reflectionPacket.rays[i] = results[i].rays[0];
+		for(int j = 0; j < packets[stackPtr].nrays; j++) {
+			int i = packets[stackPtr].indices[j];
+			accumulatedColors[i] += results[j].color * packets[stackPtr].rays[j].alpha;
+			if(results[j].rays[0].alpha.a > 0.02) {
+				reflectionPacket.rays[reflectionPacket.nrays] = results[j].rays[0];
+				reflectionPacket.indices[reflectionPacket.nrays] = i;
 				reflectionPacket.nrays++;
-			} else {
-				reflectionPacket.rays[i] = Ray(vec3(0), -1, vec3(0), vec4(0));
 			}
-			if(results[i].rays[1].alpha.a > 0.02) {
-				refractionPacket.rays[i] = results[i].rays[1];
+			if(results[j].rays[1].alpha.a > 0.02) {
+				refractionPacket.rays[refractionPacket.nrays] = results[j].rays[1];
+				refractionPacket.indices[refractionPacket.nrays] = i;
 				refractionPacket.nrays++;
-			} else {
-				refractionPacket.rays[i] = Ray(vec3(0), -1, vec3(0), vec4(0));
 			}
 		}
-		if(reflectionPacket.nrays > 0 && top < MAXDEPTH) {
-			packets[top++] = reflectionPacket;
+		if(reflectionPacket.nrays > 0 && stackPtr < MAXDEPTH) {
+			packets[stackPtr++] = reflectionPacket;
 		}
-		if(refractionPacket.nrays > 0 && top < MAXDEPTH) {
-			packets[top++] = refractionPacket;
+		if(refractionPacket.nrays > 0 && stackPtr < MAXDEPTH) {
+			packets[stackPtr++] = refractionPacket;
 		}
 	}
 
 	for(int x = 0; x < PKTDIM; x++) {
 		for(int y = 0; y < PKTDIM; y++) {
-			int pktIdx = y * PKTDIM + x;
-			ivec2 storePos = storePosBase + ivec2(x, y);
-			vec4 color = accumulatedColors[pktIdx];
+			int ridx = y * PKTDIM + x;
+			ivec2 storePos = screenSpace + ivec2(x, y);
+			vec4 color = accumulatedColors[ridx];
 			color.r = tanh(color.r);
 			color.g = tanh(color.g);
 			color.b = tanh(color.b);
