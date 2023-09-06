@@ -297,17 +297,18 @@ bool rayAABB(vec3 O, vec3 rDinv, vec3 bmin, vec3 bmax) {
 }
 
 bool planeAABB(vec3 bmin, vec3 bmax, vec4 plane) {
-	vec3 selector = step(vec3(0.0), plane.xyz); // step returns 0 if x < edge or 1 otherwise
-	vec3 pVertex = mix(bmin, bmax, selector);   // mix blends between two vectors based on the selector
-	return dot(pVertex, plane.xyz) + plane.a >= 0.0;
+	vec3 selector = step(vec3(0.0), plane.xyz);
+	vec3 positive_vertex = mix(bmin, bmax, selector);
+	return dot(positive_vertex, plane.xyz) + plane.a >= 0.0;
 }
 
+// false if completely outside, true otherwise
 bool frustumAABB(vec3 bmin, vec3 bmax, vec4 frustum[6]) {
 	bool result = true;
 	for(int i = 0; i < 6; ++i) {
 		result = result && planeAABB(bmin, bmax, frustum[i]);
 	}
-	return !result;
+	return result;
 }
 
 vec4 computePlane(vec3 a, vec3 b, vec3 c) {
@@ -316,56 +317,71 @@ vec4 computePlane(vec3 a, vec3 b, vec3 c) {
 	return vec4(normal, d);
 }
 
-void computeRayPacketFrustum(RayPacket packet, out vec4 frustum[6]) {	
-	vec3 bminOrigin = vec3(1e38);
-	vec3 bmaxOrigin = vec3(-1e38);
-	vec3 bminDirection = vec3(1e38);
-	vec3 bmaxDirection = vec3(-1e38);
-	for(int i = 0; i < packet.nrays; ++i) {
-		bminOrigin = min(bminOrigin, packet.rays[i].origin);
-		bmaxOrigin = max(bmaxOrigin, packet.rays[i].origin);
-		vec3 endpoint = packet.rays[i].origin + 1e38 * packet.rays[i].direction;
-		bminDirection = min(bminDirection, endpoint);
-		bmaxDirection = max(bmaxDirection, endpoint);
-	}
-	vec3 nearCorners[8] = {
-		bminOrigin,
-		vec3(bmaxOrigin.x, bminOrigin.y, bminOrigin.z),
-		vec3(bminOrigin.x, bmaxOrigin.y, bminOrigin.z),
-		vec3(bminOrigin.x, bminOrigin.y, bmaxOrigin.z),
-		vec3(bminOrigin.x, bmaxOrigin.y, bmaxOrigin.z),
-		vec3(bmaxOrigin.x, bminOrigin.y, bmaxOrigin.z),
-		vec3(bmaxOrigin.x, bmaxOrigin.y, bminOrigin.z),
-		bmaxOrigin
-	};
-	vec3 farCorners[8] = {
-		bminDirection,
-		vec3(bmaxDirection.x, bminDirection.y, bminDirection.z),
-		vec3(bminDirection.x, bmaxDirection.y, bminDirection.z),
-		vec3(bminDirection.x, bminDirection.y, bmaxDirection.z),
-		vec3(bminDirection.x, bmaxDirection.y, bmaxDirection.z),
-		vec3(bmaxDirection.x, bminDirection.y, bmaxDirection.z),
-		vec3(bmaxDirection.x, bmaxDirection.y, bminDirection.z),
-		bmaxDirection
-	};
-	frustum[0] = computePlane(nearCorners[0], nearCorners[1], farCorners[1]);
-	frustum[1] = computePlane(farCorners[7], farCorners[6], nearCorners[6]);
-	frustum[2] = computePlane(nearCorners[0], nearCorners[3], farCorners[3]);
-	frustum[3] = computePlane(farCorners[7], farCorners[5], nearCorners[5]);
-	frustum[4] = computePlane(nearCorners[0], nearCorners[2], farCorners[2]);
-	frustum[5] = computePlane(farCorners[7], farCorners[4], nearCorners[4]);
+void computeRayPacketFrustum(RayPacket packet, float maxDist, vec4 frustum[6]) {
+    vec3 nearMin = vec3(1e38);
+    vec3 nearMax = vec3(-1e38);
+    vec3 farMin = vec3(1e38);
+    vec3 farMax = vec3(-1e38);
+    for(int i = 0; i < packet.nrays; ++i) {
+        nearMin = min(nearMin, packet.rays[i].origin);
+        nearMax = max(nearMax, packet.rays[i].origin);
+        vec3 endpoint = packet.rays[i].origin + maxDist * packet.rays[i].direction;
+        farMin = min(farMin, endpoint);
+        farMax = max(farMax, endpoint);
+    }
+    vec3 nearCenter = (nearMin + nearMax) * 0.5;
+    vec3 farCenter = (farMin + farMax) * 0.5;
+    vec3 direction = normalize(farCenter - nearCenter);
+    // ray directions are points on a unit circle
+	// which ones are furthest from the center direction?
+    float minYaw = 1e38;
+    float maxYaw = -1e38;
+    float minPitch = 1e38;
+    float maxPitch = -1e38;
+    vec3 maxPitchDir, minPitchDir, maxYawDir, minYawDir;
+    for (int i = 0; i < packet.nrays; ++i) {
+        vec3 dir = packet.rays[i].direction;
+        float yaw = atan(dir.y, dir.x);
+        float pitch = asin(dir.z);
+        if (yaw < minYaw) {
+            minYaw = yaw;
+            minYawDir = dir;
+        }
+        if (yaw > maxYaw) {
+            maxYaw = yaw;
+            maxYawDir = dir;
+        }
+        if (pitch < minPitch) {
+            minPitch = pitch;
+            minPitchDir = dir;
+        }
+        if (pitch > maxPitch) {
+            maxPitch = pitch;
+            maxPitchDir = dir;
+        }
+    }
+	vec3 rightYaw = cross(direction, maxPitchDir);
+	vec3 leftYaw = cross(direction, minPitchDir);
+	vec3 upPitch = cross(direction, maxYawDir);
+	vec3 downPitch = cross(direction, minYawDir);
+	frustum[0] = vec4(-direction, -dot(-direction, nearCenter));  // Near
+	frustum[1] = vec4(direction, -dot(direction, farCenter));     // Far
+	frustum[2] = vec4(-rightYaw, -dot(-rightYaw, nearCenter));   // Left
+	frustum[3] = vec4(rightYaw, -dot(rightYaw, nearCenter));     // Right
+	frustum[4] = vec4(upPitch, -dot(upPitch, nearCenter));       // Top
+	frustum[5] = vec4(-downPitch, -dot(-downPitch, nearCenter)); // Bottom
 }
 
-void traverseBVHPacket(RayPacket packet, inout int hitIdx[PKTSIZE], inout float closestHit[PKTSIZE]) {
+void traverseBVHPacket(RayPacket packet, float maxDist, inout int hitIdx[PKTSIZE], inout float closestHit[PKTSIZE]) {
 	uint stack[32];
 	uint stackPtr = 0;
 	stack[stackPtr++] = 0;
 	vec4 frustum[6];
-	computeRayPacketFrustum(packet, frustum);
+	computeRayPacketFrustum(packet, maxDist, frustum);
 	while (stackPtr > 0) {
 		uint nodeIdx = stack[--stackPtr];
 		BVHNode node = nodes[nodeIdx];
-		if (frustumAABB(node.bmin, node.bmax, frustum)) {
+		if(frustumAABB(node.bmin, node.bmax, frustum)) {
 			if (node.count == 1) {
 				int i = int(node.leftFirst);
 				for (int r = 0; r < packet.nrays; ++r) {
@@ -450,7 +466,7 @@ void trace(RayPacket pkt, out Result result[PKTSIZE]) {
 	}
 
 	// primary/secondary rays
-	traverseBVHPacket(pkt, hitIdx, closestHit);
+	traverseBVHPacket(pkt, 1e20, hitIdx, closestHit);
 
 	//for(int ridx = 0; ridx < pkt.nrays; ridx++){
 	//	traverseBVH(pkt.rays[ridx], hitIdx[ridx], closestHit[ridx]);
