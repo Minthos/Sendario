@@ -207,7 +207,7 @@ const int WORKGROUP_SIZE = 8;
 const GLchar* computeShaderSrc = R"(
 #version 430
 
-layout(local_size_x = 8, local_size_y = 8) in;
+layout(local_size_x = 2, local_size_y = 2) in;
 layout(rgba32f, location = 0) writeonly uniform image2D destTex;
 uniform vec2 canvasSize;
 uniform int numSpheres;
@@ -215,8 +215,8 @@ uniform int numLights;
 uniform int maxDepth;
 
 const int MAXDEPTH = 6;
-const int PKTDIM = 1;
-const int PKTSIZE = 1;
+const int PKTDIM = 4;
+const int PKTSIZE = 16;
 
 struct Sphere {
 	vec3 center;
@@ -317,6 +317,74 @@ vec4 computePlane(vec3 a, vec3 b, vec3 c) {
 	return vec4(normal, d);
 }
 
+// it works
+void computeRayPacketFrustumMaybeFasterNotSure(RayPacket packet, float maxDist, vec4 frustum[6]) {
+    vec3 nearMin = vec3(1e38);
+    vec3 nearMax = vec3(-1e38);
+    vec3 farMin = vec3(1e38);
+    vec3 farMax = vec3(-1e38);
+    for(int i = 0; i < packet.nrays; ++i) {
+        nearMin = min(nearMin, packet.rays[i].origin);
+        nearMax = max(nearMax, packet.rays[i].origin);
+        vec3 endpoint = packet.rays[i].origin + maxDist * packet.rays[i].direction;
+        farMin = min(farMin, endpoint);
+        farMax = max(farMax, endpoint);
+    }
+    vec3 nearCenter = (nearMin + nearMax) * 0.5;
+    vec3 farCenter = (farMin + farMax) * 0.5;
+    vec3 direction = normalize(farCenter - nearCenter);
+    // ray directions are points on a unit circle
+	// which ones are furthest from the center direction?
+    int majorAxis = 0;
+    float maxMag = abs(direction.x);
+    if (abs(direction.y) > maxMag) {
+        majorAxis = 1;
+        maxMag = abs(direction.y);
+    }
+    if (abs(direction.z) > maxMag) {
+        majorAxis = 2;
+    }
+	vec3 minYaw = vec3(1e38);
+    vec3 maxYaw = vec3(-1e38);
+    vec3 minPitch = vec3(1e38);
+    vec3 maxPitch = vec3(-1e38);
+    for (int i = 0; i < packet.nrays; ++i) {
+        vec3 dir = packet.rays[i].direction;
+        switch (majorAxis) {
+            case 0:  // X is the forward direction
+                if (dir.y < minYaw.y) minYaw = dir;
+                if (dir.y > maxYaw.y) maxYaw = dir;
+                if (dir.z < minPitch.z) minPitch = dir;
+                if (dir.z > maxPitch.z) maxPitch = dir;
+                break;
+            case 1:  // Y is the forward direction
+                if (dir.x < minYaw.x) minYaw = dir;
+                if (dir.x > maxYaw.x) maxYaw = dir;
+                if (dir.z < minPitch.z) minPitch = dir;
+                if (dir.z > maxPitch.z) maxPitch = dir;
+                break;
+            case 2:  // Z is the forward direction
+                if (dir.x < minYaw.x) minYaw = dir;
+                if (dir.x > maxYaw.x) maxYaw = dir;
+                if (dir.y < minPitch.y) minPitch = dir;
+                if (dir.y > maxPitch.y) maxPitch = dir;
+                break;
+        }
+    }
+
+	vec3 rightYaw = maxYaw;
+	vec3 leftYaw = minYaw;
+	vec3 upPitch = maxPitch;
+	vec3 downPitch = minPitch;
+	frustum[0] = vec4(-direction, -dot(-direction, nearCenter));  // Near
+	frustum[1] = vec4(direction, -dot(direction, farCenter));     // Far
+	frustum[2] = vec4(-rightYaw, -dot(-rightYaw, nearCenter));   // Left
+	frustum[3] = vec4(rightYaw, -dot(rightYaw, nearCenter));     // Right
+	frustum[4] = vec4(upPitch, -dot(upPitch, nearCenter));       // Top
+	frustum[5] = vec4(-downPitch, -dot(-downPitch, nearCenter)); // Bottom
+}
+
+// it also works
 void computeRayPacketFrustum(RayPacket packet, float maxDist, vec4 frustum[6]) {
     vec3 nearMin = vec3(1e38);
     vec3 nearMax = vec3(-1e38);
