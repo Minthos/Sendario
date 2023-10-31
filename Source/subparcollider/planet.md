@@ -1,14 +1,8 @@
 
-1. Generate the fucking data
+Tile-based LOD system for planet rendering
 
-
-
-2. Render it
-
-
-
-3. Cerebrate
-
+when zoomed far out, geometry at rest can be merged with the planet's static geometry
+the same with geometry that's occluded by terrain
 
 
 
@@ -76,8 +70,11 @@ energy
 education
 culture
 
-bigger factories produce stuff faster, thus gaining xp faster and can reach higher levels of productivity (cost reduction)
-smaller factories are cheaper and faster to retool
+bigger factories produce stuff faster, thus gaining xp faster and reaching better economies of scale (cost reductions
+via lower defect rate, less material waste, higher throughput)
+* 0.5 defect rate, 0.8 waste, 1.2 throughput per level? initially 1% defect rate and 20% material waste?
+
+smaller factories can retool cheaper and faster
 
 
 npc faction:
