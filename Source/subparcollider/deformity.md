@@ -3,7 +3,7 @@ A ship should be treated as a single physics object, but it can have multiple hi
 
 When an impact is detected a stress analysis should be done to determine where the ship deforms as a result. It's not necessarily in the location that's hit. Especially if the hit point is a wheel or other movable part.
 
-"Boxoid" is not the best geometric object. I like the idea of parametric geometry but I want something slightly more flexible and generic.
+"Boxoid" is not the best geometric object. I like the idea of parametric geometry but I want something slightly more powerful.
 
 Beam:
  rod (different cross section profiles)
@@ -17,6 +17,14 @@ Round:
  cylinder (straight/conical/bezier)
  sphere (perfect/oblate)
  dome (perfect/oblate)
+
+Joint:
+ rigid (weld, etc)
+ rotating axis-constrained (limited or unlimited range of movement)
+ rotating unconstrained (limited or unlimited range of movement)
+ sliding (limited range of movement)
+ rail (configurable angles of allowed departure)
+ tethered (limited range of movement)
 
 Parametric objects should have material properties.
 
@@ -35,11 +43,7 @@ levels of deformity:
 deformation progresses incrementally, force is diminished for each step
 objects must be able to be in a state of tension from one physics tick to the next
 
-
-
 a relatively simple proof of concept would be a spaceship made of several components getting hit by kinetic impacts from random directions and random mass/velocity and colliding with terrain at different velocities and gravities
-
-
 
 
 
