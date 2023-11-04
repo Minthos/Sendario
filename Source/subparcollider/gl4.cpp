@@ -14,7 +14,7 @@ auto now = std::chrono::high_resolution_clock::now;
 
 int winW = 1920;
 int winH = 1080;
-float canvasScale = 0.25;
+float canvasScale = 0.5;
 int canvasW = winW * canvasScale;
 int canvasH = winH * canvasScale;
 unsigned int frameCount = 0;
@@ -197,7 +197,8 @@ const int MAXDEPTH = 3;
 float maxDepth = MAXDEPTH;
 int numSpheres = 54;
 Sphere* spheres = (Sphere*)malloc(sizeof(Sphere) * numSpheres);
-int numLights = 7;
+//int numLights = 7;
+int numLights = 2;
 Light* lights = (Light*)malloc(sizeof(Light) * numLights);
 
 const int WORKGROUP_SIZE = 8;
@@ -412,11 +413,11 @@ Result trace(Ray ray) {
 	} else {
 		if(closestHit == 1e38) {
 			// sky color
-			if(lights[6].position.y > 0.0) {
-				result.color = mix(vec4(0.6, 0.3, 0.2, 1.0), vec4(0.8, 0.8, 1.0, 1.0), sqrt(lights[6].position.y / 100.0)) * ray.alpha.a;
+			if(lights[0].position.y > 0.0) {
+				result.color = mix(vec4(0.6, 0.3, 0.2, 1.0), vec4(0.8, 0.8, 1.0, 1.0), sqrt(lights[0].position.y / 100.0)) * ray.alpha.a;
 			}
 			else {
-				result.color = mix(vec4(0.6, 0.3, 0.2, 1.0), vec4(0.0, 0.0, 0.02, 1.0), sqrt(-lights[6].position.y / 100.0)) * ray.alpha.a;
+				result.color = mix(vec4(0.6, 0.3, 0.2, 1.0), vec4(0.0, 0.0, 0.02, 1.0), sqrt(-lights[0].position.y / 100.0)) * ray.alpha.a;
 			}
 		}
 		if (ray.inside != -1) {
@@ -618,16 +619,16 @@ void updateLights() {
 		lights[i].radius = 0.05f;
 		lights[i].position = glm::vec3(1.2f * (i % 3) * sin(time / (i + 1)), 1.0f + 0.9f * sin(time + i), -1.5f + 1.0f * cos(time + i));
 	}
-	lights[0].color = glm::vec3(0.3f, 0.3f, 2.0f);
+	lights[0].color = glm::vec3(100.0f, 90.0f, 80.0f);
+	lights[0].position = glm::vec3(100.0f * sin(time / 5.0), 100.0f * cos(time / 5.0), 0.0f);
+	lights[0].radius = 5.0f;
 	lights[1].color = glm::vec3(0.3f, 2.0f, 0.3f);
+    /*
 	lights[2].color = glm::vec3(0.3f, 0.3f, 2.0f);
 	lights[3].color = glm::vec3(2.0f, 0.3f, 0.3f);
 	lights[4].color = glm::vec3(0.3f, 2.0f, 0.3f);
 	lights[5].color = glm::vec3(2.0f, 0.3f, 0.3f);
-	lights[6].color = glm::vec3(100.0f, 90.0f, 80.0f);
-	//lights[6].position = glm::vec3(100.0f * sin(time / 5.0), 100.0f * abs(cos(time / 5.0)), 0.0f);
-	lights[6].position = glm::vec3(100.0f * sin(time / 5.0), 100.0f * cos(time / 5.0), 0.0f);
-	lights[6].radius = 5.0f;
+	lights[6].color = glm::vec3(0.3f, 0.3f, 2.0f);*/
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightBuffer);
 	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Light) * numLights, lights, GL_STATIC_DRAW);
 }
