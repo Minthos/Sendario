@@ -1,3 +1,18 @@
+# Should do
+
+* LMDB instead of codable for saving game state to disk and c++ instead of swift (big undertaking, not worth it)
+* A better object system than the boxoid/composite mess
+ - polygon meshes
+ - hierarchical composition with unlimited depth: objects combine into objects
+ - automatic generation of decimated surface geometry for LOD
+ - rigid body and soft body physics, skeletal physics system with joints, springs, motors etc
+* start designing a terrain system and game logic, ignore rendering
+* crafting system with 1st person controls and snap to grid (0.5x0.5x0.5m default)
+ - grid is not locked to terrain grid
+* bytecode script (struct with enum + payload) for giving objects behavior
+* semi-opaque horizontal plane with grid lines position the cursor vertically. moves up and down with keyboard shortcuts or mouse wheel.
+
+
 # To do
 ## Near term TODO:
 
@@ -134,5 +149,12 @@ adds so much "free" gameplay and emotional attachment to the game world.
 ## So in conclusion..
 
 I think realistically I should go back to UE and take the time to learn UE properly. Devote maybe a week to just watching and doing UE tutorials. Blender too I guess, at least enough to make some basic meshes. And that means Windows. And that means I can only do it when I get home. Until then I suppose I should continue with what I have.
+
+## No, fuck that.
+
+I looked some more at UE and while it's nice it's too focused on serving AAA use cases so I'll always be doing things in a nonstandard way if I use it.
+Instead I need to write my own object system. Graphics is really not important but I want a good crafting system and a physics engine that's focused on making crafting and combat fun and high performance. 50k fleet battles should not bring the server to its knees.
+
+I will not have performance to throw away on ray tracing and I will turn on opengl's occlusion culling.
 
 
