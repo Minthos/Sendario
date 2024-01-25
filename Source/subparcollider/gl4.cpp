@@ -207,16 +207,16 @@ const int WORKGROUP_SIZE = 8;
 const GLchar* computeShaderSrc = R"(
 #version 430
 
-layout(local_size_x = 2, local_size_y = 2) in;
+layout(local_size_x = 8, local_size_y = 8) in;
 layout(rgba32f, location = 0) writeonly uniform image2D destTex;
 uniform vec2 canvasSize;
 uniform int numSpheres;
 uniform int numLights;
 uniform int maxDepth;
 
-const int MAXDEPTH = 6;
-const int PKTDIM = 4;
-const int PKTSIZE = 16;
+const int MAXDEPTH = 3;
+const int PKTDIM = 1;
+const int PKTSIZE = 1;
 
 struct Sphere {
 	vec3 center;
@@ -252,6 +252,19 @@ layout(std430, binding = 2) buffer TLASBuffer {
 	BVHNode nodes[];
 };
 
+vec3 reflect(vec3 L, vec3 N) {
+	return L - 2.0 * dot(L, N) * N;
+}
+
+vec3 refract(vec3 L, vec3 N, float n1, float n2) {
+	float r = n1 / n2;
+	float cosI = -dot(N, L);
+	float sinT2 = r * r * (1.0 - cosI * cosI);
+	if (sinT2 > 1.0) return vec3(0.0);  // Total internal reflection
+	float cosT = sqrt(1.0 - sinT2);
+	return r * L + (r * cosI - cosT) * N;
+}
+
 struct Ray {
 	vec3 origin;
 	int inside;
@@ -263,6 +276,11 @@ struct RayPacket {
 	Ray rays[PKTSIZE];
 	int indices[PKTSIZE];
 	int nrays;
+};
+
+struct HitInfo {
+	int ray;
+	int obj;
 };
 
 struct Result {
@@ -302,7 +320,6 @@ bool planeAABB(vec3 bmin, vec3 bmax, vec4 plane) {
 	return dot(positive_vertex, plane.xyz) + plane.a >= 0.0;
 }
 
-// false if completely outside, true otherwise
 bool frustumAABB(vec3 bmin, vec3 bmax, vec4 frustum[6]) {
 	bool result = true;
 	for(int i = 0; i < 6; ++i) {
@@ -311,80 +328,6 @@ bool frustumAABB(vec3 bmin, vec3 bmax, vec4 frustum[6]) {
 	return result;
 }
 
-vec4 computePlane(vec3 a, vec3 b, vec3 c) {
-	vec3 normal = normalize(cross(b - a, c - a));
-	float d = 0 - dot(normal, a);
-	return vec4(normal, d);
-}
-
-// it works
-void computeRayPacketFrustumMaybeFasterNotSure(RayPacket packet, float maxDist, vec4 frustum[6]) {
-    vec3 nearMin = vec3(1e38);
-    vec3 nearMax = vec3(-1e38);
-    vec3 farMin = vec3(1e38);
-    vec3 farMax = vec3(-1e38);
-    for(int i = 0; i < packet.nrays; ++i) {
-        nearMin = min(nearMin, packet.rays[i].origin);
-        nearMax = max(nearMax, packet.rays[i].origin);
-        vec3 endpoint = packet.rays[i].origin + maxDist * packet.rays[i].direction;
-        farMin = min(farMin, endpoint);
-        farMax = max(farMax, endpoint);
-    }
-    vec3 nearCenter = (nearMin + nearMax) * 0.5;
-    vec3 farCenter = (farMin + farMax) * 0.5;
-    vec3 direction = normalize(farCenter - nearCenter);
-    // ray directions are points on a unit circle
-	// which ones are furthest from the center direction?
-    int majorAxis = 0;
-    float maxMag = abs(direction.x);
-    if (abs(direction.y) > maxMag) {
-        majorAxis = 1;
-        maxMag = abs(direction.y);
-    }
-    if (abs(direction.z) > maxMag) {
-        majorAxis = 2;
-    }
-	vec3 minYaw = vec3(1e38);
-    vec3 maxYaw = vec3(-1e38);
-    vec3 minPitch = vec3(1e38);
-    vec3 maxPitch = vec3(-1e38);
-    for (int i = 0; i < packet.nrays; ++i) {
-        vec3 dir = packet.rays[i].direction;
-        switch (majorAxis) {
-            case 0:  // X is the forward direction
-                if (dir.y < minYaw.y) minYaw = dir;
-                if (dir.y > maxYaw.y) maxYaw = dir;
-                if (dir.z < minPitch.z) minPitch = dir;
-                if (dir.z > maxPitch.z) maxPitch = dir;
-                break;
-            case 1:  // Y is the forward direction
-                if (dir.x < minYaw.x) minYaw = dir;
-                if (dir.x > maxYaw.x) maxYaw = dir;
-                if (dir.z < minPitch.z) minPitch = dir;
-                if (dir.z > maxPitch.z) maxPitch = dir;
-                break;
-            case 2:  // Z is the forward direction
-                if (dir.x < minYaw.x) minYaw = dir;
-                if (dir.x > maxYaw.x) maxYaw = dir;
-                if (dir.y < minPitch.y) minPitch = dir;
-                if (dir.y > maxPitch.y) maxPitch = dir;
-                break;
-        }
-    }
-
-	vec3 rightYaw = maxYaw;
-	vec3 leftYaw = minYaw;
-	vec3 upPitch = maxPitch;
-	vec3 downPitch = minPitch;
-	frustum[0] = vec4(-direction, -dot(-direction, nearCenter));  // Near
-	frustum[1] = vec4(direction, -dot(direction, farCenter));     // Far
-	frustum[2] = vec4(-rightYaw, -dot(-rightYaw, nearCenter));   // Left
-	frustum[3] = vec4(rightYaw, -dot(rightYaw, nearCenter));     // Right
-	frustum[4] = vec4(upPitch, -dot(upPitch, nearCenter));       // Top
-	frustum[5] = vec4(-downPitch, -dot(-downPitch, nearCenter)); // Bottom
-}
-
-// it also works
 void computeRayPacketFrustum(RayPacket packet, float maxDist, vec4 frustum[6]) {
     vec3 nearMin = vec3(1e38);
     vec3 nearMax = vec3(-1e38);
@@ -440,37 +383,6 @@ void computeRayPacketFrustum(RayPacket packet, float maxDist, vec4 frustum[6]) {
 	frustum[5] = vec4(-downPitch, -dot(-downPitch, nearCenter)); // Bottom
 }
 
-void traverseBVHPacket(RayPacket packet, float maxDist, inout int hitIdx[PKTSIZE], inout float closestHit[PKTSIZE]) {
-	uint stack[32];
-	uint stackPtr = 0;
-	stack[stackPtr++] = 0;
-	vec4 frustum[6];
-	computeRayPacketFrustum(packet, maxDist, frustum);
-	while (stackPtr > 0) {
-		uint nodeIdx = stack[--stackPtr];
-		BVHNode node = nodes[nodeIdx];
-		if(frustumAABB(node.bmin, node.bmax, frustum)) {
-			if (node.count == 1) {
-				int i = int(node.leftFirst);
-				for (int r = 0; r < packet.nrays; ++r) {
-					Ray ray = packet.rays[r];
-					vec3 rD = vec3(1) / ray.direction;
-					if (rayAABB(ray.origin, rD, node.bmin, node.bmax)) {
-						float t = raySphere(ray, spheres[i].center, spheres[i].radius);
-						if (t > 0 && t < closestHit[r]) {
-							hitIdx[r] = i;
-							closestHit[r] = t;
-						}
-					}
-				}
-			} else {
-				stack[stackPtr++] = node.leftFirst;
-				stack[stackPtr++] = node.leftFirst + 1;
-			}
-		}
-	}
-}
-
 void traverseBVH(Ray ray, inout int hitIdx, inout float closestHit) {
 	uint stack[32];
 	uint stackPtr = 0;
@@ -495,17 +407,38 @@ void traverseBVH(Ray ray, inout int hitIdx, inout float closestHit) {
 	}
 }
 
-vec3 reflect(vec3 L, vec3 N) {
-	return L - 2.0 * dot(L, N) * N;
-}
-
-vec3 refract(vec3 L, vec3 N, float n1, float n2) {
-	float r = n1 / n2;
-	float cosI = -dot(N, L);
-	float sinT2 = r * r * (1.0 - cosI * cosI);
-	if (sinT2 > 1.0) return vec3(0.0);  // Total internal reflection
-	float cosT = sqrt(1.0 - sinT2);
-	return r * L + (r * cosI - cosT) * N;
+float traverseBVHPacket(RayPacket packet, float maxDist, inout int hitIdx[PKTSIZE], inout float closestHit[PKTSIZE]) {
+	float globalClosestHit = 1e38;
+	vec4 frustum[6];
+	computeRayPacketFrustum(packet, maxDist, frustum);
+	uint stack[32];
+	uint stackPtr = 0;
+	stack[stackPtr++] = 0;
+	while (stackPtr > 0) {
+		uint nodeIdx = stack[--stackPtr];
+		BVHNode node = nodes[nodeIdx];
+		if(frustumAABB(node.bmin, node.bmax, frustum)) {
+			if (node.count == 1) {
+				int i = int(node.leftFirst);
+				for (int r = 0; r < packet.nrays; ++r) {
+					Ray ray = packet.rays[r];
+					vec3 rD = vec3(1) / ray.direction;
+					if (rayAABB(ray.origin, rD, node.bmin, node.bmax)) {
+						float t = raySphere(ray, spheres[i].center, spheres[i].radius);
+						if (t > 0 && t < closestHit[r]) {
+							hitIdx[r] = i;
+							closestHit[r] = t;
+							globalClosestHit = min(globalClosestHit, t);
+						}
+					}
+				}
+			} else {
+				stack[stackPtr++] = node.leftFirst;
+				stack[stackPtr++] = node.leftFirst + 1;
+			}
+		}
+	}
+	return globalClosestHit;
 }
 
 void trace(RayPacket pkt, out Result result[PKTSIZE]) {
@@ -534,11 +467,10 @@ void trace(RayPacket pkt, out Result result[PKTSIZE]) {
 	}
 
 	// primary/secondary rays
-	traverseBVHPacket(pkt, 1e20, hitIdx, closestHit);
-
-	//for(int ridx = 0; ridx < pkt.nrays; ridx++){
-	//	traverseBVH(pkt.rays[ridx], hitIdx[ridx], closestHit[ridx]);
-	//}
+	traverseBVH(pkt.rays[0], hitIdx[0], closestHit[0]);
+	// giving up on ray packets for now. it was fun to experiment with but the slowdown of using more memory is painful.
+	// added compliexity for uncertain benefit.
+	//traverseBVHPacket(pkt, 1e38, hitIdx, closestHit);
 
 	for(int ridx = 0; ridx < pkt.nrays; ridx++){
 		if(hitIdx[ridx] >= 0) {
@@ -1026,6 +958,8 @@ void idle() {
 		auto timeBeforeSleep = now();
 		usleep(frameTimeLimit - frameDuration);
 		idleTime += std::chrono::duration_cast<std::chrono::microseconds>(now() - timeBeforeSleep).count();
+	} else {
+		usleep(1000.0);
 	}
 	if(frameDuration > 100.0 * frameTimeLimit) {
 		maxDepth = 1;
