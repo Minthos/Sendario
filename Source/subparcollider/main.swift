@@ -588,4 +588,15 @@ Ultraviolet: About 7.1% of the sun's total power output, or approximately 2.72 x
 X-rays: The sun's X-ray flux is highly variable and depends on solar activity, but it's estimated to be around 10^-6 W/m^2 during a solar flare. Over the entire surface of the sun, this would be about 10^20 W, which is still many orders of magnitude less than the total power output.
 
 Gamma rays: The sun produces essentially no gamma rays, because the temperatures in the sun's core are not high enough to support the nuclear reactions that produce gamma rays.
+
+
+wide spectrum rendering:
+radio: yellow
+microwave: orange
+infrared: red
+visible light: greyscale
+ultraviolet: purple
+x-ray: blue
+gamma: green
+
 */
