@@ -14,11 +14,11 @@ auto now = std::chrono::high_resolution_clock::now;
 
 int winW = 1920;
 int winH = 1080;
-float canvasScale = 0.33;
-int canvasW = 480;
-int canvasH = 240;
-//int canvasW = winW * canvasScale;
-//int canvasH = winH * canvasScale;
+float canvasScale = 1.00;
+//int canvasW = 480;
+//int canvasH = 240;
+int canvasW = winW * canvasScale;
+int canvasH = winH * canvasScale;
 unsigned int frameCount = 0;
 auto startTime = now();
 auto tZero = now();
@@ -113,7 +113,8 @@ AABB calculateBounds(Sphere* p, MortonPrimitive* mortonPrims, GLuint first, GLui
 GLuint findSplit(MortonPrimitive* mortonPrims, GLuint first, GLuint last) {
 	GLuint firstCode = mortonPrims[first].mortonCode;
 	GLuint lastCode = mortonPrims[last].mortonCode;
-	if (firstCode == lastCode) return (first + last) >> 1;
+	//if (firstCode == lastCode)
+        return (first + last) >> 1;
 	GLuint commonPrefix = __builtin_clz(firstCode ^ lastCode);
 	GLuint split = first;
 	for (GLuint i = first + 1; i < last; ++i) {
@@ -923,10 +924,10 @@ void reshape(int width, int height) {
 	winW = width;
 	winH = height;
 	glViewport(0, 0, width, height);
-//	canvasW = winW * canvasScale;
-//	canvasH = winH * canvasScale;
-	canvasH = std::min(240, height);
-	canvasW = canvasH * (float)winW / (float)winH;
+	canvasW = winW * canvasScale;
+	canvasH = winH * canvasScale;
+//	canvasH = std::min(240, height);
+//	canvasW = canvasH * (float)winW / (float)winH;
 	canvasW = (canvasW / WORKGROUP_SIZE) * WORKGROUP_SIZE;
 	canvasH = (canvasH / WORKGROUP_SIZE) * WORKGROUP_SIZE;
 	resizeTexture(outputTexture, canvasW, canvasH);
@@ -961,11 +962,11 @@ void idle() {
 	} else {
 		usleep(1000.0);
 	}
-	if(frameDuration > 100.0 * frameTimeLimit) {
-		maxDepth = 1;
-		canvasScale = 0.1;
-		reshape(winW, winH);
-	}
+//	if(frameDuration > 100.0 * frameTimeLimit) {
+//		maxDepth = 1;
+//		canvasScale = 0.1;
+//		reshape(winW, winH);
+//	}
 /*	
 	if((frameDuration / frameTimeLimit) > 0.5) {
 		fps_strikes++;
