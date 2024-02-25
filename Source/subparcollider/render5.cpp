@@ -308,6 +308,7 @@ typedef struct {
 SharedData sharedData;
 SharedData* sd;
 
+
 struct BufferObject {
 	GLuint VAO;
 	GLuint VBO;
@@ -1320,15 +1321,11 @@ void *rendererThread(void *arg) {
 // submit a composite to the 3d engine to prepare it for rendering
 extern "C" Objref submitComposite(Composite c) {
 	pthread_mutex_lock(&sharedData.mutex);
-	// don't run out of buffer space
 	if(sd->ncro == 0) {
-		sd->cro = (CompositeRenderObject*)malloc(64 * sizeof(CompositeRenderObject));
-	} else if ((sd->ncro % 64) == 0) {
-		CompositeRenderObject* biggerBuffer = (CompositeRenderObject*)malloc((sd->ncro + 64) * sizeof(CompositeRenderObject));
-		memcpy(biggerBuffer, sd->cro, sd->ncro);
-		free(sd->cro);
-		sd->cro = biggerBuffer;
+		sd->cro = (CompositeRenderObject*)malloc(1024 * 1024 * sizeof(CompositeRenderObject));
 	}
+	// make bigger when necessary
+	assert(sd->ncro < 1024 * 1024);
 	// create CompositeRenderObject
 	sd->cro[sd->ncro] = CompositeRenderObject(c, NULL);
 	Objref oref = Objref();

@@ -226,7 +226,7 @@ func main() {
 	{
 		for i in 0 ..< 250 {
 			var ent = Entity(name: String(format: "ent%d", i), SphericalCow(id: 6 + Int64(i),
-				 position: Vector(earth.moo.position.x + Double.random(in: -50.0 ..< 50.0), earth.moo.position.y + Double.random(in: -50.0 ..< 50.0), earth.moo.position.z + earth.moo.radius + Double.random(in: 1.0 ..< 20.0)),
+				 position: Vector(earth.moo.position.x + Double.random(in: -50.0 ..< 50.0), earth.moo.position.y + Double.random(in: -50.0 ..< 50.0), earth.moo.position.z + earth.moo.radius + Double.random(in: 1.0 ..< 2.0)),
 				 velocity: Vector(earth.moo.velocity.x, earth.moo.velocity.y + 0, earth.moo.velocity.z),
 				 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
 				 spin: Vector(0.1, 0.0, 0.0),
