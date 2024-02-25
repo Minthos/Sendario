@@ -3,7 +3,7 @@ import Foundation
 struct BoxoidCod: Codable {
 	var corners: [Vector]
 	var curvature: [Float]
-	var material_idx: Int = 0 // placeholder
+	var material_idx: Int = 4
 	var missing_faces: UInt = 0
 	var bbox: BBox
 

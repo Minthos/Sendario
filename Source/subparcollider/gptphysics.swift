@@ -274,8 +274,8 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 					for l in 0..<object2.sec.count {
 						let (distance2, closingSpeed2) = collisionTest(object1.sec[k].moo, object2.sec[l].moo)
 						if closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
-							print("ent-ent collision \(t): \(distance2) \(closingSpeed2) dt: \(dt)")
-							print("object1 section radius: \(object1.sec[k].moo.radius) object2 section radius: \(object2.sec[l].moo.radius)")
+							//print("ent-ent collision \(t): \(distance2) \(closingSpeed2) dt: \(dt)")
+							//print("object1 section radius: \(object1.sec[k].moo.radius) object2 section radius: \(object2.sec[l].moo.radius)")
 							let collisionTime2 = distance2 / closingSpeed2
 							//fmlcollisions.append((collisionTime2, object1.sec[k].moo, object2.sec[l].moo, object1, object2))
 							easycollisions.append((collisionTime2, object1.moo, object2.moo))
@@ -397,7 +397,7 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 			object1.hp -= damage
 			object2.hp -= damage
 			ent1.dinged++
-			print()
+			/*print()
 			print("hard collision Time:", String(format: "%f", elapsedTime))
 			print("dvel:", deltaVelocity.format(4))
 			print("dtan:", tangentVelocity.format(4))
@@ -408,7 +408,7 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 			print("Friction Impulse:", frictionImpulse.format(4))
 			print("dspin 1:", deltaSpin1.format(4))
 			print("dspin 2:", deltaSpin2.format(4))
-			print("object1 remaining hp: \(object1.hp) object2 remaining hp: \(object2.hp) ")
+			print("object1 remaining hp: \(object1.hp) object2 remaining hp: \(object2.hp) ")*/
 		}
 	}
 
@@ -446,7 +446,7 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		let deltaSpin2 = torque2 / object2.momentOfInertia
 		object1.spin -= deltaSpin1
 		object2.spin += deltaSpin2
-
+/*
 		print("easy collision Time:", String(format: "%f", elapsedTime))
 		print("dvel:", deltaVelocity.format(4))
 		print("dtan:", tangentVelocity.format(4))
@@ -458,7 +458,7 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		print("dspin 1:", deltaSpin1.format(4))
 		print("dspin 2:", deltaSpin2.format(4))
 		print()
-
+*/
 	}
 }
 

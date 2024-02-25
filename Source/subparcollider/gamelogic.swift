@@ -299,11 +299,14 @@ class Entity: Codable, Moo {
 		}
 		moo.momentOfInertia = 2 * moo.mass * moo.radius * moo.radius / 5
 		if(initialHp != moo.hp) {
-			print("damage report (\(sec.count) sections):\ninitial hp: \(initialHp)")
-			print("damage taken: \(initialHp - moo.hp)")
-			print("remaining hp: \(moo.hp)")
+		//	print("damage report (\(sec.count) sections):\ninitial hp: \(initialHp)")
+		//	print("damage taken: \(initialHp - moo.hp)")
+		//	print("remaining hp: \(moo.hp)")
 		}
-		if keepers.count != sec.count {
+
+		// I disabled destruction because it causes segfault
+		//if keepers.count != sec.count {
+		if false {
 			print("lost \(sec.count - keepers.count) section(s)")
 			var newb: [BoxoidCod] = []
 			var news: [Section] = []
