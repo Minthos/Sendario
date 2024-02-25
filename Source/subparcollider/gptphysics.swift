@@ -249,19 +249,17 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		}
 	}
 	for i in 0..<entities.count {
-		for j in 0..<celestials.count {
-			let object1 = entities[i]
-			let object2 = celestials[j]
-			let (distance, closingSpeed) = collisionTest(object1.moo, object2.moo)
-			if closingSpeed > 0 && distance < (closingSpeed * dt) {
-				for k in 0..<object1.sec.count {
-					let (distance2, closingSpeed2) = collisionTest(object1.sec[k].moo, object2.moo)
-					//if distance2 > 0 && closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
-					if closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
-						//print("ent-celestial collision t \(t) d \(distance2) v \(closingSpeed2) dt: \(dt)")
-						let collisionTime2 = distance2 / closingSpeed2
-						hardcollisions.append((collisionTime2, object1.sec[k].moo, object2.moo, object1))
-					}
+		let object1 = entities[i]
+		let object2 = object1.moo.referenceFrame!
+		let (distance, closingSpeed) = collisionTest(object1.moo, object2)
+		if closingSpeed > 0 && distance < (closingSpeed * dt) {
+			for k in 0..<object1.sec.count {
+				let (distance2, closingSpeed2) = collisionTest(object1.sec[k].moo, object2)
+				//if distance2 > 0 && closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
+				if closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
+					//print("ent-celestial collision t \(t) d \(distance2) v \(closingSpeed2) dt: \(dt)")
+					let collisionTime2 = distance2 / closingSpeed2
+					hardcollisions.append((collisionTime2, object1.sec[k].moo, object2, object1))
 				}
 			}
 		}
@@ -273,7 +271,7 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 			let (distance, closingSpeed) = collisionTest(object1.moo, object2.moo)
 			if closingSpeed > 0 && distance < (closingSpeed * dt) {
 				for k in 0..<object1.sec.count {
-					for l in k+1..<object2.sec.count {
+					for l in 0..<object2.sec.count {
 						let (distance2, closingSpeed2) = collisionTest(object1.sec[k].moo, object2.sec[l].moo)
 						if distance2 > 0 && closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
 							//print("ent-ent collision \(t): \(distance2) \(closingSpeed2) dt: \(dt)")
