@@ -88,7 +88,7 @@ var player1 = Entity(name: "Player 1", SphericalCow(id: 5,
 						 velocity: Vector(earth.moo.velocity.x, earth.moo.velocity.y + 0, earth.moo.velocity.z),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
 						 spin: Vector(0.0, 0.0, 0.0),
-						 mass: 10e3, radius:1.0, frictionCoefficient: 0.5))
+						 mass: 1e3, radius:1.0, frictionCoefficient: 0.5))
 var ent1 = Entity(name: "ent1", SphericalCow(id: 6,
 						 position: Vector(earth.moo.position.x + 2.0, earth.moo.position.y + 0.0, earth.moo.position.z + earth.moo.radius + 1.1),
 						 velocity: Vector(earth.moo.velocity.x, earth.moo.velocity.y + 0, earth.moo.velocity.z),
@@ -168,7 +168,7 @@ var objrefs: [Objref] = []
 var actions: [Action] = []
 var interfaceMode: InterfaceMode = .physicsSim
 //var interfaceMode: InterfaceMode = .flightMode
-var buttonPresses: Int32 = 2
+var buttonPresses: Int32 = 4
 var curcom: Int = 0 // current composite
 var curbox: Int = 0 // current boxoid
 var faceIndex: Int = 0
@@ -183,7 +183,7 @@ var thrustVector = Vector(0, 0, 0)
 var cameraSpherical = SphericalVector(1, 0, 0)
 
 let totalTime = 1e12
-var dt = 0.01
+var dt = 0.001
 var t = 0.0
 
 /*

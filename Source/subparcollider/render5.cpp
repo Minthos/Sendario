@@ -288,9 +288,9 @@ typedef struct {
 	int nextNum;
 
 	Objref *orefs;
-    size_t norefs;
+	size_t norefs;
 	Objref *nextOrefs;
-    size_t nextNorefs;
+	size_t nextNorefs;
 	
 	// samcro, ncro
 	CompositeRenderObject* cro;
@@ -662,7 +662,7 @@ Vertex vertex_interpolate(Vertex* a, Vertex* b, float c) {
 }
 */
 glm::vec3 nearestPointOnPlane(glm::vec3 origin, glm::vec3 onPlane, glm::vec3 normal) {
-    return onPlane + glm::dot(origin - onPlane, normal) * normal;
+	return onPlane + glm::dot(origin - onPlane, normal) * normal;
 }
 
 // Loop subdivision that doesn't create duplicate edges/vertices, runs in linear time
@@ -922,7 +922,7 @@ void uploadMeshes(const Mesh* meshes, int numMeshes, BufferObject* bo);
 // opengl and multithreading: we create the BufferObjects on the rendering thread.
 // The tessellation can be done on any thread (main thread for now).
 // copying vertex and index data to the gpu is done on rendering thread.
-#define MAX_LOD 3
+#define MAX_LOD 5
 struct CompositeRenderObject {
 	CompositeRenderObject* next;
 	Composite c;
@@ -1301,7 +1301,7 @@ void *rendererThread(void *arg) {
 			diffuseComponent = glm::vec3(std::pow(diffuseComponent.r, vibe), std::pow(diffuseComponent.g, vibe), std::pow(diffuseComponent.b, vibe));
 			glUniform3fv(boxoidDiffuseLoc, 1, glm::value_ptr(diffuseComponent));
 			glUniform3fv(boxoidEmissiveLoc, 1, glm::value_ptr(emissiveComponent));
-		    int lod = sd->renderMisc.buttonPresses % MAX_LOD;
+			int lod = sd->renderMisc.buttonPresses % MAX_LOD;
 			renderMeshes(&cro->bo[lod]);
 			//printf("rendered a mesh at LOD %d, position: %f %f %f\n", lod, center.x, center.y, center.z);
 		}
