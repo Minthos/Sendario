@@ -333,6 +333,13 @@ class Entity: Codable, Moo {
     // and its composite should be added to that boxoid's impulse calculation for the following tick so it repels
     // the ground and other objects with a force that equals the force it exerts on the composite plus its own inertia
 	func updateVelocityAndSpinAfterCollision() {
+        if(self.sec.count == 0) {
+            return
+        } else if(self.sec.count == 1) {
+            self.moo.velocity = self.sec[0].moo.velocity
+            self.moo.spin = self.sec[0].moo.spin
+            return
+        }
 		var inertiaTensor = Matrix3()
 		var overallMomentum = Vector()
 		var overallAngularMomentum = Vector()

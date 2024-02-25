@@ -365,12 +365,13 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		let rotationVelocity1 = object1.spin.cross(r1) 
 		let rotationVelocity2 = object2.spin.cross(r2)
 		let totalRelativeTangentialVelocity = tangentVelocity + rotationVelocity2 - rotationVelocity1
-		let minLinearMomentum = min(object1.mass, object2.mass) * totalRelativeTangentialVelocity.length
+		let maxLinearMomentum = min(object1.mass, object2.mass) * totalRelativeTangentialVelocity.length
 		let angularMomentum1 = object1.momentOfInertia * totalRelativeTangentialVelocity.length / object1.radius
 		let angularMomentum2 = object2.momentOfInertia * totalRelativeTangentialVelocity.length / object2.radius
-		let minAngularMomentum = min(angularMomentum1, angularMomentum2)
-		let maxFrictionImpulseMagnitude = min(frictionCoefficient * impulseMagnitude * totalRelativeTangentialVelocity.length, minLinearMomentum + minAngularMomentum)
-		let frictionImpulse = -totalRelativeTangentialVelocity.normalized() * maxFrictionImpulseMagnitude
+		let maxAngularMomentum = min(angularMomentum1, angularMomentum2)
+        let angularImpulse = -totalRelativeTangentialVelocity * maxAngularMomentum
+        let maxFrictionImpulseMagnitude = min(frictionCoefficient * impulseMagnitude, maxLinearMomentum + maxAngularMomentum)
+        let frictionImpulse = angularImpulse / angularImpulse.length * min(angularImpulse.length, maxFrictionImpulseMagnitude)
 		object1.velocity -= frictionImpulse * 0.5 / object1.mass
 		object2.velocity += frictionImpulse * 0.5 / object2.mass
 		let torque1 = r1.cross(frictionImpulse * 0.5)
@@ -383,13 +384,13 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		object2.hp -= closingSpeed * impulseMagnitude * invhpmult
 		ent1.dinged++
 		print()
-		print("Collision Time:", String(format: "%f", elapsedTime))
+		print("hard collision Time:", String(format: "%f", elapsedTime))
 		print("dvel:", deltaVelocity.format(4))
 		print("dtan:", tangentVelocity.format(4))
 		print("Impulse Magnitude:", String(format: "%.4f", impulseMagnitude))
 		print("Impulse:", impulse.format(4))
-		print("angular \(minAngularMomentum)")
-		print("linear \(minLinearMomentum)")
+		print("angular \(maxAngularMomentum)")
+		print("linear \(maxLinearMomentum)")
 		print("Friction Impulse:", frictionImpulse.format(4))
 		print("dspin 1:", deltaSpin1.format(4))
 		print("dspin 2:", deltaSpin2.format(4))
@@ -430,8 +431,8 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		let deltaSpin2 = torque2 / object2.momentOfInertia
 		object1.spin -= deltaSpin1
 		object2.spin += deltaSpin2
-/*
-		print("Collision Time:", String(format: "%f", elapsedTime))
+
+		print("easy collision Time:", String(format: "%f", elapsedTime))
 		print("dvel:", deltaVelocity.format(4))
 		print("dtan:", tangentVelocity.format(4))
 		print("Impulse Magnitude:", String(format: "%.4f", impulseMagnitude))
@@ -442,7 +443,7 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		print("dspin 1:", deltaSpin1.format(4))
 		print("dspin 2:", deltaSpin2.format(4))
 		print()
-*/
+
 	}
 }
 
