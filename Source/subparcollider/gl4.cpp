@@ -14,9 +14,7 @@ auto now = std::chrono::high_resolution_clock::now;
 
 int winW = 1920;
 int winH = 1080;
-float canvasScale = 1.00;
-//int canvasW = 480;
-//int canvasH = 240;
+float canvasScale = 0.5;
 int canvasW = winW * canvasScale;
 int canvasH = winH * canvasScale;
 unsigned int frameCount = 0;
@@ -99,21 +97,22 @@ AABB calculateBounds(Sphere* p, GLuint N) {
 }
 
 AABB calculateBounds(Sphere* p, MortonPrimitive* mortonPrims, GLuint first, GLuint last) {
-	AABB bounds;
-	bounds.min = glm::vec3(FLT_MAX);
-	bounds.max = glm::vec3(-FLT_MAX);
-	for (GLuint i = first; i <= last; ++i) {
-		GLuint idx = mortonPrims[i].index;
-		bounds.min = glm::min(bounds.min, p[idx].center - glm::vec3(p[idx].radius));
-		bounds.max = glm::max(bounds.max, p[idx].center + glm::vec3(p[idx].radius));
-	}
-	return bounds;
+    AABB bounds;
+    bounds.min = glm::vec3(FLT_MAX);
+    bounds.max = glm::vec3(-FLT_MAX);
+    for (GLuint i = first; i <= last; ++i) {
+        GLuint idx = mortonPrims[i].index;
+        bounds.min = glm::min(bounds.min, p[idx].center - glm::vec3(p[idx].radius));
+        bounds.max = glm::max(bounds.max, p[idx].center + glm::vec3(p[idx].radius));
+    }
+    return bounds;
 }
 
+// this function doesn't work properly
 GLuint findSplit(MortonPrimitive* mortonPrims, GLuint first, GLuint last) {
 	GLuint firstCode = mortonPrims[first].mortonCode;
 	GLuint lastCode = mortonPrims[last].mortonCode;
-	//if (firstCode == lastCode)
+	if (firstCode == lastCode)
         return (first + last) >> 1;
 	GLuint commonPrefix = __builtin_clz(firstCode ^ lastCode);
 	GLuint split = first;
@@ -133,6 +132,9 @@ void printBVHNode(const BVHNode* node, GLuint index, int level) {
 	for(int i = level; i < 6; i++) {
 		std::cout << "  ";
 	}
+    if(level > 32) {
+        std::cout << level << " ";
+    }
 	std::cout << "Node " << index << " (" << node->bmin.x << ", " << node->bmin.y << ", " << node->bmin.z << "), ";
 	std::cout << "(" << node->bmax.x << ", " << node->bmax.y << ", " << node->bmax.z << "), ";
 	if (node->count == 1) {
@@ -153,21 +155,22 @@ void printBVHTree(const BVHNode* nodes, int index, int level) {
 }
 
 void BVHNode::subdivide(BVHNode* nodes, uint* poolPtr, Sphere* primitives, MortonPrimitive* mortonPrims, uint first, uint last) {
-	if (first == last) {
-		this->leftFirst = mortonPrims[first].index;
-		this->count = 1;
-		return;
-	}
-	this->leftFirst = *poolPtr;
-	*poolPtr += 2;
-	BVHNode *left = &nodes[leftFirst];
-	BVHNode *right = &nodes[leftFirst + 1];
-	uint split = findSplit(mortonPrims, first, last);
-	left->setBounds(calculateBounds(primitives, mortonPrims, first, split));
-	right->setBounds(calculateBounds(primitives, mortonPrims, split + 1, last));
-	left->subdivide(nodes, poolPtr, primitives, mortonPrims, first, split);
-	right->subdivide(nodes, poolPtr, primitives, mortonPrims, split + 1, last);
-	this->count = last - first + 1;
+    if (first == last) {
+        this->leftFirst = mortonPrims[first].index;
+        this->count = 1;
+        return;
+    }
+    this->leftFirst = *poolPtr;
+    *poolPtr += 2;
+    BVHNode *left = &nodes[leftFirst];
+    BVHNode *right = &nodes[leftFirst + 1];
+    uint split = first + last >> 1;
+//    uint split = findSplit(mortonPrims, first, last);
+    left->setBounds(calculateBounds(primitives, mortonPrims, first, split));
+    right->setBounds(calculateBounds(primitives, mortonPrims, split + 1, last));
+    left->subdivide(nodes, poolPtr, primitives, mortonPrims, first, split);
+    right->subdivide(nodes, poolPtr, primitives, mortonPrims, split + 1, last);
+    this->count = last - first + 1;
 }
 
 void constructBVH(Sphere* primitives, int N, bool letsPrint) {
@@ -187,7 +190,12 @@ void constructBVH(Sphere* primitives, int N, bool letsPrint) {
 	root.count = N;
 	uint poolPtr = 1;
 	root.subdivide(nodes, &poolPtr, primitives, mortonPrims, 0, N - 1);
-	if(letsPrint) { printBVHTree(nodes, 0, 0); }
+	if(letsPrint) {
+        printBVHTree(nodes, 0, 0);
+        for(int i = 0; i < N; ++i) {
+            std::cout << mortonPrims[i].mortonCode << "\n";
+        }
+    }
 	
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, TLASBuffer);
 	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(BVHNode) * poolPtr, nodes, GL_STATIC_DRAW);
@@ -200,7 +208,8 @@ const int MAXDEPTH = 3;
 float maxDepth = MAXDEPTH;
 int numSpheres = 54;
 Sphere* spheres = (Sphere*)malloc(sizeof(Sphere) * numSpheres);
-int numLights = 7;
+//int numLights = 7;
+int numLights = 2;
 Light* lights = (Light*)malloc(sizeof(Light) * numLights);
 
 const int WORKGROUP_SIZE = 8;
@@ -216,8 +225,13 @@ uniform int numLights;
 uniform int maxDepth;
 
 const int MAXDEPTH = 3;
-const int PKTDIM = 1;
-const int PKTSIZE = 1;
+
+struct Ray {
+	vec3 origin;
+	int inside;
+	vec3 direction;
+	vec4 alpha;
+};
 
 struct Sphere {
 	vec3 center;
@@ -253,43 +267,6 @@ layout(std430, binding = 2) buffer TLASBuffer {
 	BVHNode nodes[];
 };
 
-vec3 reflect(vec3 L, vec3 N) {
-	return L - 2.0 * dot(L, N) * N;
-}
-
-vec3 refract(vec3 L, vec3 N, float n1, float n2) {
-	float r = n1 / n2;
-	float cosI = -dot(N, L);
-	float sinT2 = r * r * (1.0 - cosI * cosI);
-	if (sinT2 > 1.0) return vec3(0.0);  // Total internal reflection
-	float cosT = sqrt(1.0 - sinT2);
-	return r * L + (r * cosI - cosT) * N;
-}
-
-struct Ray {
-	vec3 origin;
-	int inside;
-	vec3 direction;
-	vec4 alpha;
-};
-
-struct RayPacket {
-	Ray rays[PKTSIZE];
-	int indices[PKTSIZE];
-	int nrays;
-};
-
-struct HitInfo {
-	int ray;
-	int obj;
-};
-
-struct Result {
-	vec4 color;
-	Ray rays[2];
-	float t;
-};
-
 float raySphere(Ray ray, vec3 center, float radius) {
 	vec3 oc = ray.origin - center;
 	float a = dot(ray.direction, ray.direction);
@@ -304,7 +281,7 @@ float raySphere(Ray ray, vec3 center, float radius) {
 }
 
 bool rayAABB(vec3 O, vec3 rDinv, vec3 bmin, vec3 bmax) {
-	float tmin = -1e38;
+    float tmin = -1e38;
 	float tmax = 1e38;
 	vec3 t1 = (bmin - O)*rDinv;
 	vec3 t2 = (bmax - O)*rDinv;
@@ -312,76 +289,7 @@ bool rayAABB(vec3 O, vec3 rDinv, vec3 bmin, vec3 bmax) {
 		tmin = max(tmin, min(t1[i], t2[i]));
 		tmax = min(tmax, max(t1[i], t2[i]));
 	}
-	return tmax >= max(tmin, 0.0);
-}
-
-bool planeAABB(vec3 bmin, vec3 bmax, vec4 plane) {
-	vec3 selector = step(vec3(0.0), plane.xyz);
-	vec3 positive_vertex = mix(bmin, bmax, selector);
-	return dot(positive_vertex, plane.xyz) + plane.a >= 0.0;
-}
-
-bool frustumAABB(vec3 bmin, vec3 bmax, vec4 frustum[6]) {
-	bool result = true;
-	for(int i = 0; i < 6; ++i) {
-		result = result && planeAABB(bmin, bmax, frustum[i]);
-	}
-	return result;
-}
-
-void computeRayPacketFrustum(RayPacket packet, float maxDist, vec4 frustum[6]) {
-    vec3 nearMin = vec3(1e38);
-    vec3 nearMax = vec3(-1e38);
-    vec3 farMin = vec3(1e38);
-    vec3 farMax = vec3(-1e38);
-    for(int i = 0; i < packet.nrays; ++i) {
-        nearMin = min(nearMin, packet.rays[i].origin);
-        nearMax = max(nearMax, packet.rays[i].origin);
-        vec3 endpoint = packet.rays[i].origin + maxDist * packet.rays[i].direction;
-        farMin = min(farMin, endpoint);
-        farMax = max(farMax, endpoint);
-    }
-    vec3 nearCenter = (nearMin + nearMax) * 0.5;
-    vec3 farCenter = (farMin + farMax) * 0.5;
-    vec3 direction = normalize(farCenter - nearCenter);
-    // ray directions are points on a unit circle
-	// which ones are furthest from the center direction?
-    float minYaw = 1e38;
-    float maxYaw = -1e38;
-    float minPitch = 1e38;
-    float maxPitch = -1e38;
-    vec3 maxPitchDir, minPitchDir, maxYawDir, minYawDir;
-    for (int i = 0; i < packet.nrays; ++i) {
-        vec3 dir = packet.rays[i].direction;
-        float yaw = atan(dir.y, dir.x);
-        float pitch = asin(dir.z);
-        if (yaw < minYaw) {
-            minYaw = yaw;
-            minYawDir = dir;
-        }
-        if (yaw > maxYaw) {
-            maxYaw = yaw;
-            maxYawDir = dir;
-        }
-        if (pitch < minPitch) {
-            minPitch = pitch;
-            minPitchDir = dir;
-        }
-        if (pitch > maxPitch) {
-            maxPitch = pitch;
-            maxPitchDir = dir;
-        }
-    }
-	vec3 rightYaw = cross(direction, maxPitchDir);
-	vec3 leftYaw = cross(direction, minPitchDir);
-	vec3 upPitch = cross(direction, maxYawDir);
-	vec3 downPitch = cross(direction, minYawDir);
-	frustum[0] = vec4(-direction, -dot(-direction, nearCenter));  // Near
-	frustum[1] = vec4(direction, -dot(direction, farCenter));     // Far
-	frustum[2] = vec4(-rightYaw, -dot(-rightYaw, nearCenter));   // Left
-	frustum[3] = vec4(rightYaw, -dot(rightYaw, nearCenter));     // Right
-	frustum[4] = vec4(upPitch, -dot(upPitch, nearCenter));       // Top
-	frustum[5] = vec4(-downPitch, -dot(-downPitch, nearCenter)); // Bottom
+    return tmax >= max(tmin, 0.0);
 }
 
 void traverseBVH(Ray ray, inout int hitIdx, inout float closestHit) {
@@ -408,243 +316,170 @@ void traverseBVH(Ray ray, inout int hitIdx, inout float closestHit) {
 	}
 }
 
-float traverseBVHPacket(RayPacket packet, float maxDist, inout int hitIdx[PKTSIZE], inout float closestHit[PKTSIZE]) {
-	float globalClosestHit = 1e38;
-	vec4 frustum[6];
-	computeRayPacketFrustum(packet, maxDist, frustum);
-	uint stack[32];
-	uint stackPtr = 0;
-	stack[stackPtr++] = 0;
-	while (stackPtr > 0) {
-		uint nodeIdx = stack[--stackPtr];
-		BVHNode node = nodes[nodeIdx];
-		if(frustumAABB(node.bmin, node.bmax, frustum)) {
-			if (node.count == 1) {
-				int i = int(node.leftFirst);
-				for (int r = 0; r < packet.nrays; ++r) {
-					Ray ray = packet.rays[r];
-					vec3 rD = vec3(1) / ray.direction;
-					if (rayAABB(ray.origin, rD, node.bmin, node.bmax)) {
-						float t = raySphere(ray, spheres[i].center, spheres[i].radius);
-						if (t > 0 && t < closestHit[r]) {
-							hitIdx[r] = i;
-							closestHit[r] = t;
-							globalClosestHit = min(globalClosestHit, t);
-						}
-					}
-				}
-			} else {
-				stack[stackPtr++] = node.leftFirst;
-				stack[stackPtr++] = node.leftFirst + 1;
-			}
-		}
-	}
-	return globalClosestHit;
+vec3 reflect(vec3 L, vec3 N) {
+	return L - 2.0 * dot(L, N) * N;
 }
 
-void trace(RayPacket pkt, out Result result[PKTSIZE]) {
-	float closestHit[PKTSIZE];
-	float t[PKTSIZE];
-	int hitIdx[PKTSIZE];
+vec3 refract(vec3 L, vec3 N, float n1, float n2) {
+	float r = n1 / n2;
+	float cosI = -dot(N, L);
+	float sinT2 = r * r * (1.0 - cosI * cosI);
+	//if (sinT2 > 1.0) return vec3(0.0);  // Total internal reflection
+	float cosT = sqrt(1.0 - sinT2);
+	return r * L + (r * cosI - cosT) * N;
+}
 
-	// lights get special treatment
-	// should change this to raster, maybe a post-processing step but then we need to store z values
-	// also the question of reflected/refracted rays
-	// bvh for lights would solve it of course
-	for(int ridx = 0; ridx < pkt.nrays; ridx++){
-		closestHit[ridx] = 1e38;
-		t[ridx] = 0.0;
-		hitIdx[ridx] = -1;
-		result[ridx].color = vec4(0, 0, 0, 0);
-		result[ridx].rays[0] = Ray(vec3(0), -1, vec3(0), vec4(0));
-		result[ridx].rays[1] = Ray(vec3(0), -1, vec3(0), vec4(0));
-		for (int i = 0; i < numLights; i++) {
-			float t = raySphere(pkt.rays[ridx], lights[i].position, lights[i].radius);
-			if (t > 0) {
-				result[ridx].color = vec4(lights[i].color, 1);
-				closestHit[ridx] = t;
-			}
+struct Result {
+	vec4 color;
+	Ray rays[2];
+	float t;
+};
+
+Result trace(Ray ray) {
+	float closestHit = 1e38;
+	float t = 0.0;
+	int hitIdx = -1;
+	Result result;
+	result.color = vec4(0, 0, 0, 0);
+	result.rays[0] = Ray(vec3(0), -1, vec3(0), vec4(0));
+	result.rays[1] = Ray(vec3(0), -1, vec3(0), vec4(0));
+	for (int i = 0; i < numLights; i++) {
+		float t = raySphere(ray, lights[i].position, lights[i].radius);
+		if (t > 0) {
+			result.color = vec4(lights[i].color, 1);
+			closestHit = t;
 		}
 	}
-
-	// primary/secondary rays
-	traverseBVH(pkt.rays[0], hitIdx[0], closestHit[0]);
-	// giving up on ray packets for now. it was fun to experiment with but the slowdown of using more memory is painful.
-	// added compliexity for uncertain benefit.
-	//traverseBVHPacket(pkt, 1e38, hitIdx, closestHit);
-
-	for(int ridx = 0; ridx < pkt.nrays; ridx++){
-		if(hitIdx[ridx] >= 0) {
-			result[ridx].color = vec4(0, 0, 0, 0);
-			int i = hitIdx[ridx];
-			t[ridx] = closestHit[ridx];
-			vec3 hitPoint = pkt.rays[ridx].origin + t[ridx] * pkt.rays[ridx].direction;
-			vec3 normal = (hitPoint - spheres[i].center) / spheres[i].radius;
-			vec3 origin = hitPoint + 0.001 * normal;
-			
-			// diffuse and specular: x, y
-			if(spheres[i].material.x > 0.0 || spheres[i].material.y > 0.0) {
-				for (int l = 0; l < numLights; l++) {
-					Ray shadowRay;
-					shadowRay.direction = lights[l].position - hitPoint;
-					float lightDist = length(shadowRay.direction);
-					shadowRay.direction = shadowRay.direction / lightDist;
-					shadowRay.origin = origin;
-					vec3 light = lights[l].color;
-					int s = -1;
-					float shadow_t = lightDist;
-
-					// shadow rays
-					traverseBVH(shadowRay, s, shadow_t);
-
-					if(s >= 0) {
-						light = mix(light, spheres[s].color.rgb, spheres[s].color.a) * (1.0 - spheres[s].color.a);
-					}
-					light = light * (1.0 / (0.1 + lightDist));
-					float lambertian = max(0.0, dot(normal, shadowRay.direction)) * spheres[i].material.x;
-					float gloss = 32.0;
-					vec3 h = (-shadowRay.direction + pkt.rays[ridx].direction) * -0.5;
-					vec3 halfDir = normalize(-shadowRay.direction + pkt.rays[ridx].direction);
-					float specAngle = max(0.0, dot(halfDir, -normal));
-					float specular = pow(specAngle, gloss) * spheres[i].material.y;
-					vec3 contribution = lambertian * light * spheres[i].color.rgb + specular * light;
-					result[ridx].color += vec4(contribution, spheres[i].color.a);
+	traverseBVH(ray, hitIdx, closestHit);
+	if(hitIdx >= 0) {
+		result.color = vec4(0, 0, 0, 0);
+		int i = hitIdx;
+		t = closestHit;
+		vec3 hitPoint = ray.origin + t * ray.direction;
+		vec3 normal = (hitPoint - spheres[i].center) / spheres[i].radius;
+		vec3 origin = hitPoint + 0.001 * normal;
+		
+		// diffuse and specular: x, y
+		if(spheres[i].material.x > 0.0 || spheres[i].material.y > 0.0) {
+			for (int l = 0; l < numLights; l++) {
+				Ray shadowRay;
+				shadowRay.direction = lights[l].position - hitPoint;
+				float lightDist = length(shadowRay.direction);
+				shadowRay.direction = shadowRay.direction / lightDist;
+				shadowRay.origin = origin;
+				vec3 light = lights[l].color;
+				int s = -1;
+				float shadow_t = lightDist;
+				traverseBVH(shadowRay, s, shadow_t);
+				if(s >= 0) {
+					light = mix(light, spheres[s].color.rgb, spheres[s].color.a) * (1.0 - spheres[s].color.a);
 				}
+				light = light * (1.0 / (0.1 + lightDist));
+				float lambertian = max(0.0, dot(normal, shadowRay.direction)) * spheres[i].material.x;
+				float gloss = 32.0;
+				vec3 h = (-shadowRay.direction + ray.direction) * -0.5;
+				vec3 halfDir = normalize(-shadowRay.direction + ray.direction);
+				float specAngle = max(0.0, dot(halfDir, -normal));
+				float specular = pow(specAngle, gloss) * spheres[i].material.y;
+				vec3 contribution = lambertian * light * spheres[i].color.rgb + specular * light;
+				result.color += vec4(contribution, spheres[i].color.a);
 			}
-			// reflection: z
-			// FIXME: the fresnel calculation causes a slight shadow on the glass sphere
-			float fresnel = max(0, min(1, 0.5 * (0.5 - spheres[i].material.x) * (1.0 + dot(pkt.rays[ridx].direction, normal))));
-			result[ridx].rays[0].origin = origin;
-			result[ridx].rays[0].alpha = pkt.rays[ridx].alpha * fresnel + pkt.rays[ridx].alpha * spheres[i].color * spheres[i].material.z;
-			result[ridx].rays[0].direction = reflect(pkt.rays[ridx].direction, normal);
+		}
+		// reflection: z
+		float fresnel = 0;//max(0.0, min(1, 0.5 * (0.5 - spheres[i].material.x) * (1.0 + dot(ray.direction, normal))));
+		result.rays[0].origin = origin;
+		result.rays[0].alpha = ray.alpha * fresnel + ray.alpha * spheres[i].color * spheres[i].material.z;
+		result.rays[0].direction = reflect(ray.direction, normal);
 
-			// refraction: w, color.a
-			float refractiveIndexAir = 1.0;
-			result[ridx].rays[1].origin = hitPoint - (0.001 * normal);
-			result[ridx].rays[1].direction = refract(pkt.rays[ridx].direction, normal, refractiveIndexAir, spheres[i].material.w);
+		// refraction: w, color.a
+		float refractiveIndexAir = 1.0;
+		result.rays[1].origin = hitPoint - (0.001 * normal);
+		result.rays[1].direction = refract(ray.direction, normal, refractiveIndexAir, spheres[i].material.w);
 
-			if (pkt.rays[ridx].inside != -1) {
-				if (pkt.rays[ridx].inside == i) {
-					result[ridx].rays[1].inside = -1;
-					float transparency = pow(spheres[i].color.a, abs(t[ridx]));
-					vec4 c = mix(spheres[i].color, vec4(1), transparency);
-					result[ridx].rays[1].alpha = pkt.rays[ridx].alpha * c;
-					result[ridx].rays[0].alpha = result[ridx].rays[0].alpha * c;
-				}
-				else {
-					float transparency = pow(spheres[pkt.rays[ridx].inside].color.a, abs(t[ridx] * 2));
-					vec4 c = mix(spheres[pkt.rays[ridx].inside].color, vec4(1), transparency);
-					result[ridx].rays[0].alpha = result[ridx].rays[0].alpha * c;
-					result[ridx].rays[0].inside = pkt.rays[ridx].inside;
-					result[ridx].color = result[ridx].color * c;
-				}
+		if (ray.inside != -1) {
+			if (ray.inside == i) {
+				result.rays[1].inside = -1;
+				float transparency = pow(spheres[i].color.a, abs(t));
+				vec4 c = mix(spheres[i].color, vec4(1), transparency);
+				result.rays[1].alpha = ray.alpha * c;
+				result.rays[0].alpha = result.rays[0].alpha * c;
 			}
-			// entering sphere
-			else if(pkt.rays[ridx].inside == -1 && spheres[i].color.a < 1.0) {
-				result[ridx].rays[1].inside = i;
-				result[ridx].rays[1].alpha = vec4(mix(pkt.rays[ridx].alpha.rgb, spheres[i].color.rgb, spheres[i].material.x), pkt.rays[ridx].alpha.a);
-			}
-			// is outide, stay outside
 			else {
-				;
-			}
-		} else {
-			if(closestHit[ridx] == 1e38) {
-				// sky color
-				if(lights[6].position.y > 0.0) {
-					result[ridx].color = mix(vec4(0.6, 0.3, 0.2, 1.0), vec4(0.8, 0.8, 1.0, 1.0),
-							sqrt(lights[6].position.y / 100.0)) * pkt.rays[ridx].alpha.a;
-				}
-				else {
-					result[ridx].color = mix(vec4(0.6, 0.3, 0.2, 1.0), vec4(0.0, 0.0, 0.02, 1.0),
-							sqrt(-lights[6].position.y / 100.0)) * pkt.rays[ridx].alpha.a;
-				}
-			}
-			if (pkt.rays[ridx].inside != -1) {
-				float transparency = pow(spheres[pkt.rays[ridx].inside].color.a, spheres[pkt.rays[ridx].inside].radius);
-				vec4 c = mix(spheres[pkt.rays[ridx].inside].color, vec4(1), transparency);
-				result[ridx].color = result[ridx].color * c;
+				float transparency = pow(spheres[ray.inside].color.a, abs(t * 2));
+				vec4 c = mix(spheres[ray.inside].color, vec4(1), transparency);
+				result.rays[0].alpha = result.rays[0].alpha * c;
+				result.rays[0].inside = ray.inside;
+				result.color = result.color * c;
 			}
 		}
-		result[ridx].t = closestHit[ridx];
+		// entering sphere
+		else if(ray.inside == -1 && spheres[i].color.a < 1.0) {
+			result.rays[1].inside = i;
+			result.rays[1].alpha = vec4(mix(ray.alpha.rgb, spheres[i].color.rgb, spheres[i].material.x), ray.alpha.a);
+		}
+		// is outide, stay outside
+		else {
+			;
+		}
+	} else {
+		if(closestHit == 1e38) {
+			// sky color
+			if(lights[0].position.y > 0.0) {
+				result.color = mix(vec4(0.6, 0.3, 0.2, 1.0), vec4(0.8, 0.8, 1.0, 1.0), sqrt(lights[0].position.y / 100.0)) * ray.alpha.a;
+			}
+			else {
+				result.color = mix(vec4(0.6, 0.3, 0.2, 1.0), vec4(0.0, 0.0, 0.02, 1.0), sqrt(-lights[0].position.y / 100.0)) * ray.alpha.a;
+			}
+		}
+		if (ray.inside != -1) {
+			float transparency = pow(spheres[ray.inside].color.a, spheres[ray.inside].radius);
+			vec4 c = mix(spheres[ray.inside].color, vec4(1), transparency);
+			result.color = result.color * c;
+		}
 	}
-	return;
+	result.t = closestHit;
+	return result;
 }
 
 void main() {
-	vec2 uvBase;
-	ivec2 screenSpace = ivec2(gl_GlobalInvocationID.xy) * PKTDIM;
-	uvBase.x = (2.0 * float(screenSpace.x) / canvasSize.x - 1.0);
-	uvBase.y = (2.0 * float(screenSpace.y) / canvasSize.y - 1.0);
+	vec2 uv;
+	ivec2 storePos = ivec2(gl_GlobalInvocationID.xy);
+	uv.x = (2.0 * float(storePos.x) / canvasSize.x - 1.0);
+	uv.y = (2.0 * float(storePos.y) / canvasSize.y - 1.0);
 	float aspectRatio = canvasSize.x / canvasSize.y;
-	vec4 accumulatedColors[PKTSIZE];
-	for(int i = 0; i < PKTSIZE; i++) {
-		accumulatedColors[i] = vec4(0.0);
-	}
-	RayPacket packets[MAXDEPTH];
-	int stackPtr = 0;
-	for(int x = 0; x < PKTDIM; x++) {
-		for(int y = 0; y < PKTDIM; y++) {
-			int ridx = y * PKTDIM + x;
-			vec2 uv = uvBase + vec2(x,y) * 2.0 / canvasSize.xy;
-			packets[stackPtr].rays[ridx].origin = vec3(0);
-			packets[stackPtr].rays[ridx].inside = -1;
-			for(int i = 0; i < numSpheres; i++) {
-				if(length(spheres[i].center) < spheres[i].radius) {
-					packets[stackPtr].rays[ridx].inside = i;
-				}
-			}
-			packets[stackPtr].rays[ridx].direction = normalize(vec3(aspectRatio * uv.x, uv.y, -1));
-			packets[stackPtr].rays[ridx].alpha = vec4(1.0);
-			packets[stackPtr].indices[ridx] = ridx;
-		}
-	}
-	packets[stackPtr].nrays = PKTSIZE;
-	stackPtr++;
 
-	// let the tracing begin
-	while(stackPtr-- > 0) {
-		Result results[PKTSIZE];
-		trace(packets[stackPtr], results);
-		RayPacket reflectionPacket;
-		reflectionPacket.nrays = 0;
-		RayPacket refractionPacket;
-		refractionPacket.nrays = 0;
-		for(int j = 0; j < packets[stackPtr].nrays; j++) {
-			int i = packets[stackPtr].indices[j];
-			accumulatedColors[i] += results[j].color * packets[stackPtr].rays[j].alpha;
-			if(results[j].rays[0].alpha.a > 0.02) {
-				reflectionPacket.rays[reflectionPacket.nrays] = results[j].rays[0];
-				reflectionPacket.indices[reflectionPacket.nrays] = i;
-				reflectionPacket.nrays++;
-			}
-			if(results[j].rays[1].alpha.a > 0.02) {
-				refractionPacket.rays[refractionPacket.nrays] = results[j].rays[1];
-				refractionPacket.indices[refractionPacket.nrays] = i;
-				refractionPacket.nrays++;
-			}
+	Ray ray[MAXDEPTH + 1];
+	int ridx = 0;
+	ray[ridx].origin = vec3(0);
+	ray[ridx].inside = -1;
+	for(int i = 0; i < numSpheres; i++) {
+		if(length(spheres[i].center) < spheres[i].radius) {
+			ray[ridx].inside = i;
 		}
-		if(reflectionPacket.nrays > 0 && stackPtr < MAXDEPTH) {
-			packets[stackPtr++] = reflectionPacket;
-		}
-		if(refractionPacket.nrays > 0 && stackPtr < MAXDEPTH) {
-			packets[stackPtr++] = refractionPacket;
+	}
+	ray[ridx].direction = normalize(vec3(aspectRatio * uv.x, uv.y, -1));
+	ray[ridx].alpha = vec4(1.0);
+	vec4 accumulatedColor = vec4(0, 0, 0, 0);
+
+	for (int ridx = 0; ridx >= 0; ridx--) {
+		Result result = trace(ray[ridx]);
+		accumulatedColor += result.color * ray[ridx].alpha;
+		if (ridx < maxDepth) {
+			if(result.rays[0].alpha.a > 0.02) {
+				ray[ridx++] = result.rays[0];
+			}
+			if(result.rays[1].alpha.a > 0.02) {
+				ray[ridx++] = result.rays[1];
+			}
 		}
 	}
 
-	for(int x = 0; x < PKTDIM; x++) {
-		for(int y = 0; y < PKTDIM; y++) {
-			int ridx = y * PKTDIM + x;
-			ivec2 storePos = screenSpace + ivec2(x, y);
-			vec4 color = accumulatedColors[ridx];
-			color.r = tanh(color.r);
-			color.g = tanh(color.g);
-			color.b = tanh(color.b);
-			imageStore(destTex, storePos, color);
-		}
-	}
+	//accumulatedColor = accumulatedColor / accumulatedColor.a;
+	accumulatedColor.r = tanh(accumulatedColor.r);
+	accumulatedColor.g = tanh(accumulatedColor.g);
+	accumulatedColor.b = tanh(accumulatedColor.b);
+	imageStore(destTex, storePos, accumulatedColor);
 }
-
 )";
 
 const GLchar* vertexShaderSrc = R"(
@@ -744,67 +579,81 @@ void initQuadShader() {
 }
 
 float pseudoRandom(float x) {
-	float val = sin(17.0f * x) * cos(23.0f * x * x);
-	return val - floor(val);
+    float val = sin(17.0f * x) * cos(23.0f * x * x);
+    return val - floor(val);
 }
 
-
+// material: diffuse, specular, reflective, refractive
 void updateSpheres() {
-	for (int i = 0; i < 3; i++) {
-		float t = 3.0 + (now() - tZero).count() / 2000000000.0;
-		spheres[i].center = glm::vec3(1.6 * cos(t - ((float)i * 2.1)), 0.0f, 1.6 * sin(t - ((float)i * 2.1)) - 4.0f);
-		spheres[i].radius = 1.0f;
-	}
-	spheres[3].center = glm::vec3(0.0f, -10001.5f * cos(0.1), -1000.0f);
-	spheres[3].radius = 10000.0f;
-	float timeFactor = (now() - tZero).count() / 2000000000.0;
-	float gridSize = 8.0f;
-	float perturbation = 2.5f;
-	for (int i = 4; i < numSpheres; i++) {
-		float x = (i % 7) * gridSize;
-		float z = (i / 7) * gridSize;
-		float bounce = 2.5 + sin(timeFactor + (float)i * 0.5f) * 1.5f;
-		x += (pseudoRandom((float)i + 0.123f) - 10.5f) * perturbation;
-		z += (pseudoRandom((float)i + 0.987f) - 0.5f) * perturbation;
-		if(i % 2 == 0){
-			spheres[i].center = glm::vec3(x, bounce, z - 60.0f);
-		} else {
-			spheres[i].center = glm::vec3(x, cos(i) + 3.0, z - 60.0f);
-		}
-		spheres[i].radius = 1.0f;
-		spheres[i].color = glm::vec4((float)(i % 3) * 0.3f + 0.2f, (float)((i + 1) % 3) * 0.3f, (float)((i + 2) % 3) * 0.3f, 1.0f);
-		spheres[i].material = glm::vec4(sin(x * 10), cos(z * 4), glm::fract(sin(3.0f * x)), glm::max(1.0f, (float)(i % 5)));
-	}
-	spheres[0].color = glm::vec4(1.0f, 0.95f, 0.5f, 1.0f);
-	spheres[0].material = glm::vec4(0.1f, 0.1f, 0.8f, 1.0f);  
-	spheres[1].color = glm::vec4(1.0f, 0.5f, 1.0f, 0.5f);
-	spheres[1].material = glm::vec4(0.0f, 0.0f, 0.0f, 1.52f);
-	spheres[1].radius = 1.0f;
-	spheres[2].color = glm::vec4(0.8f, 0.8f, 1.0f, 1.0f);
-	spheres[2].material = glm::vec4(1.0f, 0.5f, 0.0f, 1.07f);
-	spheres[3].color = glm::vec4(0.2f, 0.6f, 0.25f, 1.0f);
-	spheres[3].material = glm::vec4(0.8f, 0.7f, 0.2f, 1.0f);
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, sphereBuffer);
-	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Sphere) * numSpheres, spheres, GL_STATIC_DRAW);
+    for (int i = 0; i < 3; i++) {
+        float t = 3.0 + (now() - tZero).count() / 2000000000.0;
+        spheres[i].center = glm::vec3(1.6 * cos(t - ((float)i * 2.1)), 0.0f, 1.6 * sin(t - ((float)i * 2.1)) - 4.0f);
+        spheres[i].radius = 1.0f;
+    }
+    spheres[3].center = glm::vec3(0.0f, -10001.5f * cos(0.1), -1000.0f);
+    spheres[3].radius = 10000.0f;
+    float timeFactor = (now() - tZero).count() / 2000000000.0;
+    float gridSize = 8.0f;
+    float perturbation = 2.5f;
+    for (int i = 4; i < numSpheres; i++) {
+        float x = (i % 7) * gridSize;
+        float z = (i / 7) * gridSize;
+        float bounce = 2.5 + sin(timeFactor + (float)i * 0.5f) * 1.5f;
+        x += (pseudoRandom((float)i + 0.123f) - 10.5f) * perturbation;
+        z += (pseudoRandom((float)i + 0.987f) - 0.5f) * perturbation;
+        if(i % 2 == 0){
+            spheres[i].center = glm::vec3(x, bounce, z - 60.0f);
+        } else {
+            spheres[i].center = glm::vec3(x, cos(i) + 3.0, z - 60.0f);
+        }
+        spheres[i].radius = 1.0f;
+        spheres[i].color = glm::vec4(1.0f, 0.71f, 0.08f, 1.0f); // gold
+        //spheres[i].color = glm::vec4((float)(i % 3) * 0.3f + 0.2f, (float)((i + 1) % 3) * 0.3f, (float)((i + 2) % 3) * 0.3f, 1.0f);
+        spheres[i].material = glm::vec4(0.05, 0.05, 0.9, 10.0);
+        //spheres[i].material = glm::vec4(sin(x * 10), cos(z * 4), glm::fract(sin(3.0f * x)), glm::max(1.0f, (float)(i % 5)));
+    }
+    spheres[0].color = glm::vec4(1.0f, 0.95f, 0.5f, 1.0f);
+    spheres[0].material = glm::vec4(0.1f, 0.1f, 0.8f, 1.0f);  
+    spheres[1].color = glm::vec4(1.0f, 0.5f, 1.0f, 0.5f);
+    spheres[1].material = glm::vec4(0.0f, 0.0f, 0.0f, 1.52f);
+    spheres[1].radius = 1.0f;
+    spheres[2].color = glm::vec4(0.8f, 0.8f, 1.0f, 1.0f);
+    spheres[2].material = glm::vec4(1.0f, 0.5f, 0.0f, 1.07f);
+    spheres[3].color = glm::vec4(0.2f, 0.6f, 0.25f, 1.0f);
+    spheres[3].material = glm::vec4(0.8f, 0.7f, 0.2f, 1.0f);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, sphereBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Sphere) * numSpheres, spheres, GL_STATIC_DRAW);
 }
+
 
 void updateLights() {
+    float SUN_DISTANCE = 100.0f;
+    float SUN_SLOWNESS = 50.0f;
+    float DISCOFREQ = 3.0f;
+
 	auto time = (now() - tZero).count() / -1230000000.0;
 	for (int i = 0; i < numLights; i++) {
 		lights[i].id = i;
 		lights[i].radius = 0.05f;
 		lights[i].position = glm::vec3(1.2f * (i % 3) * sin(time / (i + 1)), 1.0f + 0.9f * sin(time + i), -1.5f + 1.0f * cos(time + i));
 	}
-	lights[0].color = glm::vec3(0.3f, 0.3f, 2.0f);
-	lights[1].color = glm::vec3(0.3f, 2.0f, 0.3f);
+	lights[0].color = glm::vec3(100.0f, 90.0f, 80.0f);
+	lights[0].position = glm::vec3(SUN_DISTANCE * cos((time + 15.0) / SUN_SLOWNESS), SUN_DISTANCE * -sin((time + 15.0) / SUN_SLOWNESS), 0.0f);
+	lights[0].radius = 5.0f;
+    
+    if(sin(time * DISCOFREQ) < -0.5f) {
+        lights[1].color = glm::vec3(0.3f, 0.3f, 2.0f);
+    } else if(cos(time * DISCOFREQ) > 0.0f) {
+	    lights[1].color = glm::vec3(0.3f, 2.0f, 0.3f);
+    } else {
+        lights[1].color = glm::vec3(2.0f, 0.3f, 0.3f);
+    }
+    /*
 	lights[2].color = glm::vec3(0.3f, 0.3f, 2.0f);
 	lights[3].color = glm::vec3(2.0f, 0.3f, 0.3f);
 	lights[4].color = glm::vec3(0.3f, 2.0f, 0.3f);
 	lights[5].color = glm::vec3(2.0f, 0.3f, 0.3f);
-	lights[6].color = glm::vec3(100.0f, 90.0f, 80.0f);
-	//lights[6].position = glm::vec3(100.0f * sin(time / 5.0), 100.0f * abs(cos(time / 5.0)), 0.0f);
-	lights[6].position = glm::vec3(100.0f * sin(time / 5.0), 100.0f * cos(time / 5.0), 0.0f);
-	lights[6].radius = 5.0f;
+	lights[6].color = glm::vec3(0.3f, 0.3f, 2.0f);*/
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightBuffer);
 	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Light) * numLights, lights, GL_STATIC_DRAW);
 }
@@ -926,14 +775,11 @@ void reshape(int width, int height) {
 	glViewport(0, 0, width, height);
 	canvasW = winW * canvasScale;
 	canvasH = winH * canvasScale;
-//	canvasH = std::min(240, height);
-//	canvasW = canvasH * (float)winW / (float)winH;
 	canvasW = (canvasW / WORKGROUP_SIZE) * WORKGROUP_SIZE;
 	canvasH = (canvasH / WORKGROUP_SIZE) * WORKGROUP_SIZE;
 	resizeTexture(outputTexture, canvasW, canvasH);
 }
 
-int downscale = 4;
 int fps_strikes = 0;
 double fps_limit = 120.0;
 double idleTime = 0.0;
@@ -946,9 +792,9 @@ void idle() {
 	auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(now() - startTime).count();
 	float fps = frameCount / (elapsed / 1000000.0);
 	if (elapsed >= 1000000) {
-		//if(fps < fps_limit * 0.8) {
+		if(fps < fps_limit * 0.8) {
 			std::cout << "FPS: " << fps << " Frame Time: " << busyTime/(1000.0 * frameCount) << " ms " << "CPU Busy: " << (1.0 - (idleTime / elapsed)) * 100.0f << "%" << " maxDepth: " << maxDepth << " scale: " << canvasScale << std::endl;
-		//`}
+		}
 		idleTime = 0.0;
 		busyTime = 0.0;
 		frameCount = 0;
@@ -959,33 +805,32 @@ void idle() {
 		auto timeBeforeSleep = now();
 		usleep(frameTimeLimit - frameDuration);
 		idleTime += std::chrono::duration_cast<std::chrono::microseconds>(now() - timeBeforeSleep).count();
-	} else {
-		usleep(1000.0);
 	}
-//	if(frameDuration > 100.0 * frameTimeLimit) {
-//		maxDepth = 1;
-//		canvasScale = 0.1;
-//		reshape(winW, winH);
-//	}
-/*	
-	if((frameDuration / frameTimeLimit) > 0.5) {
+	if(frameDuration > 100.0 * frameTimeLimit) {
+		maxDepth = 1;
+		canvasScale = 0.1;
+		reshape(winW, winH);
+	}
+/*	if (fps < fps_limit * 0.8) {
 		fps_strikes++;
 		if(fps_strikes > 10) {
-			downscale++;
-			canvasScale = 2.0 / downscale;
+			canvasScale *= 0.9;
+			canvasScale = std::max(0.25f, canvasScale);
 			reshape(winW, winH);
 			fps_strikes = 0;
 		}
-	} else if((idleTime / elapsed) < 0.01) {
+	} else if((idleTime / elapsed) > 0.98) {
 		fps_strikes--;
 		if(fps_strikes < -10) {
-			downscale = std::max(1, downscale - 1);
-			canvasScale = 2.0 / downscale;
+			maxDepth = std::min((float)MAXDEPTH, maxDepth + 1);
+			canvasScale *= 1.11;
+			canvasScale = std::min(1.0f, canvasScale);
 			reshape(winW, winH);
 			fps_strikes = 0;
 		}
 	}
 */
+
 	prevFrameTime = now();
 	glutPostRedisplay();
 }
