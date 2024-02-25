@@ -273,10 +273,12 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 				for k in 0..<object1.sec.count {
 					for l in 0..<object2.sec.count {
 						let (distance2, closingSpeed2) = collisionTest(object1.sec[k].moo, object2.sec[l].moo)
-						if distance2 > 0 && closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
-							//print("ent-ent collision \(t): \(distance2) \(closingSpeed2) dt: \(dt)")
+						if closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
+							print("ent-ent collision \(t): \(distance2) \(closingSpeed2) dt: \(dt)")
+							print("object1 section radius: \(object1.sec[k].moo.radius) object2 section radius: \(object2.sec[l].moo.radius)")
 							let collisionTime2 = distance2 / closingSpeed2
-							fmlcollisions.append((collisionTime2, object1.sec[k].moo, object2.sec[l].moo, object1, object2))
+							//fmlcollisions.append((collisionTime2, object1.sec[k].moo, object2.sec[l].moo, object1, object2))
+							easycollisions.append((collisionTime2, object1.moo, object2.moo))
 						}
 					}
 				}

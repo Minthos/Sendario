@@ -112,7 +112,7 @@ struct CompositeCod: Codable {
 	}
 
 	static func unit() -> CompositeCod {
-		return CompositeCod(orientation: Quaternion(w: 0, x: 0, y: 1, z: 0), position: Vector(), scale: 0.4, b:[BoxoidCod.unit()], bbox: BBox())
+		return CompositeCod(orientation: Quaternion(w: 0, x: 0, y: 1, z: 0), position: Vector(), scale: 0.667, b:[BoxoidCod.unit()], bbox: BBox())
 	}
 
 	static func load(_ path: String) -> CompositeCod {

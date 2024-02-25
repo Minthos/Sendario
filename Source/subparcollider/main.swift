@@ -84,25 +84,25 @@ var moon = Celestial(name: "Luna", SphericalCow(id: 4,
 						 spin: Vector(0, 0, 0),
 						 mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.2))
 var player1 = Entity(name: "Player 1", SphericalCow(id: 5,
-						 position: Vector(earth.moo.position.x + 0.0, earth.moo.position.y + 0.0, earth.moo.position.z + earth.moo.radius + 2.1),
+						 position: Vector(earth.moo.position.x + 0.0, earth.moo.position.y + 0.0, earth.moo.position.z + earth.moo.radius + 1.1),
 						 velocity: Vector(earth.moo.velocity.x, earth.moo.velocity.y + 0, earth.moo.velocity.z),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
 						 spin: Vector(0.0, 0.0, 0.0),
 						 mass: 1e3, radius:1.0, frictionCoefficient: 0.5))
 var ent1 = Entity(name: "ent1", SphericalCow(id: 6,
-						 position: Vector(earth.moo.position.x + 0.0, earth.moo.position.y + 0.0, earth.moo.position.z + earth.moo.radius + 5.1),
+						 position: Vector(earth.moo.position.x + 0.0, earth.moo.position.y + 0.5, earth.moo.position.z + earth.moo.radius + 3.2),
 						 velocity: Vector(earth.moo.velocity.x, earth.moo.velocity.y + 0, earth.moo.velocity.z),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
 						 spin: Vector(0.1, 0.0, 0.0),
 						 mass: 1e3, radius:1.0, frictionCoefficient: 0.5))
 var ent2 = Entity(name: "ent2", SphericalCow(id: 7,
-						 position: Vector(earth.moo.position.x + 0.0, earth.moo.position.y + 0.0, earth.moo.position.z + earth.moo.radius + 10.2),
+						 position: Vector(earth.moo.position.x + 2.0, earth.moo.position.y + 0.0, earth.moo.position.z + earth.moo.radius + 2.4),
 						 velocity: Vector(earth.moo.velocity.x, earth.moo.velocity.y + 0, earth.moo.velocity.z),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
 						 spin: Vector(0.1, 0.0, 0.0),
 						 mass: 1e3, radius:1.0, frictionCoefficient: 0.5))
 var ent3 = Entity(name: "ent3", SphericalCow(id: 8,
-						 position: Vector(earth.moo.position.x + 0.0, earth.moo.position.y + 0.0, earth.moo.position.z + earth.moo.radius + 14.3),
+						 position: Vector(earth.moo.position.x + 2.0, earth.moo.position.y + -0.1, earth.moo.position.z + earth.moo.radius + 4.6),
 						 velocity: Vector(earth.moo.velocity.x, earth.moo.velocity.y + 0, earth.moo.velocity.z),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
 						 spin: Vector(0.1, 0.0, 0.0),
@@ -183,7 +183,7 @@ var thrustVector = Vector(0, 0, 0)
 var cameraSpherical = SphericalVector(1, 0, 0)
 
 let totalTime = 1e12
-var dt = 0.001
+var dt = 0.01
 var t = 0.0
 
 /*
@@ -433,7 +433,7 @@ func main() {
 					}
 					ship.dinged = 0
 				}	 
-				if(player1.moo.hp < 0.001) {
+				if(player1.moo.hp < -1000000000.001) {
 					dt = 0.0
 					print("game over! to respawn: rm composites.json; ./subparcollider")
 					shouldExit = true
@@ -494,7 +494,7 @@ func main() {
 		let nearestCelestial = moon.moo
 		let relativeVelocity = cameraTarget.velocity - nearestCelestial.velocity
 		var prograde = relativeVelocity
-		camera.moo.position = Vector(earth.moo.position.x + 2.0, earth.moo.position.y + 10.0, earth.moo.position.z + earth.moo.radius + 0.5)
+		camera.moo.position = Vector(earth.moo.position.x + 20.0, earth.moo.position.y + 100.0, earth.moo.position.z + earth.moo.radius + 0.5)
 //		camera.moo.position = cameraTarget.position + Vector(2.0, 10.0, 2.0)
 		//camera.moo.position = cameraTarget.position + Vector(10, 10, -4.5 * cameraTarget.radius)
 		if(relativeVelocity.lengthSquared == 0) {
