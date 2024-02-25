@@ -84,28 +84,28 @@ var moon = Celestial(name: "Luna", SphericalCow(id: 4,
 						 spin: Vector(0, 0, 0),
 						 mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.2))
 var player1 = Entity(name: "Player 1", SphericalCow(id: 5,
-						 position: Vector(earth.moo.position.x + 0.0, earth.moo.position.y + 0.0, earth.moo.position.z + earth.moo.radius + 0.01),
+						 position: Vector(earth.moo.position.x + 0.0, earth.moo.position.y + 0.0, earth.moo.position.z + earth.moo.radius + 1.0),
 						 velocity: Vector(earth.moo.velocity.x, earth.moo.velocity.y + 0, earth.moo.velocity.z),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
-						 spin: earth.moo.spin,
+						 spin: Vector(0.0, 0.0, 0.0),
 						 mass: 10e3, radius:1.0, frictionCoefficient: 0.5))
 var ent1 = Entity(name: "ent1", SphericalCow(id: 6,
-						 position: Vector(earth.moo.position.x + 2.0, earth.moo.position.y + 0.0, earth.moo.position.z + earth.moo.radius + 5.55),
+						 position: Vector(earth.moo.position.x + 2.0, earth.moo.position.y + 0.0, earth.moo.position.z + earth.moo.radius + 1.1),
 						 velocity: Vector(earth.moo.velocity.x, earth.moo.velocity.y + 0, earth.moo.velocity.z),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
-						 spin: earth.moo.spin,
+						 spin: Vector(0.1, 0.0, 0.0),
 						 mass: 1e3, radius:1.0, frictionCoefficient: 0.5))
 var ent2 = Entity(name: "ent2", SphericalCow(id: 7,
-						 position: Vector(earth.moo.position.x + 0.0, earth.moo.position.y + 2.0, earth.moo.position.z + earth.moo.radius + 1.5),
+						 position: Vector(earth.moo.position.x + 0.0, earth.moo.position.y + 2.0, earth.moo.position.z + earth.moo.radius + 1.2),
 						 velocity: Vector(earth.moo.velocity.x, earth.moo.velocity.y + 0, earth.moo.velocity.z),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
-						 spin: earth.moo.spin,
+						 spin: Vector(0.1, 0.0, 0.0),
 						 mass: 1e3, radius:1.0, frictionCoefficient: 0.5))
 var ent3 = Entity(name: "ent3", SphericalCow(id: 8,
-						 position: Vector(earth.moo.position.x + 2.5, earth.moo.position.y + -2.5, earth.moo.position.z + earth.moo.radius + 3.25),
+						 position: Vector(earth.moo.position.x + 2.5, earth.moo.position.y + -2.5, earth.moo.position.z + earth.moo.radius + 1.3),
 						 velocity: Vector(earth.moo.velocity.x, earth.moo.velocity.y + 0, earth.moo.velocity.z),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
-						 spin: earth.moo.spin,
+						 spin: Vector(0.1, 0.0, 0.0),
 						 mass: 1e3, radius:1.0, frictionCoefficient: 0.5))
 var camera = Celestial(name: "Camera", SphericalCow(id: -1,
 						  position: Vector(earth.moo.position.x, earth.moo.position.y + earth.moo.radius * 2.0, earth.moo.position.z - earth.moo.radius * 8.0),
@@ -160,6 +160,7 @@ struct GameState: Codable {
 }
 
 var s: GameState = GameState();
+var enableGrid = false
 var grid: [CompositeCod] = []
 var gridrefs: [Objref] = []
 let grid_size = 10000.0
@@ -182,7 +183,7 @@ var thrustVector = Vector(0, 0, 0)
 var cameraSpherical = SphericalVector(1, 0, 0)
 
 let totalTime = 1e12
-var dt = 0.001
+var dt = 0.01
 var t = 0.0
 
 /*
@@ -223,29 +224,13 @@ func main() {
 	s = GameState.load()
 	if s.composites.count == 0 {
 		s.composites.append(CompositeCod.unit())
+		
+		//s.composites[0].b.append(BoxoidCod.unit())
+		//s.composites[0].b[0].translate(Vector(0, 1.0, 0.5))
+		//s.composites[0].bbox = s.composites[0].calculateBBox()
+
 		s.composites[0].position = player1.moo.position
 		s.composites[0].orientation = player1.moo.orientation
-		s.composites.append(CompositeCod.unit())
-		s.composites[1].position = ent1.moo.position
-		s.composites[1].orientation = ent1.moo.orientation
-        ent1.c = s.composites[1]
-        ent1.createCows()
-        ent1.recomputeCows()
-        ent1.updateCows()
-		s.composites.append(CompositeCod.unit())
-		s.composites[2].position = ent2.moo.position
-		s.composites[2].orientation = ent2.moo.orientation
-        ent2.c = s.composites[2]
-        ent2.createCows()
-        ent2.recomputeCows()
-        ent2.updateCows()
-		s.composites.append(CompositeCod.unit())
-		s.composites[3].position = ent3.moo.position
-		s.composites[3].orientation = ent3.moo.orientation
-        ent3.c = s.composites[3]
-        ent3.createCows()
-        ent3.recomputeCows()
-        ent3.updateCows()
 		//s.composites.append(CompositeCod.load("grid.json"))
 		//s.composites[1].orientation = Quaternion()
 	} else {
@@ -256,6 +241,31 @@ func main() {
 	player1.createCows()
 	player1.recomputeCows()
 	player1.updateCows()
+
+	if(s.composites.count < 4)
+	{
+		s.composites.append(CompositeCod.unit())
+		s.composites[1].position = ent1.moo.position
+		s.composites[1].orientation = ent1.moo.orientation
+		ent1.c = s.composites[1]
+		ent1.createCows()
+		ent1.recomputeCows()
+		ent1.updateCows()
+		s.composites.append(CompositeCod.unit())
+		s.composites[2].position = ent2.moo.position
+		s.composites[2].orientation = ent2.moo.orientation
+		ent2.c = s.composites[2]
+		ent2.createCows()
+		ent2.recomputeCows()
+		ent2.updateCows()
+		s.composites.append(CompositeCod.unit())
+		s.composites[3].position = ent3.moo.position
+		s.composites[3].orientation = ent3.moo.orientation
+		ent3.c = s.composites[3]
+		ent3.createCows()
+		ent3.recomputeCows()
+		ent3.updateCows()
+	}
 
 	for i in 0..<celestials.count {
 		celestials[i].moo.hp = celestials[i].moo.mass * 100.0
@@ -274,7 +284,7 @@ func main() {
 	// main game loop. handle input, do a physics tick, send results to renderer
 	while( !shouldExit ) {
 		// take a nap first, don't want to work too hard
-		usleep(1000)
+		usleep(10000)
 		
 		// poll for inputs, generate actions
 		for i in 0..<SDL_NumJoysticks() {
@@ -415,25 +425,25 @@ func main() {
 			}
 			gravTick(center: sun.moo, celestials: &celestials, t: t, dt: dt)
 			tick(actions: actions, entities: &ships, celestials: &celestials, t: t, dt: dt)
-            for (i, ship) in ships.enumerated() {
-               if(ship.dinged > 0) {
-                    if(ship.damageReport()) {
-                        s.composites[i] = ship.c
-                        updateComposite(objrefs[i], toC(s.composites[i]))
-                    }
-                    if(player1.moo.hp < 0.001) {
-                        dt = 0.0
-                        print("game over! to respawn: rm composites.json; ./subparcollider")
-                        shouldExit = true
-                        let encoder = JSONEncoder()
-                        encoder.outputFormatting = .prettyPrinted
-                        //try! print((String(data: encoder.encode(player1), encoding: .utf8)!)
-                    }
-                    ship.dinged = 0
-			    }     
-                s.composites[i].position = ship.moo.position
-                s.composites[i].orientation = ship.moo.orientation
-            }
+			for (i, ship) in ships.enumerated() {
+			   if(ship.dinged > 0) {
+					if(ship.damageReport()) {
+						s.composites[i] = ship.c
+						updateComposite(objrefs[i], toC(s.composites[i]))
+					}
+					ship.dinged = 0
+				}	 
+				if(player1.moo.hp < 0.001) {
+					dt = 0.0
+					print("game over! to respawn: rm composites.json; ./subparcollider")
+					shouldExit = true
+					let encoder = JSONEncoder()
+					encoder.outputFormatting = .prettyPrinted
+					//try! print((String(data: encoder.encode(player1), encoding: .utf8)!)
+				}
+				s.composites[i].position = ship.moo.position
+				s.composites[i].orientation = ship.moo.orientation
+			}
 			t += dt
 		} else if interfaceMode == .workshop {
 			switch(dpad) {
@@ -484,7 +494,8 @@ func main() {
 		let nearestCelestial = moon.moo
 		let relativeVelocity = cameraTarget.velocity - nearestCelestial.velocity
 		var prograde = relativeVelocity
-		camera.moo.position = cameraTarget.position + Vector(2.0, 10.0, 2.0)
+		camera.moo.position = Vector(earth.moo.position.x + 2.0, earth.moo.position.y + 10.0, earth.moo.position.z + earth.moo.radius + 0.5)
+//		camera.moo.position = cameraTarget.position + Vector(2.0, 10.0, 2.0)
 		//camera.moo.position = cameraTarget.position + Vector(10, 10, -4.5 * cameraTarget.radius)
 		if(relativeVelocity.lengthSquared == 0) {
 			prograde = cameraTarget.orientation * Vector(0, 0, 1)
@@ -492,7 +503,8 @@ func main() {
 			prograde = relativeVelocity.normalized()
 			//camera.moo.position = cameraTarget.position + relativeVelocity.normalized() * -4.5 * cameraTarget.radius
 		}
-		var camFwd = (cameraTarget.position - camera.moo.position).normalized()
+		var camFwd = Vector(0, -1.0, 0)
+		//var camFwd = (cameraTarget.position - camera.moo.position).normalized()
 		var upVec = (cameraTarget.position - nearestCelestial.position).normalized()
 		let pitchAxis = camFwd.cross(upVec).normalized()
 		let pitchQuat = Quaternion(axis: pitchAxis, angle: 2.0 * cameraSpherical.phi * (rcsIsEnabled ? 0.0 : 1.0))
@@ -502,7 +514,7 @@ func main() {
 			upVec = cameraTarget.orientation * worldUpVector
 			camera.moo.position = cameraTarget.position + camFwd * -4.5 * cameraTarget.radius
 		} else {
-		    upVec = (camera.moo.position - nearestCelestial.position).normalized()
+			upVec = (camera.moo.position - nearestCelestial.position).normalized()
 			//camFwd = yawQuat * pitchQuat * camFwd
 			//upVec = pitchQuat * upVec
 		}
@@ -581,7 +593,11 @@ func main() {
 //			compositeArray[i + objrefs.count] = Objref(orientation: grid[0].orientation.float, position: position.float, id: gridrefs[0].id, type: gridrefs[0].type)
 //		}
 
-		render(compositeArray, objrefs.count + 1, sphereArray, allTheThings.count + trajectory.count, renderMisc)
+		if(enableGrid) {
+			render(compositeArray, objrefs.count + 1, sphereArray, allTheThings.count + trajectory.count, renderMisc)
+		} else {
+			render(compositeArray, objrefs.count, sphereArray, allTheThings.count + trajectory.count, renderMisc)
+		}
 		compositeArray.deallocate()
 		sphereArray.deallocate()
 	}

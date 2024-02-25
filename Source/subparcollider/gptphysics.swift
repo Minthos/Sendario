@@ -192,6 +192,17 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		if(nearest !== object.moo.referenceFrame) {
 			object.moo.updateReferenceFrame(nearest)
 		}
+		let altitude = object.moo.position.length - nearest.radius
+		let (density, _, viscosity) = atmosphericProperties(altitude: altitude)
+		let dragCoefficient = 0.47 // Assuming a sphere
+		let area = Double.pi * pow(object.moo.radius, 2)
+		var dragForceMagnitude = 0.5 * density * pow(object.moo.velocity.length, 2) * dragCoefficient * area
+		if(dragForceMagnitude.isNaN) {
+			dragForceMagnitude = 0
+		}
+		let dragForce = -object.moo.velocity.normalized() * dragForceMagnitude
+		object.moo.applyForce(force: dragForce, category: .impact, dt: dt)
+
 		object.moo.integrateForce(dt: dt)
 		object.moo.integrateTorque(dt: dt)
 		if(object.c.b.count != object.sec.count) {
@@ -247,7 +258,7 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 					let (distance2, closingSpeed2) = collisionTest(object1.sec[k].moo, object2.moo)
 					//if distance2 > 0 && closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
 					if closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
-						print("ent-celestial collision t \(t) d \(distance2) v \(closingSpeed2) dt: \(dt)")
+						//print("ent-celestial collision t \(t) d \(distance2) v \(closingSpeed2) dt: \(dt)")
 						let collisionTime2 = distance2 / closingSpeed2
 						hardcollisions.append((collisionTime2, object1.sec[k].moo, object2.moo, object1))
 					}
@@ -265,7 +276,7 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 					for l in k+1..<object2.sec.count {
 						let (distance2, closingSpeed2) = collisionTest(object1.sec[k].moo, object2.sec[l].moo)
 						if distance2 > 0 && closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
-							print("ent-ent collision \(t): \(distance2) \(closingSpeed2) dt: \(dt)")
+							//print("ent-ent collision \(t): \(distance2) \(closingSpeed2) dt: \(dt)")
 							let collisionTime2 = distance2 / closingSpeed2
 							fmlcollisions.append((collisionTime2, object1.sec[k].moo, object2.sec[l].moo, object1, object2))
 						}
@@ -369,9 +380,9 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		let angularMomentum1 = object1.momentOfInertia * totalRelativeTangentialVelocity.length / object1.radius
 		let angularMomentum2 = object2.momentOfInertia * totalRelativeTangentialVelocity.length / object2.radius
 		let maxAngularMomentum = min(angularMomentum1, angularMomentum2)
-        let angularImpulse = -totalRelativeTangentialVelocity * maxAngularMomentum
-        let maxFrictionImpulseMagnitude = min(frictionCoefficient * impulseMagnitude, maxLinearMomentum + maxAngularMomentum)
-        let frictionImpulse = angularImpulse / angularImpulse.length * min(angularImpulse.length, maxFrictionImpulseMagnitude)
+		let angularImpulse = -totalRelativeTangentialVelocity * maxAngularMomentum
+		let maxFrictionImpulseMagnitude = min(frictionCoefficient * impulseMagnitude, maxLinearMomentum + maxAngularMomentum)
+		let frictionImpulse = angularImpulse / angularImpulse.length * min(angularImpulse.length, maxFrictionImpulseMagnitude)
 		object1.velocity -= frictionImpulse * 0.5 / object1.mass
 		object2.velocity += frictionImpulse * 0.5 / object2.mass
 		let torque1 = r1.cross(frictionImpulse * 0.5)
@@ -380,21 +391,25 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		let deltaSpin2 = torque2 / object2.momentOfInertia
 		object1.spin -= deltaSpin1
 		object2.spin += deltaSpin2
-		object1.hp -= closingSpeed * impulseMagnitude * invhpmult
-		object2.hp -= closingSpeed * impulseMagnitude * invhpmult
-		ent1.dinged++
-		print()
-		print("hard collision Time:", String(format: "%f", elapsedTime))
-		print("dvel:", deltaVelocity.format(4))
-		print("dtan:", tangentVelocity.format(4))
-		print("Impulse Magnitude:", String(format: "%.4f", impulseMagnitude))
-		print("Impulse:", impulse.format(4))
-		print("angular \(maxAngularMomentum)")
-		print("linear \(maxLinearMomentum)")
-		print("Friction Impulse:", frictionImpulse.format(4))
-		print("dspin 1:", deltaSpin1.format(4))
-		print("dspin 2:", deltaSpin2.format(4))
-		print("object1 remaining hp: \(object1.hp) object2 remaining hp: \(object2.hp) ")
+
+		let damage = closingSpeed * impulseMagnitude * invhpmult
+		if(damage > 0.1) {
+			object1.hp -= damage
+			object2.hp -= damage
+			ent1.dinged++
+			print()
+			print("hard collision Time:", String(format: "%f", elapsedTime))
+			print("dvel:", deltaVelocity.format(4))
+			print("dtan:", tangentVelocity.format(4))
+			print("Impulse Magnitude:", String(format: "%.4f", impulseMagnitude))
+			print("Impulse:", impulse.format(4))
+			print("angular \(maxAngularMomentum)")
+			print("linear \(maxLinearMomentum)")
+			print("Friction Impulse:", frictionImpulse.format(4))
+			print("dspin 1:", deltaSpin1.format(4))
+			print("dspin 2:", deltaSpin2.format(4))
+			print("object1 remaining hp: \(object1.hp) object2 remaining hp: \(object2.hp) ")
+		}
 	}
 
 	easycollisions.sort { $0.0 < $1.0 }

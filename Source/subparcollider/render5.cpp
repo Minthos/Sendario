@@ -1287,7 +1287,9 @@ void *rendererThread(void *arg) {
 			glm::vec3 center = vectorize(cro->c.position);
 			// for now correctly assuming all orefs are to composites
 			glUseProgram(boxoidProgram);
+			glm::mat4 scaling = glm::scale(glm::mat4(1.0f), glm::vec3(cro->c.scale));
 			model = glm::translate(glm::mat4(1.0f), center);
+			model = model * scaling;
 			glUniformMatrix4fv(boxoidModelLoc, 1, GL_FALSE, glm::value_ptr(model));
 			glUniform3f(boxoidCenterLoc, center[0], center[1], center[2]);
 			// separate rotation from translation so we can rotate normals in the vertex shader

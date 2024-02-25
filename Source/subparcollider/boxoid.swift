@@ -47,7 +47,8 @@ struct BoxoidCod: Codable {
 							Vector((1.0, -1.0, -1.0)),
 							Vector((1.0,  1.0, -1.0))]
 		return BoxoidCod(corners: corners,
-				  curvature:[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+				  //curvature:[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+				  curvature:[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
 				  material_idx: 4, missing_faces: 0, bbox: BBox(corners))
 	}
 }
@@ -111,7 +112,7 @@ struct CompositeCod: Codable {
 	}
 
 	static func unit() -> CompositeCod {
-		return CompositeCod(orientation: Quaternion(w: 0, x: 0, y: 1, z: 0), position: Vector(), scale: 1.0, b:[BoxoidCod.unit()], bbox: BBox())
+		return CompositeCod(orientation: Quaternion(w: 0, x: 0, y: 1, z: 0), position: Vector(), scale: 0.4, b:[BoxoidCod.unit()], bbox: BBox())
 	}
 
 	static func load(_ path: String) -> CompositeCod {
