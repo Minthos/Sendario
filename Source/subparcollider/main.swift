@@ -248,7 +248,7 @@ func main() {
 			s.composites.append(CompositeCod.unit())
 			s.composites[i + 1].position = ent.moo.position
 			s.composites[i + 1].orientation = ent.moo.orientation
-			s.composites[i + 1].scale = Float(radius)
+			s.composites[i + 1].scale = Float(radius * 0.6)
 			ent.c = s.composites[i + 1]
 			ent.createCows()
 //			ent.recomputeCows()

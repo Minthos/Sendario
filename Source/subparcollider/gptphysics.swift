@@ -191,99 +191,56 @@ func collisionTest(_ object1: SphericalCow, _ object2: SphericalCow) -> (Double,
 	let deltaPosition = object2.position - object1.position
 	let sumRadii = object1.radius + object2.radius
 	let centerDistance = deltaPosition.length
-	let distance = centerDistance - sumRadii
-
+	var distance = centerDistance - sumRadii
 	if(distance < 0) {
-		object1.position += deltaPosition.normalized() * distance
-		object2.position -= deltaPosition.normalized() * distance
-		return collisionTest(object1, object2)
+		let awayVector = deltaPosition.normalized() * (distance * 3)
+		object1.position += awayVector
+		object2.position -= awayVector
+		distance = distance * -3
 	}
-
 	let deltaVelocity = object2.velocity - object1.velocity
-	
 	let collisionNormal = deltaPosition / centerDistance
 	let normalVelocity = collisionNormal * (deltaVelocity.dot(collisionNormal))
 	let closingSpeed = normalVelocity.length
-
 	if(closingSpeed > deltaVelocity.length * 1.001) {
 		print("closingSpeed: \(closingSpeed), deltaVelocity.length: \(deltaVelocity.length)")
 	}
-
 	return (distance, closingSpeed)
 }
 
-func applyCollisions(collisions: inout [(Double, Double, SphericalCow, SphericalCow)]) {
-	collisions.sort { $0.0 < $1.0 }
-	for (elapsedTime, closingSpeed, object1, object2) in collisions {
-		let deltaPosition = object2.position - object1.position
-		let deltaVelocity = object2.velocity - object1.velocity
-		let centerDistance = deltaPosition.length
-		let collisionNormal = deltaPosition / centerDistance
-		let normalVelocity = collisionNormal * (deltaVelocity.dot(collisionNormal))
-		let tangentVelocity = deltaVelocity - normalVelocity
-
-		let impulseMagnitude = min(object1.mass, object2.mass) * closingSpeed * 2
-
-		var impulseMag1 = impulseMagnitude / object1.mass
-		var impulseMag2 = impulseMagnitude / object2.mass
-		
-		if(impulseMag1 < impulseMag2) {
-			impulseMag2 = impulseMagnitude - impulseMag1
-		} else {
-			impulseMag1 = impulseMagnitude - impulseMag2
-		}
-		
-		let bounciness = 1.0
-		let impulse1 = collisionNormal * impulseMag1 * bounciness
-		let impulse2 = collisionNormal * impulseMag2 * bounciness
-
-		object1.velocity -= impulse1 / object1.mass
-		object2.velocity += impulse2 / object2.mass
-
-		// that was the radial component, the easy part
-
-		
-		// now for the tangential component.. this shit produces NaNs like there's no tomorrow
-/*
-		let collisionPoint = object1.position + (collisionNormal * object1.radius)
-		let r1 = collisionPoint - object1.position
-		let r2 = collisionPoint - object2.position
-		let rotationVelocity1 = object1.spin.cross(r1) 
-		let rotationVelocity2 = object2.spin.cross(r2)
-		let totalRelativeTangentialVelocity = tangentVelocity + rotationVelocity2 - rotationVelocity1
-		let minLinearMomentum = min(object1.mass, object2.mass) * totalRelativeTangentialVelocity.length
-		let angularMomentum1 = object1.momentOfInertia * totalRelativeTangentialVelocity.length / object1.radius
-		let angularMomentum2 = object2.momentOfInertia * totalRelativeTangentialVelocity.length / object2.radius
-		let minAngularMomentum = min(angularMomentum1, angularMomentum2)
-		let maxFrictionImpulseMagnitude = min(totalRelativeTangentialVelocity.length, minLinearMomentum + minAngularMomentum)
-		let frictionImpulse = -totalRelativeTangentialVelocity.normalized() * maxFrictionImpulseMagnitude
-		object1.velocity -= frictionImpulse / object1.mass
-		object2.velocity += frictionImpulse / object2.mass
-		let torque1 = r1.cross(frictionImpulse)
-		let torque2 = r2.cross(frictionImpulse)
-		let deltaSpin1 = torque1 / object1.momentOfInertia
-		let deltaSpin2 = torque2 / object2.momentOfInertia
-		object1.spin -= deltaSpin1
-		object2.spin += deltaSpin2
-
-		assert( !deltaVelocity.x.isNaN )
-		assert( !tangentVelocity.x.isNaN )
-		assert( !impulseMagnitude.isNaN )
-*/
-
-/*
+func applyCollision(_ elapsedTime: Double, _ closingSpeed: Double, _ object1: inout SphericalCow, _ object2: inout SphericalCow) {
+	let deltaPosition = object2.position - object1.position
+	let deltaVelocity = object2.velocity - object1.velocity
+	let centerDistance = deltaPosition.length
+	let collisionNormal = deltaPosition / centerDistance
+	let normalVelocity = collisionNormal * (deltaVelocity.dot(collisionNormal))
+	let tangentVelocity = deltaVelocity - normalVelocity
+	let impulseMagnitude = min(object1.mass, object2.mass) * closingSpeed * 2
+	var impulseMag1 = impulseMagnitude / object1.mass
+	var impulseMag2 = impulseMagnitude / object2.mass
+	if(impulseMag1 < impulseMag2) {
+		impulseMag2 = impulseMagnitude - impulseMag1
+	} else {
+		impulseMag1 = impulseMagnitude - impulseMag2
+	}
+	let bounciness = 0.7
+	let dv1 = collisionNormal * -impulseMag1 * bounciness / object1.mass
+	let dv2 = collisionNormal * impulseMag2 * bounciness / object2.mass
+	if(dv1.length > deltaVelocity.length * 2.1 || dv2.length > deltaVelocity.length * 2.1) {
+		print("shit's fucked yo \(dv1.length) \(dv2.length) \(deltaVelocity.length * 2)")
 		print("easy collision Time:", String(format: "%f", elapsedTime))
 		print("dvel:", deltaVelocity.format(4))
 		print("dtan:", tangentVelocity.format(4))
 		print("Impulse Magnitude:", String(format: "%.4f", impulseMagnitude))
-		print("angular \(minAngularMomentum)")
-		print("linear \(minLinearMomentum)")
-		print("Friction Impulse:", frictionImpulse.format(4))
-		print("dspin 1:", deltaSpin1.format(4))
-		print("dspin 2:", deltaSpin2.format(4))
 		print()
-*/
+		object1.velocity = Vector()
+		object2.velocity = Vector()
+		assert(false)
+		exit(-1)
 	}
+
+	object1.velocity += dv1
+	object2.velocity += dv2
 }
 
 // "frame of reference" is zoning in the physics engine.
@@ -324,51 +281,31 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		object.moo.integrateForce(dt: dt)
 		object.moo.integrateTorque(dt: dt)
 
-
 		if(object.c.b.count != object.sec.count) {
 			object.createCows()
 			object.recomputeCows()
 		}
 
-		object.updateCows()
-		//let altitude = object.position.z - earth.radius
-		//let (density, _, viscosity) = atmosphericProperties(altitude: altitude)
-		//let dragCoefficient = 0.47 // Assuming a sphere
-		//let area = Double.pi * pow(object.radius, 2)
-		//var dragForceMagnitude = 0.5 * density * pow(object.velocity.length, 2) * dragCoefficient * area
-		//if(dragForceMagnitude.isNaN) {
-		//	dragForceMagnitude = 0
-		//}
-		//let dragForce = -object.velocity.normalized() * dragForceMagnitude
-		//object.applyForce(force: dragForce, dt: dt)
-
-		//let angularDragTorqueMagnitude = 8 * Double.pi * viscosity * pow(object.radius, 3) * object.spin.length / 3
-		//let angularDragTorque = -object.spin.normalized() * angularDragTorqueMagnitude
-		//object.applyTorque(torque: angularDragTorque, dt: dt)
-
-		//let magnusForce = magnusForce(velocity: object.velocity, spin: object.spin, density: density, viscosity: viscosity, radius: object.radius)
-		//object.applyForce(force: magnusForce, dt: dt)
-		//print("drag: \(dragForceMagnitude), magnus: \(magnusForce.length), gravity: \(gravityForce.length), total: \((dragForce + magnusForce + gravityForce).length)")
-		//object.applyHeat(heat: 
+//		object.updateCows()
 	}
 
 	var collisions: [(Double, Double, SphericalCow, SphericalCow)] = []
 	for i in 0..<celestials.count {
 		for j in i+1..<celestials.count {
-			let object1 = celestials[i].moo
-			let object2 = celestials[j].moo
+			var object1 = celestials[i].moo
+			var object2 = celestials[j].moo
 			let (distance, closingSpeed) = collisionTest(object1, object2)
 			if distance > 0 && closingSpeed > 0 && distance < (closingSpeed * dt) {
 				print("celestial-celestial collision \(t): \(distance) \(closingSpeed) dt: \(dt)")
 				let collisionTime = distance / closingSpeed
-				collisions.append((collisionTime, closingSpeed, object1, object2))
+				applyCollision(collisionTime, closingSpeed, &object1, &object2)
 			}
 		}
 	}
 	for i in 0..<entities.count {
 		let object1 = entities[i]
 		// clever trick to prevent us from messing with the planet/moon when calculating collisions with the ground
-		let object2 = object1.moo.referenceFrame!.copy()
+		var object2 = object1.moo.referenceFrame!.copy()
 		object2.position = Vector()
 		object2.velocity = Vector()
 		object2.spin = Vector()
@@ -379,13 +316,13 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 			if(collisionTime < 0.0) {
 				collisionTime = 0.0
 			}
-			collisions.append((collisionTime, closingSpeed, object1.moo, object2))
+			applyCollision(collisionTime, closingSpeed, &object1.moo, &object2)
 		}
 	}
 	for i in 0..<entities.count {
 		for j in i+1..<entities.count {
-			let object1 = entities[i]
-			let object2 = entities[j]
+			var object1 = entities[i]
+			var object2 = entities[j]
 			let (distance, closingSpeed) = collisionTest(object1.moo, object2.moo)
 			if closingSpeed > 0 && distance >= 0 && distance < (closingSpeed * dt) {
 				var collisionTime = distance / closingSpeed
@@ -393,87 +330,9 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 				if(collisionTime < 0.0) {
 					collisionTime = 0.0
 				}
-				collisions.append((collisionTime, closingSpeed, object1.moo, object2.moo))
+				applyCollision(collisionTime, closingSpeed, &object1.moo, &object2.moo)
 			}
 		}
 	}
-	applyCollisions(collisions: &collisions)
 }
 
-
-func magnusCoefficient(velocity: Vector, spin: Vector, density: Double, viscosity: Double, radius: Double) -> Double {
-	let reynoldsNumber = density * velocity.length * 2 * radius / viscosity
-	let spinRatio = spin.length / velocity.length
-	let spinReynoldsNumber = reynoldsNumber * spinRatio
-
-	if spinReynoldsNumber <= 0 {
-		return 0.0
-	}
-
-	if spinReynoldsNumber >= 1e5 {
-		return 0.2
-	}
-
-	let logTerm = log10(spinReynoldsNumber)
-	let a = -4.6 * logTerm + 23.4
-	let b = -logTerm + 0.4
-	let c = -0.4 * logTerm + 2.5
-	let magnusCoefficient = (a * pow(spinRatio, b)) / (1 + c * pow(spinRatio, b))
-
-	return magnusCoefficient
-}
-
-func magnusForce(velocity: Vector, spin: Vector, density: Double, viscosity: Double, radius: Double) -> Vector {
-	let magnusCoefficient = magnusCoefficient(velocity: velocity, spin: spin, density: density, viscosity: viscosity, radius: radius)
-	let area = Double.pi * pow(radius, 2)
-	let relativeVelocity = velocity.length
-	var magnusForceMagnitude = 0.5 * density * pow(relativeVelocity, 2) * magnusCoefficient * area
-	if(magnusForceMagnitude.isNaN) {
-		magnusForceMagnitude = 0
-	}
-let magnusForceDirection = velocity.cross(spin).normalized()
-	let magnusForce = magnusForceDirection * magnusForceMagnitude
-	if(magnusForceMagnitude > 0) {
-//		print("magnus force: \(magnusForce.format(2))")
-	}
-	return magnusForce
-}
-
-
-/*
-// straight from gpt-3.5
-func dragHeatEnergy(sphereRadius: Double, velocity: Double, altitude: Double) -> (Double, Double) {
-	let density = atmosphericDensity(altitude: altitude)
-	let area = Double.pi * pow(sphereRadius, 2)
-	let dragCoefficient = 0.47 // Assuming a sphere
-	let velocitySquared = pow(velocity, 2)
-	
-	// Calculate total drag energy
-	let dragForceMagnitude = 0.5 * density * velocitySquared * dragCoefficient * area
-	let dragEnergy = dragForceMagnitude * velocity * secondsPerStep
-	
-	// Calculate total heat energy
-	let Cp = 1004.5 // Specific heat at constant pressure for air at room temperature
-	let T0 = atmosphericTemperature(altitude: altitude)
-	let Pr = 0.7 // Prandtl number for air at room temperature
-	let k = 0.026 // Thermal conductivity of air at room temperature
-	let Re = (density * velocity * 2 * sphereRadius) / 1.846e-5 // Reynolds number for a sphere
-	let Nu = (2 + 0.4 * pow(Re, 0.5) + 0.06 * pow(Re, 0.66667)) * pow(Pr, 0.33) // Nusselt number for a sphere
-	let h = (Nu * k) / (2 * sphereRadius) // Convective heat transfer coefficient
-	let Tf = T0 + (dragForceMagnitude / (sphereMass * Cp)) * (1 + 0.5 * (gamma - 1) * MachNumberSquared) // Temperature rise due to friction heating
-	let heatFlux = h * (Tf - T0) // Heat flux from the sphere surface
-	let heatEnergy = heatFlux * area * secondsPerStep
-	return (dragEnergy, heatEnergy)
-}
-
-// NASA Ames according to gpt-3.5 -- simplified
-func capsuleReentryHeat(radius: Double, mass: Double, velocity: Double, time: Double, altitude: Double) -> (Double, Double) {
-	let area = 4 * Double.pi * pow(radius, 2)
-	let density = atmosphericDensity(altitude: altitude)
-	let heatTransferCoefficient = 100 // W/m^2*K, approximate value for convective heat transfer coefficient
-	
-	let q = 1.83 * pow(density, 0.67) * pow(velocity, 3.07) * (area / mass) * pow((1 - 0.12 * exp(-0.2 * time)), 2/3)
-	let heat = q * heatTransferCoefficient * area * secondsPerStep
-
-	return (q, heat)
-}*/

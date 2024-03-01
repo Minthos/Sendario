@@ -329,13 +329,7 @@ class Entity: Codable, Moo {
 	}
 
 	// progress report:
-	// overallAngularMomentum seems reasonable but we need to keep track of:
-	// ongoing collisions: elastic collisions and objects penetrating each other
-	// multiple boxoids from the same composite hitting the same object in the same tick
-
-	// actually this is probably a good place to do something with elasticity. The elastic force between a boxoid
-	// and its composite should be added to that boxoid's impulse calculation for the following tick so it repels
-	// the ground and other objects with a force that equals the force it exerts on the composite plus its own inertia
+	// something is wrong with the collision code, can't work on this until that's fixed
 	func updateVelocityAndSpinAfterCollision() {
 		if(self.sec.count == 0) {
 			return
