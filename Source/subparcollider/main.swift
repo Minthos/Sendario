@@ -234,7 +234,7 @@ func main() {
 		for i in 0 ..< 250 {
 			var ent = Entity(name: String(format: "ent%d", i), SphericalCow(id: 6 + Int64(i),
 				 referenceFrame: earth.moo,
-				 position: Vector(Double.random(in: -50.0 ..< 50.0), Double.random(in: -50.0 ..< 50.0), earth.moo.radius + Double.random(in: 1.0 ..< 50.0)),
+				 position: Vector(Double.random(in: -50.0 ..< 50.0), Double.random(in: -50.0 ..< 50.0), earth.moo.radius + Double.random(in: 1.0 ..< 5.0)),
 				 velocity: Vector(),
 				 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
 				 spin: Vector(0.1, 0.0, 0.0),
@@ -268,7 +268,7 @@ func main() {
 	// main game loop. handle input, do a physics tick, send results to renderer
 	while( !shouldExit ) {
 		// take a nap first, don't want to work too hard
-		usleep(10000)
+		usleep(30000)
 		
 		// poll for inputs, generate actions
 		for i in 0..<SDL_NumJoysticks() {
@@ -478,7 +478,8 @@ func main() {
 		let nearestCelestial = earth.moo
 		let relativeVelocity = cameraTarget.velocity - nearestCelestial.velocity
 		var prograde = relativeVelocity
-		camera.moo.position = Vector(20.0, 100.0, earth.moo.radius + 0.5)
+		camera.moo.position = Vector(0.0, 80.0, earth.moo.radius + 20.0)
+		//camera.moo.position = Vector(10.0, 10.0, earth.moo.radius + 100.0)
 		camera.moo.referenceFrame = earth.moo
 //		camera.moo.position = cameraTarget.position + Vector(2.0, 10.0, 2.0)
 		//camera.moo.position = cameraTarget.position + Vector(10, 10, -4.5 * cameraTarget.radius)
@@ -488,7 +489,8 @@ func main() {
 			prograde = relativeVelocity.normalized()
 			//camera.moo.position = cameraTarget.position + relativeVelocity.normalized() * -4.5 * cameraTarget.radius
 		}
-		var camFwd = Vector(-0.15, -0.9, 0)
+		var camFwd = Vector(0.0, -0.8, -0.2)
+		//var camFwd = Vector(0.0, -0.1, -0.9)
 		//var camFwd = (cameraTarget.position - camera.moo.position).normalized()
 		var upVec = cameraTarget.position.normalized()
 		let pitchAxis = camFwd.cross(upVec).normalized()

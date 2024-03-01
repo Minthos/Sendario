@@ -666,6 +666,11 @@ glm::vec3 nearestPointOnPlane(glm::vec3 origin, glm::vec3 onPlane, glm::vec3 nor
 	return onPlane + glm::dot(origin - onPlane, normal) * normal;
 }
 
+
+// TODO:
+// Do tessellation in separate steps: First generate a cube at the desired LOD, then stretch it out to its final shape
+// I think this is the only way to prevent numerical instability at higher LODs
+
 // Loop subdivision that doesn't create duplicate edges/vertices, runs in linear time
 // it looks like the mesh needs a little bit smoothing at iterations 3 and above.
 Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
@@ -797,7 +802,7 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 		}
 	}
 	// do some smoothing to counteract numeric instability, algo has some drawbacks and improvements are welcome
-	for(int i = 0; i < numTris; i++) {
+/*	for(int i = 0; i < numTris; i++) {
 		Vertex avgVert;
 		float smoothingMagnitude = 0.2f * (iteration - 3);
 		float deviance = 0.0f;
@@ -832,7 +837,7 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 		}
 neeext:
 		;
-	}
+	}*/
 	//printf("1 mesh subdivided. %d verts, %d tris, %d edges, %d indices\n", numVerts, numTris, numEdges, numIndices);
 	return Mesh(original->centre, original->faceNormals, original->faceCentres, verts, numVerts, tris, numTris, edges, numEdges, indices, numIndices);
 }
