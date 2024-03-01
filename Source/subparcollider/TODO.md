@@ -1,14 +1,14 @@
 
 # physics stuff
 
+Implement zoning in the physics engine
 
-Entities should have a 64-bit physics object that does not directly interact with other physics objects
-it's subject to gravity, aerodynamic drag and accumulated acceleration from its components
+Frame of reference needs to be a fairly small zone, and then the zone can have the planet as its frame of reference
 
-Components should have a 32-bit physics object that interacts with other 32-bit physics objects
-rigid-body physics, joints, springs, deformation, destruction
+In addition to / combination with zoning the physics engine needs a spatial acceleration structure so that I don't do N^2 collision checks for all the objects in my game world
 
-For now just stick with SphericalCow I guess
+
+
 
 # wish list
 

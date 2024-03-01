@@ -193,7 +193,10 @@ func collisionTest(_ object1: SphericalCow, _ object2: SphericalCow) -> (Double,
 	let centerDistance = deltaPosition.length
 	var distance = centerDistance - sumRadii
 	if(distance < 0) {
-		let awayVector = deltaPosition.normalized() * (distance * 10)
+		var awayVector = deltaPosition.normalized() * (distance * 10)
+		if(awayVector.length > 1000.0 || awayVector.length < -distance) {
+			print("FFFUUUUU")
+		}
 		object1.position += awayVector
 		object2.position -= awayVector
 		distance = distance * -9
@@ -223,7 +226,7 @@ func applyCollision(_ elapsedTime: Double, _ closingSpeed: Double, _ object1: in
 	} else {
 		impulseMag1 = impulseMagnitude - impulseMag2
 	}
-	let bounciness = 0.7
+	let bounciness = 0.99
 	let dv1 = collisionNormal * -impulseMag1 * bounciness / object1.mass
 	let dv2 = collisionNormal * impulseMag2 * bounciness / object2.mass
 	if(dv1.length > deltaVelocity.length * 2.1 || dv2.length > deltaVelocity.length * 2.1) {
