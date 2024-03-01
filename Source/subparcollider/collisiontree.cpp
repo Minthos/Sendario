@@ -1,0 +1,106 @@
+#include <cstdint>
+//#include <glm/glm.hpp>
+
+// shadows glm type
+struct dvec3 {
+    double x;
+    double y;
+    double z;
+};
+
+// shadows glm type
+struct ivec3 {
+    int x;
+    int y;
+    int z;
+};
+
+// returns the number of children by counting high bits in the bit field
+int count_bits(uint64_t v) {
+    int c = 0;
+    while(v != 0) {
+        v &= v - 1; // clear the least significant bit set
+        c += 1;
+    }
+    return c;
+}
+
+// https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
+// expects a bit field with a single bit set to high
+// returns the index of that bit
+uint8_t whichBit(uint64_t input){
+    uint64_t masks[] = {
+        0xaaaaaaaaaaaaaaaa,
+        0xcccccccccccccccc,
+        0xf0f0f0f0f0f0f0f0,
+        0xff00ff00ff00ff00,
+        0xffff0000ffff0000,
+        0xffffffff00000000
+    };
+    uint8_t bit = 0;
+    for(uint32_t i = 0; i < 6; i++) {
+        bit += (!(!(input & masks[i]))) << i;
+    }
+    return bit;
+}
+
+// returns an array of numbers indicating which bit in the bit field represents
+// the child node at the same index in the children array
+//
+// example:
+// bit_field 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0001 0000 0001 0001
+// children [node, node, node]
+// decode: [0,4,12]
+// then you can zip decode with children and get something like [(0, node), (4, node), (12, node)]
+void decode(uint64_t bit_field, uint8_t *results) {
+    uint64_t v = bit_field;
+    int i = 0;
+    while(v != 0) {
+        uint64_t prev = v;
+        v &= v - 1; // clear the least significant bit set
+        uint64_t diff = v ^ prev;
+        results[i++] = whichBit(diff);
+    }
+    return;
+}
+
+struct ctnode {
+    uint64_t occupancy;
+    union {
+        ctnode *firstChild;
+        void *firstLeaf;
+    };
+};
+
+// resolution at bottom level: 4m
+// 1 level up: 16
+// 2 -> 64
+// 3 -> 256
+// 4 -> 1024 (one zone? maybe zones should be bigger, 1 km is fairly short range for mech/aircraft/spaceship weapons)
+// 5 -> 4096
+// 6 -> 16384
+// 7 -> 65536 (nice round number..)
+// 8 -> 262144
+// A tree shouldn't be too big, it should represent a frame of reference for the physics engine
+// We want to keep the numbers small to counter floating point stability issues
+// Better to have many trees and move more frequently between them
+class CollisionTree {
+    int numItems;
+    ctnode *root;
+};
+
+// I want the tree to be packed in a contiguous array so that lookups can benefit maximally from
+// cpu cache and prefetching. The physics engine can do all the position updates in a single
+// batch and then we can update and repack the tree before we do lookups.
+
+// Additional data like lighting/shadow information and terrain data can be kept in one or more
+// separate arrays whose structures mirror the tree.
+
+// 5800x3d
+// 64 KB L1 cache at 4 cycles
+// 512 KB L2 cache at 14 cycles
+// 96 MB shared L3 cache at 47 cycles
+
+
+
+
