@@ -85,6 +85,7 @@ struct ctnode {
 // We want to keep the numbers small to counter floating point stability issues
 // Better to have many trees and move more frequently between them
 class CollisionTree {
+    dvec3 origo;
     int numItems;
     ctnode *root;
 };
@@ -92,12 +93,11 @@ class CollisionTree {
 // I want the tree to be packed in a contiguous array so that lookups can benefit maximally from
 // cpu cache and prefetching. The physics engine can do all the position updates in a single
 // batch and then we can update and repack the tree before we do lookups.
-
 // Additional data like lighting/shadow information and terrain data can be kept in one or more
 // separate arrays whose structures mirror the tree.
 
 // 5800x3d
-// 64 KB L1 cache at 4 cycles
+// 32 KB L1 data cache at 4 or 5 cycles
 // 512 KB L2 cache at 14 cycles
 // 96 MB shared L3 cache at 47 cycles
 
