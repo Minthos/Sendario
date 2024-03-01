@@ -203,8 +203,8 @@ func main() {
 	materialsArray[4].diffuse = (0.8, 0.8, 0.8)
 	materialsArray[4].emissive = (0, 0, 0)
 	//Player1
-	materialsArray[5].diffuse = (1.0, 0.0, 1.0)
-	materialsArray[5].emissive = (500.0, 500.0, 15.0)
+	materialsArray[5].diffuse = (0.4, 0.4, 1.0)
+	materialsArray[5].emissive = (0.4, 0.4, 1.0)
 	//trajectory
 	materialsArray[6].diffuse = (0.0, 0.0, 0.0)
 	materialsArray[6].emissive = (50.0, 0.0, 0.0)
@@ -226,25 +226,32 @@ func main() {
 	}
 	player1.c = s.composites[0]
 	player1.createCows()
-	player1.recomputeCows()
+//	player1.recomputeCows()
 	player1.updateCows()
 
 	if(s.composites.count < 4)
 	{
 		for i in 0 ..< 250 {
+			let radius = pow(Double.random(in: 0.4 ..< 1.0), 3.0)
+			let mass = pow(radius, 3.0) * 1000.0
+
+//			let mass = Double.random(in: 1.0 ..< 1000.0)
+//			let radius = pow(mass * 0.001, 0.33)
+
 			var ent = Entity(name: String(format: "ent%d", i), SphericalCow(id: 6 + Int64(i),
 				 referenceFrame: earth.moo,
-				 position: Vector(Double.random(in: -50.0 ..< 50.0), Double.random(in: -50.0 ..< 50.0), earth.moo.radius + Double.random(in: 1.0 ..< 5.0)),
+				 position: Vector(Double.random(in: -10.0 ..< 10.0), Double.random(in: -10.0 ..< 10.0), earth.moo.radius + Double.random(in: 1.0 ..< 500.0)),
 				 velocity: Vector(),
 				 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
 				 spin: Vector(0.1, 0.0, 0.0),
-				 mass: 1e3, radius:1.0, frictionCoefficient: 0.5))
+				 mass: mass, radius: radius, frictionCoefficient: 0.5))
 			s.composites.append(CompositeCod.unit())
 			s.composites[i + 1].position = ent.moo.position
 			s.composites[i + 1].orientation = ent.moo.orientation
+			s.composites[i + 1].scale = Float(radius)
 			ent.c = s.composites[i + 1]
 			ent.createCows()
-			ent.recomputeCows()
+//			ent.recomputeCows()
 			ent.updateCows()
 			ships.append(ent)
 			allTheThings.append(ent)
@@ -268,7 +275,7 @@ func main() {
 	// main game loop. handle input, do a physics tick, send results to renderer
 	while( !shouldExit ) {
 		// take a nap first, don't want to work too hard
-		usleep(30000)
+		usleep(8000)
 		
 		// poll for inputs, generate actions
 		for i in 0..<SDL_NumJoysticks() {

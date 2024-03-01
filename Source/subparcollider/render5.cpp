@@ -229,6 +229,7 @@ in vec3 fragPos;
 in vec3 fragNormal;
 in vec4 vertexPosClip;
 in vec3 fragLight;
+in vec3 fragTex;
 flat in int fragFlags;
 
 struct light {
@@ -263,13 +264,14 @@ void main()
 		vec3 lightDirection = lightVector / sqrt(squaredDistance);
 		float attenuation = 1.0 / squaredDistance;
 		float lambertian = max(dot(fragNormal, lightDirection), 0.0);
-		accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
+		accumulatedLight += attenuation * lambertian * lightColors[i];
+//		accumulatedLight += attenuation * materialDiffuse * lightColors[i] * lambertian;
 		//accumulatedLight += attenuation * invNormals.xyz * lightColors[i] * lambertian;
 	}
-	vec3 radiance = materialEmissive * 0.079577 + accumulatedLight;
+	vec3 radiance = materialEmissive * 0.079577 + accumulatedLight * materialDiffuse;
 	float darkness = 3.0 / (3.0 + exposure + radiance.r + radiance.g + radiance.b);
 	radiance = radiance * darkness;
-	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0) * 0.75 + invNormals * 0.25;
+	fragColor = vec4(pow(radiance, vec3(1.0 / gamma)), 1.0);
 	const float constantForDepth = 1.0;
 	const float farDistance = 3e18;
 	const float offsetForDepth = 1.0;
@@ -802,7 +804,7 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 		}
 	}
 	// do some smoothing to counteract numeric instability, algo has some drawbacks and improvements are welcome
-/*	for(int i = 0; i < numTris; i++) {
+	for(int i = 0; i < numTris; i++) {
 		Vertex avgVert;
 		float smoothingMagnitude = 0.2f * (iteration - 3);
 		float deviance = 0.0f;
@@ -837,7 +839,7 @@ Mesh tessellateMesh(Mesh* original, int iteration, Boxoid* box) {
 		}
 neeext:
 		;
-	}*/
+	}
 	//printf("1 mesh subdivided. %d verts, %d tris, %d edges, %d indices\n", numVerts, numTris, numEdges, numIndices);
 	return Mesh(original->centre, original->faceNormals, original->faceCentres, verts, numVerts, tris, numTris, edges, numEdges, indices, numIndices);
 }
@@ -864,7 +866,8 @@ Mesh boxoidToMesh(Boxoid box) {
 		verts[i] = Vertex(corners[i],
 			glm::normalize(corners[i] - centre),
 			glm::vec3(0.0f, glm::length(corners[i] - centre), 1.0f),
-			glm::vec3(sphereVertices[i * 3], sphereVertices[i * 3 + 1], sphereVertices[i * 3 + 2]),
+			glm::vec3(1.0f, 1.0f, 0.0f),
+			//glm::vec3(sphereVertices[i * 3], sphereVertices[i * 3 + 1], sphereVertices[i * 3 + 2]),
 			VERT_ORIGINAL | VERT_CORNER | (0x1 << 24));
 	}
 	for(int i = 0; i < 12; i++) {

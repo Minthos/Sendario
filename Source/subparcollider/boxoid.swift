@@ -49,7 +49,7 @@ struct BoxoidCod: Codable {
 		return BoxoidCod(corners: corners,
 				  //curvature:[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
 				  curvature:[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-				  material_idx: 4, missing_faces: 0, bbox: BBox(corners))
+				  material_idx: Int.random(in: 1..<6), missing_faces: 0, bbox: BBox(corners))
 	}
 }
 

@@ -252,6 +252,7 @@ class Entity: Codable, Moo {
 		self.name = name
 		self.moo = moo
 		self.c = CompositeCod.unit()
+		self.c.scale = Float(moo.radius)
 		self.sec = []
 		self.dinged = 0
 		self.inertia = Matrix3()

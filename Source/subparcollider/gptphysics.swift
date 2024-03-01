@@ -240,11 +240,14 @@ func applyCollisions(collisions: inout [(Double, Double, SphericalCow, Spherical
 		object1.velocity -= impulse1 / object1.mass
 		object2.velocity += impulse2 / object2.mass
 
-		/*
+		// that was the radial component, the easy part
+
+		
+		// now for the tangential component.. this shit produces NaNs like there's no tomorrow
+/*
 		let collisionPoint = object1.position + (collisionNormal * object1.radius)
 		let r1 = collisionPoint - object1.position
 		let r2 = collisionPoint - object2.position
-		let frictionCoefficient = (object1.frictionCoefficient * object2.frictionCoefficient)
 		let rotationVelocity1 = object1.spin.cross(r1) 
 		let rotationVelocity2 = object2.spin.cross(r2)
 		let totalRelativeTangentialVelocity = tangentVelocity + rotationVelocity2 - rotationVelocity1
@@ -252,12 +255,12 @@ func applyCollisions(collisions: inout [(Double, Double, SphericalCow, Spherical
 		let angularMomentum1 = object1.momentOfInertia * totalRelativeTangentialVelocity.length / object1.radius
 		let angularMomentum2 = object2.momentOfInertia * totalRelativeTangentialVelocity.length / object2.radius
 		let minAngularMomentum = min(angularMomentum1, angularMomentum2)
-		let maxFrictionImpulseMagnitude = min(frictionCoefficient * impulseMagnitude * totalRelativeTangentialVelocity.length, minLinearMomentum + minAngularMomentum)
+		let maxFrictionImpulseMagnitude = min(totalRelativeTangentialVelocity.length, minLinearMomentum + minAngularMomentum)
 		let frictionImpulse = -totalRelativeTangentialVelocity.normalized() * maxFrictionImpulseMagnitude
-		object1.velocity -= frictionImpulse * 0.5 / object1.mass
-		object2.velocity += frictionImpulse * 0.5 / object2.mass
-		let torque1 = r1.cross(frictionImpulse * 0.5)
-		let torque2 = r2.cross(frictionImpulse * 0.5)
+		object1.velocity -= frictionImpulse / object1.mass
+		object2.velocity += frictionImpulse / object2.mass
+		let torque1 = r1.cross(frictionImpulse)
+		let torque2 = r2.cross(frictionImpulse)
 		let deltaSpin1 = torque1 / object1.momentOfInertia
 		let deltaSpin2 = torque2 / object2.momentOfInertia
 		object1.spin -= deltaSpin1
@@ -266,12 +269,13 @@ func applyCollisions(collisions: inout [(Double, Double, SphericalCow, Spherical
 		assert( !deltaVelocity.x.isNaN )
 		assert( !tangentVelocity.x.isNaN )
 		assert( !impulseMagnitude.isNaN )
+*/
 
+/*
 		print("easy collision Time:", String(format: "%f", elapsedTime))
 		print("dvel:", deltaVelocity.format(4))
 		print("dtan:", tangentVelocity.format(4))
 		print("Impulse Magnitude:", String(format: "%.4f", impulseMagnitude))
-		print("Impulse:", impulse.format(4))
 		print("angular \(minAngularMomentum)")
 		print("linear \(minLinearMomentum)")
 		print("Friction Impulse:", frictionImpulse.format(4))
@@ -315,7 +319,7 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 			dragForceMagnitude = 0
 		}
 		let dragForce = -object.moo.velocity.normalized() * dragForceMagnitude
-		//object.moo.applyForce(force: dragForce, category: .drag, dt: dt)
+		object.moo.applyForce(force: dragForce, category: .drag, dt: dt)
 		// TODO: dissipate heat, apply damage from heat. right now heat only ever increases, which is fine since it does nothing.
 		object.moo.integrateForce(dt: dt)
 		object.moo.integrateTorque(dt: dt)
