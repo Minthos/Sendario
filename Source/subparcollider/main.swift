@@ -54,44 +54,51 @@ struct Action {
 }
 
 var sun = Celestial(name: "Sol", SphericalCow(id: 0,
+						 referenceFrame: nil,
 						 position: Vector(0, 0, 0),
 						 velocity: Vector(0, 0, 0),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
 						 spin: Vector(0, 0, 0),
 						 mass: 1.989e30, radius: 696.34e6, frictionCoefficient: 0.8))
 var mercury = Celestial(name: "Mercury", SphericalCow(id: 1,
+						 referenceFrame: nil,
 						 position: Vector(0, 0, -57.91e9),
 						 velocity: Vector(0, 0, 47.87e3),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
 						 spin: Vector(0, 0, 0),
 						 mass: 3.285e23, radius: 2.44e6, frictionCoefficient: 0.8))
 var venus = Celestial(name: "Venus", SphericalCow(id: 2,
+						 referenceFrame: nil,
 						 position: Vector(0, 0, 108.2e9),
 						 velocity: Vector(0, 0, 35.02e3),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
 						 spin: Vector(0, 0, 0),
 						 mass: 4.867e24, radius: 6.0518e6, frictionCoefficient: 0.8))
 var earth = Celestial(name: "Earth", SphericalCow(id: 3,
+						 referenceFrame: nil,
 						 position: Vector(0, 0, -149.6e9),
 						 velocity: Vector(0, 29.78e3, 0),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
 						 spin: Vector(0, 0, 0),
 						 mass: 5.972e24, radius: 6.371e6, frictionCoefficient: 0.8))
 var moon = Celestial(name: "Luna", SphericalCow(id: 4,
+						 referenceFrame: nil,
 						 position: Vector(earth.moo.position.x - 384e6, earth.moo.position.y, earth.moo.position.z),
 						 velocity: Vector(earth.moo.velocity.x, earth.moo.velocity.y, earth.moo.velocity.z + 1.022e3),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
 						 spin: Vector(0, 0, 0),
 						 mass: 7.342e22, radius: 1.7371e6, frictionCoefficient: 0.2))
 var player1 = Entity(name: "Player 1", SphericalCow(id: 5,
-						 position: Vector(earth.moo.position.x + 0.0, earth.moo.position.y + 0.0, earth.moo.position.z + earth.moo.radius + 1.1),
-						 velocity: Vector(earth.moo.velocity.x, earth.moo.velocity.y + 0, earth.moo.velocity.z),
+						 referenceFrame: earth.moo,
+						 position: Vector(0.0, 0.0, earth.moo.radius + 1.1),
+						 velocity: Vector(),
 						 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
 						 spin: Vector(0.0, 0.0, 0.0),
 						 mass: 1e3, radius:1.0, frictionCoefficient: 0.5))
 var camera = Celestial(name: "Camera", SphericalCow(id: -1,
-						  position: Vector(earth.moo.position.x, earth.moo.position.y + earth.moo.radius * 2.0, earth.moo.position.z - earth.moo.radius * 8.0),
-						  velocity: earth.moo.velocity,
+						  referenceFrame: earth.moo,
+						  position: Vector(20.0, 100.0, earth.moo.radius + 0.5),
+						  velocity: Vector(),
 						  orientation: Quaternion(w: 0, x: 0, y: 1, z: 0),
 						  spin: Vector(0, 0, 0),
 						  mass: 0, radius: 0, frictionCoefficient: 0.0))
@@ -226,8 +233,9 @@ func main() {
 	{
 		for i in 0 ..< 250 {
 			var ent = Entity(name: String(format: "ent%d", i), SphericalCow(id: 6 + Int64(i),
-				 position: Vector(earth.moo.position.x + Double.random(in: -50.0 ..< 50.0), earth.moo.position.y + Double.random(in: -50.0 ..< 50.0), earth.moo.position.z + earth.moo.radius + Double.random(in: 1.0 ..< 2.0)),
-				 velocity: Vector(earth.moo.velocity.x, earth.moo.velocity.y + 0, earth.moo.velocity.z),
+				 referenceFrame: earth.moo,
+				 position: Vector(Double.random(in: -50.0 ..< 50.0), Double.random(in: -50.0 ..< 50.0), earth.moo.radius + Double.random(in: 1.0 ..< 50.0)),
+				 velocity: Vector(),
 				 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
 				 spin: Vector(0.1, 0.0, 0.0),
 				 mass: 1e3, radius:1.0, frictionCoefficient: 0.5))
@@ -467,10 +475,11 @@ func main() {
 		renderMisc.buttonPresses = abs(buttonPresses);
 		renderMisc.materials = materialsArray
 		let cameraTarget = player1.moo
-		let nearestCelestial = moon.moo
+		let nearestCelestial = earth.moo
 		let relativeVelocity = cameraTarget.velocity - nearestCelestial.velocity
 		var prograde = relativeVelocity
-		camera.moo.position = Vector(earth.moo.position.x + 20.0, earth.moo.position.y + 100.0, earth.moo.position.z + earth.moo.radius + 0.5)
+		camera.moo.position = Vector(20.0, 100.0, earth.moo.radius + 0.5)
+		camera.moo.referenceFrame = earth.moo
 //		camera.moo.position = cameraTarget.position + Vector(2.0, 10.0, 2.0)
 		//camera.moo.position = cameraTarget.position + Vector(10, 10, -4.5 * cameraTarget.radius)
 		if(relativeVelocity.lengthSquared == 0) {
@@ -481,7 +490,7 @@ func main() {
 		}
 		var camFwd = Vector(-0.15, -0.9, 0)
 		//var camFwd = (cameraTarget.position - camera.moo.position).normalized()
-		var upVec = (cameraTarget.position - nearestCelestial.position).normalized()
+		var upVec = cameraTarget.position.normalized()
 		let pitchAxis = camFwd.cross(upVec).normalized()
 		let pitchQuat = Quaternion(axis: pitchAxis, angle: 2.0 * cameraSpherical.phi * (rcsIsEnabled ? 0.0 : 1.0))
 		let yawQuat = Quaternion(axis: upVec, angle: 2.0 * cameraSpherical.theta * (rcsIsEnabled ? 0.0 : 1.0))
@@ -490,12 +499,13 @@ func main() {
 			upVec = cameraTarget.orientation * worldUpVector
 			camera.moo.position = cameraTarget.position + camFwd * -4.5 * cameraTarget.radius
 		} else {
-			upVec = (camera.moo.position - nearestCelestial.position).normalized()
+			upVec = camera.moo.position.normalized()
 			//camFwd = yawQuat * pitchQuat * camFwd
 			//upVec = pitchQuat * upVec
 		}
 		renderMisc.camForward = (Float(camFwd.x), Float(camFwd.y), Float(camFwd.z))
-		renderMisc.camUp = (Float(upVec.z), Float(upVec.y), Float(upVec.x))
+		//renderMisc.camUp = (Float(upVec.z), Float(upVec.y), Float(upVec.x))
+		renderMisc.camUp = Vector(0, 0, 1).float
 		// camera is at 0,0,0 to make it easy for the renderer
 		renderMisc.camPosition = (0, 0, 0)
 		for (index, object) in lights.enumerated() {
@@ -504,10 +514,11 @@ func main() {
 				break
 			}
 			withUnsafeMutablePointer(to:&renderMisc.lights) { lights_ptr in
-				lights_ptr[index].position =
-					(Float(object.moo.position.x - camera.moo.position.x),
-					 Float(object.moo.position.y - camera.moo.position.y),
-					 Float(object.moo.position.z - camera.moo.position.z))
+				lights_ptr[index].position = (object.moo.position - (camera.moo.position + camera.moo.referenceFrame!.position)).float
+//				lights_ptr[index].position =
+//					(Float(object.moo.position.x - camera.moo.position.x),
+//					 Float(object.moo.position.y - camera.moo.position.y),
+//					 Float(object.moo.position.z - camera.moo.position.z))
 				// hardcoded values for the sun, improve later
 				lights_ptr[index].color = (4.38e24, 4.38e24, 4.18e24)
 			}
@@ -525,18 +536,23 @@ func main() {
 		for (index, object) in celestials.enumerated() {
 			// the mapping from object.id to material_idx should not be 1:1 in the future but it's good enough for now
 			// center everything on the camera before converting to float to avoid float precision issues when rendering
-			sphereArray[index + trajectory.count] = Sphere(position: (Float(object.moo.position.x - camera.moo.position.x),
-										Float(object.moo.position.y - camera.moo.position.y),
-										Float(object.moo.position.z - camera.moo.position.z)),
+			if(object.moo === camera.moo.referenceFrame) {
+				let pos = -camera.moo.position
+				sphereArray[index + trajectory.count] = Sphere(position: pos.float,
 										radius: Float(object.moo.radius),
 										material_idx: (Int32(object.moo.id)))
+				
+			} else {
+				let pos = object.moo.position - (camera.moo.referenceFrame!.position + camera.moo.position)
+				sphereArray[index + trajectory.count] = Sphere(position: pos.float,
+											radius: Float(object.moo.radius),
+											material_idx: (Int32(object.moo.id)))
+			}
 		}
 		for (index, object) in trajectory.enumerated() {
 			// center everything on the camera before converting to float to avoid float precision issues when rendering
 			let position = Vector(object.x - camera.moo.position.x, object.y - camera.moo.position.y, object.z - camera.moo.position.z)
-			sphereArray[index] = Sphere(position: (Float(position.x),
-										Float(position.y),
-										Float(position.z)),
+			sphereArray[index] = Sphere(position: position.float,
 										radius: Float(player1.moo.radius * pow(position.length * 0.01, 0.9)),
 										material_idx: 6)
 		}

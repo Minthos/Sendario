@@ -27,74 +27,74 @@ the mesh and choose between them based on size/distance to maintain uniform deta
 #define MAX_LIGHTS 1
 
 typedef enum {
-    COMPOSITE,
-    SPHERE,
-    BOXOID,
-    RIBBON
+	COMPOSITE,
+	SPHERE,
+	BOXOID,
+	RIBBON
 } shape_type;
 
 typedef struct {
-    float corners[3 * 8];
-    float curvature[12]; // the curvature of each face in two axes per face. setting all 12 curvatures to 1 gives a spheroid shape.
+	float corners[3 * 8];
+	float curvature[12]; // the curvature of each face in two axes per face. setting all 12 curvatures to 1 gives a spheroid shape.
 // all to 0 gives a box shape. negative values gives a kiki shape. this way we can produce cylinders, capsules, cones and weird custom shapes.
-    int material_idx; // placeholder
-    unsigned int missing_faces; // bit field specifying which faces to omit from rendering. could have been unsigned char, but padding is nice.
+	int material_idx; // placeholder
+	unsigned int missing_faces; // bit field specifying which faces to omit from rendering. could have been unsigned char, but padding is nice.
 } Boxoid;
 
 typedef struct {
-    float position[3];
-    float radius;
-    int material_idx;
+	float position[3];
+	float radius;
+	int material_idx;
 } Sphere;
 
 typedef struct {
-    size_t num_points;
-    int material_idx;
-    float point[4 * 0]; // (x, y, z, width) * num_points
+	size_t num_points;
+	int material_idx;
+	float point[4 * 0]; // (x, y, z, width) * num_points
 } Ribbon;
 
 typedef struct {
-    float orientation[4]; // w,x,y,z quaternion specifying the object's rotation from object space to world space
-    float position[3]; // x,y,z coordinates in world space
-    float scale; // default is 1
-    size_t nb; // how many boxoid shapes the object is composed of
-    Boxoid* b;
+	float orientation[4]; // w,x,y,z quaternion specifying the object's rotation from object space to world space
+	float position[3]; // x,y,z coordinates in world space
+	float scale; // default is 1
+	size_t nb; // how many boxoid shapes the object is composed of
+	Boxoid* b;
 } Composite;
 
 typedef struct {
-    shape_type type;
-    union {
+	shape_type type;
+	union {
 	Boxoid boxoid;
 	Sphere sphere;
 	Ribbon ribbon;
 	Composite composite;
-    };
+	};
 } shape_wrapper;
 
 typedef struct {
-    float orientation[4]; // w,x,y,z quaternion specifying the object's rotation from object space to world space
-    float position[3]; // x,y,z coordinates in world space
+	float orientation[4]; // w,x,y,z quaternion specifying the object's rotation from object space to world space
+	float position[3]; // x,y,z coordinates in world space
 	size_t id;
 	shape_type type;
 } Objref;
 
 typedef struct {
-    float position[3];
-    float color[3];
+	float position[3];
+	float color[3];
 } light_source;
 
 typedef struct {
-    float diffuse[3];
-    float emissive[3];
+	float diffuse[3];
+	float emissive[3];
 } material;
 
 typedef struct {
-    float camForward[3];
-    float camUp[3];
-    float camPosition[3];
-    float fov;
-    light_source lights[MAX_LIGHTS];
-    material* materials;
+	float camForward[3];
+	float camUp[3];
+	float camPosition[3];
+	float fov;
+	light_source lights[MAX_LIGHTS];
+	material* materials;
 	int32_t buttonPresses;
 } render_misc;
 

@@ -26,8 +26,9 @@ class SphericalCow: Codable {
 	var armor: Double = 0
 	var kineticEnergy: Double { return (mass * 0.5 * velocity.lengthSquared) + (momentOfInertia * 0.5 * spin.lengthSquared) }
 
-	init(id: Int64, position: Vector, velocity: Vector, orientation: Quaternion, spin: Vector, mass: Double, radius: Double, frictionCoefficient: Double = 0.1) {
+	init(id: Int64, referenceFrame: SphericalCow?, position: Vector, velocity: Vector, orientation: Quaternion, spin: Vector, mass: Double, radius: Double, frictionCoefficient: Double = 0.1) {
 		self.id = id
+		self.referenceFrame = referenceFrame
 		self.position = position
 		self.w = 200.0
 		self.warpVector = Vector()
@@ -46,18 +47,17 @@ class SphericalCow: Codable {
 	}
 
 	func copy() -> SphericalCow {
-		return SphericalCow(id: id, position: position, velocity: velocity, orientation: orientation, spin: spin, mass: mass, radius: radius, frictionCoefficient: frictionCoefficient)
+		return SphericalCow(id: id, referenceFrame: referenceFrame, position: position, velocity: velocity, orientation: orientation, spin: spin, mass: mass, radius: radius, frictionCoefficient: frictionCoefficient)
 	}
 
 	static func unit() -> SphericalCow {
-		return SphericalCow(id: 0, position: Vector(), velocity: Vector(), orientation: Quaternion(), spin: Vector(), mass: 0, radius: 0, frictionCoefficient: 0)
+		return SphericalCow(id: 0, referenceFrame: nil, position: Vector(), velocity: Vector(), orientation: Quaternion(), spin: Vector(), mass: 0, radius: 0, frictionCoefficient: 0)
 	}
 
-	// let's not do this for now, instead let's keep different star systems in separate coordinate spaces and not mix objects between them.
 	func updateReferenceFrame(_ new: SphericalCow) {
 		let old = self.referenceFrame ?? SphericalCow.unit()
-		//self.position = self.position + old.position - new.position
-		//self.velocity = self.velocity + old.velocity - new.velocity
+		self.position = self.position - old.position + new.position
+		self.velocity = self.velocity - old.velocity + new.velocity
 		self.referenceFrame = new
 	}
 
@@ -66,6 +66,8 @@ class SphericalCow: Codable {
 		self.accumulatedForce += force
 		if(category == .thrust) {
 			warpVector += force * (dt / mass)
+		} else if(category == .drag) {
+			heat += force.length / mass
 		}
 	}
 
@@ -99,36 +101,6 @@ class SphericalCow: Codable {
 
 }
 
-func calculatePeriApo(_ moo: SphericalCow) -> (SphericalVector, SphericalVector) {
-	return(SphericalVector(0,0,0), SphericalVector(0,0,0))
-}
-
-func calculateGravities(subject: SphericalCow, objects: [Celestial]) -> (Vector, SphericalCow) {
-	var gravity = Vector(0, 0, 0)
-	var strongestForce = 0.0
-	var strongestAttractor = subject
-	for object in objects {
-		if(subject !== object.moo) {
-			let deltaPosition = object.moo.position - subject.position
-			let distance = deltaPosition.length
-			var mass = object.moo.mass
-			if(distance == 0) {
-				continue
-			} else if(distance < object.moo.radius) {
-				let volumeEnclosed = (4.0 / 3.0) * Double.pi * pow(distance, 3)
-				mass = object.moo.density * volumeEnclosed
-			}
-			let forceMagnitude = (G * mass * subject.mass) / pow(distance, 2)
-			gravity += deltaPosition.normalized() * forceMagnitude
-			if forceMagnitude > strongestForce {
-				strongestForce = forceMagnitude
-				strongestAttractor = object.moo
-			}
-		}
-	}
-	return (gravity, strongestAttractor)
-}
-
 func extrapolateTrajectory(subject: Moo, relativeTo: Moo, otherObjects: [Celestial], t: Double, dt: Double, iterations: Int) -> [Vector] {
 	/*let s = subject.copy()
 	let other = relativeTo.copy()
@@ -147,12 +119,69 @@ func extrapolateTrajectory(subject: Moo, relativeTo: Moo, otherObjects: [Celesti
 	return result
 }
 
+func calculatePeriApo(_ moo: SphericalCow) -> (SphericalVector, SphericalVector) {
+	return(SphericalVector(0,0,0), SphericalVector(0,0,0))
+}
+
+// calculate the strongest single gravity force affecting an object unless the object is inside a celestial
+func calculateGravity(subject: SphericalCow, objects: [Celestial]) -> (Vector, SphericalCow) {
+	var gravity = Vector(0, 0, 0)
+	var strongestForce = 0.0
+	var strongestAttractor = subject
+	for object in objects {
+		var deltaPosition = -subject.position
+		if(object.moo !== subject.referenceFrame) {
+			deltaPosition += object.moo.position - (subject.referenceFrame?.position ?? Vector())
+		}
+		let distance = deltaPosition.length
+		var mass = object.moo.mass
+		if(distance < 0.001) {
+			return(Vector(), object.moo)
+		} else if(distance < object.moo.radius) {
+			let volumeEnclosed = (4.0 / 3.0) * Double.pi * pow(distance, 3)
+			mass = object.moo.density * volumeEnclosed
+			let forceMagnitude = (G * mass * subject.mass) / pow(distance, 2)
+			gravity = deltaPosition.normalized() * forceMagnitude
+			return (gravity, object.moo)
+		} else {
+			let forceMagnitude = (G * mass * subject.mass) / pow(distance, 2)
+			if forceMagnitude > strongestForce {
+				gravity += deltaPosition.normalized() * forceMagnitude
+				strongestForce = forceMagnitude
+				strongestAttractor = object.moo
+			}
+		}
+	}
+	return (gravity, strongestAttractor)
+}
+
+// calculate the sum of gravity forces affecting a celestial
+func calculateGravities(subject: SphericalCow, objects: [Celestial]) -> Vector {
+	var gravity = Vector(0, 0, 0)
+	for object in objects {
+		if(subject !== object.moo) {
+			let deltaPosition = object.moo.position - subject.position
+			let distance = deltaPosition.length
+			var mass = object.moo.mass
+			if(distance == 0) {
+				continue
+			} else if(distance < object.moo.radius) {
+				let volumeEnclosed = (4.0 / 3.0) * Double.pi * pow(distance, 3)
+				mass = object.moo.density * volumeEnclosed
+			}
+			let forceMagnitude = (G * mass * subject.mass) / pow(distance, 2)
+			gravity += deltaPosition.normalized() * forceMagnitude
+		}
+	}
+	return gravity
+}
+
 func gravTick(center: SphericalCow, celestials: inout [Celestial], t: Double, dt: Double) {
 	for object in celestials {
 		if(object.moo !== center){
-			let (gravity, nearest) = calculateGravities(subject: object.moo, objects: celestials)
+			let gravity = calculateGravities(subject: object.moo, objects: celestials)
 			object.moo.applyForce(force: gravity, category: .gravity, dt: dt)
-			// these are celestials, they should all have the same frame of reference (their star's)
+			// these are celestials, they should all have the same frame of reference (nil, implicitly centered on the star they orbit)
 		}
 		object.moo.integrateForce(dt: dt)
 		object.moo.integrateTorque(dt: dt)
@@ -164,7 +193,12 @@ func collisionTest(_ object1: SphericalCow, _ object2: SphericalCow) -> (Double,
 	let sumRadii = object1.radius + object2.radius
 	let distance = deltaPosition.length - sumRadii
 	let deltaVelocity = object2.velocity - object1.velocity
-	let closingSpeed = -(deltaVelocity.dot(deltaPosition.normalized()))
+
+	var closingSpeed = deltaVelocity.length
+	if((deltaPosition + deltaVelocity).lengthSquared > (deltaPosition - deltaVelocity).lengthSquared) {
+		closingSpeed = -closingSpeed
+	}
+
 	return (distance, closingSpeed)
 }
 
@@ -187,11 +221,11 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 	}
 
 	for object in entities {
-		let (gravity, nearest) = calculateGravities(subject: object.moo, objects: celestials)
-		object.moo.applyForce(force: gravity, category: .gravity, dt: dt)
+		let (gravity, nearest) = calculateGravity(subject: object.moo, objects: celestials)
 		if(nearest !== object.moo.referenceFrame) {
 			object.moo.updateReferenceFrame(nearest)
 		}
+		object.moo.applyForce(force: gravity, category: .gravity, dt: dt)
 		let altitude = object.moo.position.length - nearest.radius
 		let (density, _, viscosity) = atmosphericProperties(altitude: altitude)
 		let dragCoefficient = 0.47 // Assuming a sphere
@@ -201,10 +235,12 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 			dragForceMagnitude = 0
 		}
 		let dragForce = -object.moo.velocity.normalized() * dragForceMagnitude
-		object.moo.applyForce(force: dragForce, category: .impact, dt: dt)
-
+		//object.moo.applyForce(force: dragForce, category: .drag, dt: dt)
+		// TODO: dissipate heat, apply damage from heat. right now heat only ever increases, which is fine since it does nothing.
 		object.moo.integrateForce(dt: dt)
 		object.moo.integrateTorque(dt: dt)
+
+
 		if(object.c.b.count != object.sec.count) {
 			object.createCows()
 			object.recomputeCows()
@@ -234,8 +270,8 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 
 	var easycollisions: [(Double, SphericalCow, SphericalCow)] = []
 	var hardcollisions: [(Double, SphericalCow, SphericalCow, Entity)] = []
-	var fmlcollisions: [(Double, SphericalCow, SphericalCow, Entity, Entity)] = []
-	var everything: [Moo] = entities + celestials
+	//var fmlcollisions: [(Double, SphericalCow, SphericalCow, Entity, Entity)] = []
+	//var everything: [Moo] = entities + celestials
 	for i in 0..<celestials.count {
 		for j in i+1..<celestials.count {
 			let object1 = celestials[i].moo
@@ -250,18 +286,25 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 	}
 	for i in 0..<entities.count {
 		let object1 = entities[i]
-		let object2 = object1.moo.referenceFrame!
+		let object2 = object1.moo.referenceFrame!.copy()
+		object2.position = Vector()
+		object2.velocity = Vector()
+		object2.spin = Vector()
 		let (distance, closingSpeed) = collisionTest(object1.moo, object2)
 		if closingSpeed > 0 && distance < (closingSpeed * dt) {
-			for k in 0..<object1.sec.count {
-				let (distance2, closingSpeed2) = collisionTest(object1.sec[k].moo, object2)
-				//if distance2 > 0 && closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
-				if closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
-					//print("ent-celestial collision t \(t) d \(distance2) v \(closingSpeed2) dt: \(dt)")
-					let collisionTime2 = distance2 / closingSpeed2
-					hardcollisions.append((collisionTime2, object1.sec[k].moo, object2, object1))
-				}
+			var collisionTime = distance/closingSpeed
+			assert(collisionTime <= dt)
+			if(collisionTime < 0.0) {
+				collisionTime = 0.0
 			}
+			easycollisions.append((collisionTime, object1.moo, object2))
+//			for k in 0..<object1.sec.count {
+//				let (distance2, closingSpeed2) = collisionTest(object1.sec[k].moo, object2)
+//				if closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
+//					let collisionTime2 = distance2 / closingSpeed2
+//					hardcollisions.append((collisionTime2, object1.sec[k].moo, object2, object1))
+//				}
+//			}
 		}
 	}
 	for i in 0..<entities.count {
@@ -276,139 +319,16 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 						if closingSpeed2 > 0 && distance2 < (closingSpeed2 * dt) {
 							//print("ent-ent collision \(t): \(distance2) \(closingSpeed2) dt: \(dt)")
 							//print("object1 section radius: \(object1.sec[k].moo.radius) object2 section radius: \(object2.sec[l].moo.radius)")
-							let collisionTime2 = distance2 / closingSpeed2
-							//fmlcollisions.append((collisionTime2, object1.sec[k].moo, object2.sec[l].moo, object1, object2))
+							var collisionTime2 = distance2 / closingSpeed2
+							assert(collisionTime2 <= dt)
+							if(collisionTime2 < 0.0) {
+								collisionTime2 = 0.0
+							}
 							easycollisions.append((collisionTime2, object1.moo, object2.moo))
 						}
 					}
 				}
 			}
-		}
-	}
-
-	let hpmult = 1000.0
-	let invhpmult = 1.0/hpmult
-
-	// one thing is still broken.
-	// it was fine-ish when we ignored impulse angular component.
-	hardcollisions.sort { $0.0 < $1.0 }
-	for (elapsedTime, object1, object2, ent1) in hardcollisions {
-		
-/*
-		let deltaPosition = object2.position - object1.position
-		let deltaVelocity = object2.velocity - object1.velocity
-		let centerDistance = deltaPosition.length
-		let collisionNormal = deltaPosition / centerDistance
-		let closingSpeed = -(deltaVelocity.dot(collisionNormal))
-		let distance = centerDistance - object1.radius - object2.radius
-		if (distance) < 0 || closingSpeed < 0 || distance > (closingSpeed * dt) {
-			print("skipping")
-			continue
-		}
-		let collisionPoint1 = object1.position + (collisionNormal * object1.radius)
-		let collisionPoint2 = object2.position + (collisionNormal * object2.radius)
-		let r1 = collisionPoint1 - ent1.moo.position
-		let r2 = collisionPoint2 - object2.position
-		let normalVelocity = collisionNormal * -closingSpeed
-		let tangentVelocity = deltaVelocity - normalVelocity
-		var impulseMagnitude = abs(min(ent1.moo.mass, object2.mass) * closingSpeed * 2)
-		impulseMagnitude = min(object1.hp * hpmult / closingSpeed, object2.hp * hpmult / closingSpeed, impulseMagnitude)
-		object1.hp -= closingSpeed * impulseMagnitude * invhpmult
-		object2.hp -= closingSpeed * impulseMagnitude * invhpmult
-		let impulse = collisionNormal * impulseMagnitude
-		let impulseTorque = r1.cross(impulse * 0.5)
-		var ke_lin = 0.5 * ent1.moo.mass * (closingSpeed ** 2)
-		var ke_rot = 0.5 * ent1.moo.momentOfInertia * ((impulseTorque.length / ent1.moo.momentOfInertia) ** 2)
-		let ke_sum = ke_lin + ke_rot
-		print("kinetic energy rot, lin, sum", ke_rot, ke_lin, ke_sum)
-		ke_lin *= ke_lin / ke_sum
-		ke_rot *= ke_lin / ke_sum
-
-		let dv = sqrt(2 * ke_lin / ent1.moo.mass)
-		print("adjsted rot, lin, sum", ke_rot, ke_lin)
-		let adjusted_impulse = (ent1.moo.mass * dv * 2) * collisionNormal
-		let adjusted_impulseTorque = r1.cross(adjusted_impulse * 0.5)
-		print("impulse \(impulse.length) adjusted \(adjusted_impulse.length) torque \(impulseTorque.length)")
-		
-		ent1.moo.velocity -= adjusted_impulse / ent1.moo.mass
-		//ent1.moo.velocity -= impulse / ent1.moo.mass
-		object2.velocity += impulse / object2.mass
-		let frictionCoefficient = (object1.frictionCoefficient * object2.frictionCoefficient)
-		let rotationVelocity1 = object1.spin.cross(collisionPoint1 - object1.position)
-		let rotationVelocity2 = object2.spin.cross(r2)
-		let totalRelativeTangentialVelocity = tangentVelocity + rotationVelocity1 + rotationVelocity2
-		print("l: n \(normalVelocity.length) t \(tangentVelocity.length) r1 \(rotationVelocity1.length) r2 \(rotationVelocity2.length)")
-		let magtanv = totalRelativeTangentialVelocity.length
-		let minLinearMomentum = min(ent1.moo.mass, object2.mass) * magtanv
-		let angularMomentum1 = ent1.moo.momentOfInertia * magtanv / ent1.moo.radius
-		let angularMomentum2 = object2.momentOfInertia * magtanv / object2.radius
-		let minAngularMomentum = min(angularMomentum1, angularMomentum2)
-		var maxFrictionImpulseMagnitude = min(frictionCoefficient * impulseMagnitude * magtanv, minLinearMomentum, minAngularMomentum)
-		maxFrictionImpulseMagnitude = min(object1.hp * hpmult / magtanv, object2.hp * hpmult / magtanv, maxFrictionImpulseMagnitude)
-		object1.hp -= magtanv * maxFrictionImpulseMagnitude * invhpmult
-		object2.hp -= magtanv * maxFrictionImpulseMagnitude * invhpmult
-		let frictionImpulse = -totalRelativeTangentialVelocity.normalized() * maxFrictionImpulseMagnitude
-		ent1.moo.velocity -= frictionImpulse * 0.5 / ent1.moo.mass
-		object2.velocity += frictionImpulse * 0.5 / object2.mass
-		let torque1 = r1.cross(frictionImpulse * 0.5)
-		let torque2 = r2.cross(frictionImpulse * 0.5)
-		let deltaSpin1 = (torque1 + adjusted_impulseTorque) / ent1.moo.momentOfInertia
-		let deltaSpin2 = torque2 / object2.momentOfInertia
-		ent1.moo.spin -= deltaSpin1
-		object2.spin += deltaSpin2
-*/
-
-		let deltaPosition = object2.position - object1.position
-		let deltaVelocity = object2.velocity - object1.velocity
-		let centerDistance = deltaPosition.length
-		let collisionNormal = deltaPosition / centerDistance
-		let normalVelocity = collisionNormal * (deltaVelocity.dot(collisionNormal))
-		let tangentVelocity = deltaVelocity - normalVelocity 
-		let closingSpeed = normalVelocity.length
-		let impulseMagnitude = abs(min(object1.mass, object2.mass) * closingSpeed * 2)
-		let impulse = collisionNormal * impulseMagnitude
-		object1.velocity -= impulse / object1.mass
-		object2.velocity += impulse / object2.mass
-		let collisionPoint = object1.position + (collisionNormal * object1.radius)
-		let r1 = collisionPoint - object1.position
-		let r2 = collisionPoint - object2.position
-		let frictionCoefficient = (object1.frictionCoefficient * object2.frictionCoefficient)
-		let rotationVelocity1 = object1.spin.cross(r1) 
-		let rotationVelocity2 = object2.spin.cross(r2)
-		let totalRelativeTangentialVelocity = tangentVelocity + rotationVelocity2 - rotationVelocity1
-		let maxLinearMomentum = min(object1.mass, object2.mass) * totalRelativeTangentialVelocity.length
-		let angularMomentum1 = object1.momentOfInertia * totalRelativeTangentialVelocity.length / object1.radius
-		let angularMomentum2 = object2.momentOfInertia * totalRelativeTangentialVelocity.length / object2.radius
-		let maxAngularMomentum = min(angularMomentum1, angularMomentum2)
-		let angularImpulse = -totalRelativeTangentialVelocity * maxAngularMomentum
-		let maxFrictionImpulseMagnitude = min(frictionCoefficient * impulseMagnitude, maxLinearMomentum + maxAngularMomentum)
-		let frictionImpulse = angularImpulse / angularImpulse.length * min(angularImpulse.length, maxFrictionImpulseMagnitude)
-		object1.velocity -= frictionImpulse * 0.5 / object1.mass
-		object2.velocity += frictionImpulse * 0.5 / object2.mass
-		let torque1 = r1.cross(frictionImpulse * 0.5)
-		let torque2 = r2.cross(frictionImpulse * 0.5)
-		let deltaSpin1 = torque1 / object1.momentOfInertia
-		let deltaSpin2 = torque2 / object2.momentOfInertia
-		object1.spin -= deltaSpin1
-		object2.spin += deltaSpin2
-
-		let damage = closingSpeed * impulseMagnitude * invhpmult
-		if(damage > 0.1) {
-			object1.hp -= damage
-			object2.hp -= damage
-			ent1.dinged++
-			/*print()
-			print("hard collision Time:", String(format: "%f", elapsedTime))
-			print("dvel:", deltaVelocity.format(4))
-			print("dtan:", tangentVelocity.format(4))
-			print("Impulse Magnitude:", String(format: "%.4f", impulseMagnitude))
-			print("Impulse:", impulse.format(4))
-			print("angular \(maxAngularMomentum)")
-			print("linear \(maxLinearMomentum)")
-			print("Friction Impulse:", frictionImpulse.format(4))
-			print("dspin 1:", deltaSpin1.format(4))
-			print("dspin 2:", deltaSpin2.format(4))
-			print("object1 remaining hp: \(object1.hp) object2 remaining hp: \(object2.hp) ")*/
 		}
 	}
 
@@ -422,9 +342,13 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		let tangentVelocity = deltaVelocity - normalVelocity 
 		let closingSpeed = normalVelocity.length
 		let impulseMagnitude = abs(min(object1.mass, object2.mass) * closingSpeed * 2)
-		let impulse = collisionNormal * impulseMagnitude
+		// TODO: give objects configurable bounciness
+		let bounciness = min(0.99, 0.5 + 10.0 * closingSpeed)
+		let impulse = collisionNormal * impulseMagnitude * bounciness
 		object1.velocity -= impulse / object1.mass
 		object2.velocity += impulse / object2.mass
+
+		/*
 		let collisionPoint = object1.position + (collisionNormal * object1.radius)
 		let r1 = collisionPoint - object1.position
 		let r2 = collisionPoint - object2.position
@@ -446,7 +370,11 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 		let deltaSpin2 = torque2 / object2.momentOfInertia
 		object1.spin -= deltaSpin1
 		object2.spin += deltaSpin2
-/*
+
+		assert( !deltaVelocity.x.isNaN )
+		assert( !tangentVelocity.x.isNaN )
+		assert( !impulseMagnitude.isNaN )
+
 		print("easy collision Time:", String(format: "%f", elapsedTime))
 		print("dvel:", deltaVelocity.format(4))
 		print("dtan:", tangentVelocity.format(4))

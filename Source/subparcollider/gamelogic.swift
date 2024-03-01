@@ -420,6 +420,7 @@ class Celestial: Codable, Moo {
 enum ForceCategory {
 	case thrust
 	case gravity
-	case impact // the impact forces are not reported through the correct channels.
+	case impact
+	case drag
 }
 
