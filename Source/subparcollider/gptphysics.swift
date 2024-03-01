@@ -236,7 +236,7 @@ func applyCollision(_ elapsedTime: Double, _ closingSpeed: Double, _ object1: in
 		object1.velocity = Vector()
 		object2.velocity = Vector()
 		assert(false)
-		exit(-1)
+//		exit(-1)
 	}
 
 	object1.velocity += dv1
@@ -276,7 +276,7 @@ func tick(actions: [Action], entities: inout [Entity], celestials: inout [Celest
 			dragForceMagnitude = 0
 		}
 		let dragForce = -object.moo.velocity.normalized() * dragForceMagnitude
-		object.moo.applyForce(force: dragForce, category: .drag, dt: dt)
+		//object.moo.applyForce(force: dragForce, category: .drag, dt: dt)
 		// TODO: dissipate heat, apply damage from heat. right now heat only ever increases, which is fine since it does nothing.
 		object.moo.integrateForce(dt: dt)
 		object.moo.integrateTorque(dt: dt)
