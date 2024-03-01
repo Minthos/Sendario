@@ -240,7 +240,7 @@ func main() {
 
 			var ent = Entity(name: String(format: "ent%d", i), SphericalCow(id: 6 + Int64(i),
 				 referenceFrame: earth.moo,
-				 position: Vector(Double.random(in: -10.0 ..< 10.0), Double.random(in: -10.0 ..< 10.0), earth.moo.radius + Double.random(in: 1.0 ..< 500.0)),
+				 position: Vector(Double.random(in: -10.0 ..< 10.0), Double.random(in: -10.0 ..< 10.0), earth.moo.radius + Double.random(in: 1.0 ..< 100.0)),
 				 velocity: Vector(),
 				 orientation: Quaternion(w: 0, x: 0, y: 1, z:0),
 				 spin: Vector(0.1, 0.0, 0.0),

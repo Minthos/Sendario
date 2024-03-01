@@ -193,10 +193,10 @@ func collisionTest(_ object1: SphericalCow, _ object2: SphericalCow) -> (Double,
 	let centerDistance = deltaPosition.length
 	var distance = centerDistance - sumRadii
 	if(distance < 0) {
-		let awayVector = deltaPosition.normalized() * (distance * 3)
+		let awayVector = deltaPosition.normalized() * (distance * 10)
 		object1.position += awayVector
 		object2.position -= awayVector
-		distance = distance * -3
+		distance = distance * -9
 	}
 	let deltaVelocity = object2.velocity - object1.velocity
 	let collisionNormal = deltaPosition / centerDistance
