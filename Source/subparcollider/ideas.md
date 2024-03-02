@@ -27,3 +27,19 @@ priority should be weighted depending on the chance of hitting each incoming thi
 
 
 
+
+----
+
+
+Procgen
+
+Generate the basic heightmap of the planet, refine it on demand
+Pick a sea level
+Rainfall comes from the sea, preferentially deposits on mountains
+Hot weather gives more rain, cold weather retains the rain as snow and ice
+Fallen rain follows valleys and becomes rivers
+Wet areas produce vegetation
+
+
+
+
