@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <vector>
 //#include <glm/glm.hpp>
 
 // shadows glm type
@@ -64,11 +65,85 @@ void decode(uint64_t bit_field, uint8_t *results) {
     return;
 }
 
+
+struct Mesh {
+    // put some vertices and triangles here
+    //
+    // also a texture and shadow map
+};
+
+struct CollisionShape;
+
+struct Motor {
+    double maxForce;
+    double minForce; // negative values for motors that can produce power in both directions
+    double maxPower; // both positive and negative if applicable
+};
+
+struct Joint {
+    dvec3 origin;
+    dvec3 axis;
+    Motor motor;
+};
+
+struct JointHinge: Joint {
+    double targetAngle;
+    double angle;
+    double maxAngle;
+    double minAngle;
+};
+
+struct JointSlide: Joint {
+    double targetExtension;
+    double extension;
+    double maxExtension;
+    double minExtension;
+};
+
+struct Joint6dof: Joint {
+    dvec3 targetAngle;
+    dvec3 angle;
+};
+
+struct PhysicsObject {
+    CollisionShape *shape; // for objects with no parent this should be the total shape of the object including all descendants.
+    // for objects with a parent it should only represent a single shape, not its children.
+    PhysicsObject *parent;
+    Joint *joint; // joint can only represent the connection to parent. directed acyclic graph is the only valid topology.
+    PhysicsObject **children; // both direct and indirect children
+
+    double mass;
+    dvec3 pos; // center of mass, not necessarily the center of the bounding volume
+    dvec3 vel;
+    dvec3 rot;
+    dvec3 spin;
+};
+
+struct CollisionShape {
+    double radius;
+    dvec3 center; // bounding sphere enclosing the shape .. yes I know we also have an AABB
+    // but not all collision shapes will have an AABB and also a sphere is a good starting point
+    // for creating the AABB quickly when the object moves and rotates without having to transform
+    // every vertex
+    Mesh *convex_hull;
+    PhysicsObject *object;
+};
+
+struct ctleaf {
+    // axis-aligned bounding box enclosing the entire object
+    ivec3 hi;
+    ivec3 lo;
+    CollisionShape *shape;
+};
+
 struct ctnode {
-    uint64_t occupancy;
-    union {
-        ctnode *firstChild;
-        void *firstLeaf;
+    union{
+        uint64_t occupancy; // if occupancy is empty, the first and only child is a collision shape
+        uint64_t num_leaves; // if the node is at max depth, occupancy instead is the number of leaves
+    };
+    union{
+        ctnode *first_child; // could also have been a uint32
+        ctleaf *first_leaf;
     };
 };
 
@@ -80,11 +155,10 @@ struct ctnode {
 // 5 -> 4096
 // 6 -> 16384
 // 7 -> 65536 (nice round number..)
-// 8 -> 262144
 // A tree shouldn't be too big, it should represent a frame of reference for the physics engine
 // We want to keep the numbers small to counter floating point stability issues
 // Better to have many trees and move more frequently between them
-class CollisionTree {
+struct CollisionTree {
     dvec3 origo;
     int numItems;
     ctnode *root;
@@ -101,6 +175,31 @@ class CollisionTree {
 // 512 KB L2 cache at 14 cycles
 // 96 MB shared L3 cache at 47 cycles
 
+// Collision: bounce, deform, absorb, destroy
 
+/*
+
+"collision shape" should probably just be simplified to an AABB for each object from the tree's
+perspective. Then when testing object collisions we can test the polygon mesh if the AABBs intersect.
+An object's AABB should be registered in the collision tree at every node it intersects.
+This will make the tree costlier to update but easier to query.
+If a vehicle's bounding sphere is far from anything else (i.e. not near the surface of any
+celestial and not near other flying objects) we can enter it at the highest level of the tree that
+doesn't contain anything else.
+
+Collision shapes should be the building blocks of buildings and vehicles.
+Exterior-facing shapes should be flagged as exterior-facing, interiors can be ignored
+
+Box
+Cylinder
+Sphere
+Capsule
+Low-polygon convex hull mesh
+
+Each collision shape should have one connection to a physics object. By default the connection
+should be to the main object. Exceptions will be when we want parts to move together as a unit,
+for example a turret with a gun attached or a spring with a wheel attached.
+
+*/
 
 
