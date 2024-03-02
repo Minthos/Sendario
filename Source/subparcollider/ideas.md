@@ -34,6 +34,8 @@ priority should be weighted depending on the chance of hitting each incoming thi
 Procgen
 
 Generate the basic heightmap of the planet, refine it on demand
+no, don't generate a heightmap. instead generate only vertices for the local minima and maxima
+as little data as possible at first, add more detail only when needed
 Pick a sea level
 Rainfall comes from the sea, preferentially deposits on mountains
 Hot weather gives more rain, cold weather retains the rain as snow and ice
