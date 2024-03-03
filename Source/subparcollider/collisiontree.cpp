@@ -9,6 +9,8 @@
 
 using glm::dvec3;
 using glm::vec3;
+using glm::dmat4;
+using glm::dmat3;
 
 struct unionvec3 {
     union {
@@ -54,7 +56,6 @@ struct hvec3 {
     hvec3() { x = 0; y = 0; z = 0; }
     hvec3(int16_t in) { x = in; y = in; z = in; }
     constexpr hvec3(int16_t px, int16_t py, int16_t pz) : x(px), y(py), z(pz) {}
-//    constexpr hvec3(int16_t px, int16_t py, int16_t pz) { x = px; y = py; z = pz; }
     hvec3(dvec3 in) {
         x = d2hi(in.x);
         y = d2hi(in.y);
@@ -128,10 +129,85 @@ constexpr dvec3 operator-(const dvec3 lhs, const vec3 rhs) {
     return dvec3(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z);
 }
 
-struct Mesh {
-    // put some vertices and triangles here
-    //
-    // also a texture and shadow map
+struct dTri;
+
+struct dEdge {
+    uint32_t verts[3];
+    dEdge* subdivisions[2];
+    dTri* tris[2];
+    dvec3 normal;
+    
+    dEdge() {}
+    dEdge(uint32_t vert0, uint32_t vert1) {
+        verts[0] = vert0;
+        verts[1] = vert1;
+        verts[2] = -1;
+        subdivisions[0] = nullptr;
+        subdivisions[1] = nullptr;
+        tris[0] = nullptr;
+        tris[1] = nullptr;
+    }
+};
+
+struct dTri {
+    uint32_t verts[3];
+    dEdge *edges[3];
+    glm::dvec3 normal;
+
+    dTri() {}
+    dTri(uint32_t pverts[3], dEdge *pedges[3], dvec3* vertData, dvec3 center) {
+        verts[0] = pverts[0];
+        verts[1] = pverts[1];
+        verts[2] = pverts[2];
+        edges[0] = pedges[0];
+        edges[1] = pedges[1];
+        edges[2] = pedges[2];
+        // demand that all triangles are created in strict order
+        // first edge must connect points 1 and 2
+        assert(edges[0]->verts[0] == verts[0] || edges[0]->verts[1] == verts[0]);
+        assert(edges[0]->verts[0] == verts[1] || edges[0]->verts[1] == verts[1]);
+        // ssecond edge must connect points 2 and 3
+        assert(edges[1]->verts[0] == verts[1] || edges[1]->verts[1] == verts[1]);
+        assert(edges[1]->verts[0] == verts[2] || edges[1]->verts[1] == verts[2]);
+        // third edge must connect points 3 and 1
+        assert(edges[2]->verts[0] == verts[2] || edges[2]->verts[1] == verts[2]);
+        assert(edges[2]->verts[0] == verts[0] || edges[2]->verts[1] == verts[0]);
+        normal = glm::normalize(glm::cross((vertData[verts[0]] - vertData[verts[1]]), (vertData[verts[0]] - vertData[verts[2]])));
+        float dotProduct = glm::dot(normal, vertData[verts[0]] - center);
+        if(dotProduct < 0.0f){
+            normal = -normal;
+        }
+    }
+};
+
+void setEdgePtrs(dTri* tri) {
+    for(int i = 0; i < 3; i++) {
+        if(tri->edges[i]->tris[0] == nullptr) {
+            tri->edges[i]->tris[0] = tri;
+        } else {
+            tri->edges[i]->tris[1] = tri;
+        }
+    }
+}
+
+struct dMesh {
+    dvec3 center;
+    dvec3 *verts;
+    dTri *tris;
+    dEdge *edges;
+    uint32_t num_verts;
+    uint32_t num_tris;
+    uint32_t num_edges;
+
+    dMesh(dvec3 pcenter, dvec3* pverts, uint32_t pnumVerts, dTri* ptris, uint32_t pnumTris, dEdge* pedges, uint32_t pnumEdges) {
+        center = pcenter;
+        verts = pverts;
+        num_verts = pnumVerts;
+        tris = ptris;
+        num_tris = pnumTris;
+        edges = pedges;
+        num_edges = pnumEdges;
+    }
 };
 
 struct CollisionShape;
@@ -182,29 +258,41 @@ struct PhysicsObject {
 
     enum physics_state state;
     double mass;
-    dvec3 pos; // center of mass, not necessarily the center of the bounding volume
+    dmat3 inertia_tensor;
+    dvec3 pos; // center of coordinate transforms? the center of mass can shift so this should be the geometric center instead
     dvec3 vel;
     dvec3 rot;
     dvec3 spin;
 };
 
 struct CollisionShape {
-    double radius;
-    dvec3 pos; // center of the bounding sphere
-    Mesh *convex_hull;
+    double radius; // radius of the bounding sphere for simplified math. Not all objects need a collision mesh.
+    dMesh *convex_hull;
     PhysicsObject *object;
+};
+
+// TODO: calculate the bounding box from the collision shape. should probably use the convex hull
+// to get a tighter fit than the bounding sphere.
+//
+// 1. physics objects move, rotate, appear and disappear
+// 2. we calculate a transformation matrix from the object's new rotation
+// 3. we transform each point in the collision shape's mesh to calculate a new bounding box (but leave the mesh untransformed)
+// 3b. we may consider caching a transformed copy of the mesh for faster collision detection
+// 4. we add the physics object's position to the bounding box's
+// 5. we update the BVH
+// 6. we can now read from the BVH and write to the physics objects to our heart's content for the rest of the tick
+
+struct ctleaf {
+    CollisionShape *shape;// 8 bytes
+
+    // axis-aligned bounding box
+    hvec3 hi; // 6 bytes (total 14)
+    hvec3 lo; // 6 bytes (total 20)
 };
 
 struct AABB {
 	hvec3 max;
 	hvec3 min;
-};
-
-struct ctleaf {
-    CollisionShape *shape;// 8 bytes
-    // axis-aligned bounding box enclosing the bounding sphere of the shape
-    hvec3 hi; // 6 bytes (total 14)
-    hvec3 lo; // 6 bytes (total 20)
 };
 
 AABB calculateBounds(ctleaf* p, uint32_t first, uint32_t last) {
@@ -294,6 +382,10 @@ struct CollisionTree {
 
 };
 
+// TODO:
+// we should put all the zones into a zone BVH for each celestial so it's easy to find the correct zone for any location near a celestial
+// for zones not near a celestial we need a solution with a bigger coordinate system than 16 bits
+
 struct Celestial {
     dvec3 pos;
     dvec3 vel;
@@ -321,11 +413,6 @@ struct Zone {
 
 "collision shape" should probably just be simplified to an AABB for each object from the tree's
 perspective. Then when testing object collisions we can test the polygon mesh if the AABBs intersect.
-An object's AABB should be registered in the collision tree at every node it intersects.
-This will make the tree costlier to update but easier to query.
-If a vehicle's bounding sphere is far from anything else (i.e. not near the surface of any
-celestial and not near other flying objects) we can enter it at the highest level of the tree that
-doesn't contain anything else.
 
 Collision shapes should be the building blocks of buildings and vehicles.
 Exterior-facing shapes should be flagged as exterior-facing, interiors can be ignored
@@ -349,6 +436,10 @@ pulling them down. This way they don't try to accelerate into the ground and rep
 
 Really the collision code should not only take into account an object's velocity and rotation but
 also its force and torque values.
+
+
+Long-term data storage:
+Consider PostGIS
 
 
 Multiplayer considerations and server memory constraints:
