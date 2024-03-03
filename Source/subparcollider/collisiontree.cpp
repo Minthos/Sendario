@@ -267,9 +267,17 @@ struct PhysicsObject {
 
 struct CollisionShape {
     double radius; // radius of the bounding sphere for simplified math. Not all objects need a collision mesh.
-    dMesh *convex_hull;
+    dMesh *convex_hull; // concave hull?
     PhysicsObject *object;
 };
+
+// Thoughts on convex/concave hull
+//
+// We should separately collision test anything connected to a joint, and also anything protruding from the main hull.
+// The final authority on whether a component collides with something should be its hull mesh. Each component should have a very
+// simple hull mesh and the main body can have a hull mesh that combines the outer surface into one mesh except protruding 
+// and jointed features since they will be tested separately.
+
 
 // TODO: calculate the bounding box from the collision shape. should probably use the convex hull
 // to get a tighter fit than the bounding sphere.
