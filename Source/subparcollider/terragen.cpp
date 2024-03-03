@@ -1,9 +1,30 @@
 #include <vector>
 #include <cmath>
 
+
+/* ranking of planets/moons
+
+habitable - magnetic field, oxygen atmosphere, surface water, usually has life
+wet - oxygen-free or toxic atmosphere, surface liquids (titan)
+dry - thin atmosphere, no surface liquids, some subsurface liquids (mars)
+subsurface ocean - may have atmosphere, frozen surface, thick layer of liquid below the surface, cryovolcanism (europa, triton, ganymede)
+frozen - no atmosphere, frozen liquids on or below the surface (pluto, eris, ceres, callisto, +++)
+barren - no atmosphere, no surface liquids, few or no subsurface liquids (mercury, the moon)
+volcanic - some atmosphere, solid surface with ample volcanic activity (io)
+tidally locked - extreme temperature difference between hot and cold side
+thick - atmosphere too thick for easy colonization, surface conditions are hard to measure from orbit (venus)
+lava - surface of liquid rock/metal
+ice giant - crushing atmosphere, no surface (neptune, uranus)
+gas giant - crushing atmosphere, no surface (jupiter, saturn)
+
+*/
+
 // include libFastNoise.a
 // it would be cool to use terragen from planetside.co.uk but I want something fast and lightweight that can
 // run on each player's computer more than I want really beautiful and detailed planets
+
+
+
 
 struct polar_vert {
     double lat;

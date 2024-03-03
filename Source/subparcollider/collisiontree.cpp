@@ -1,35 +1,16 @@
+#include <algorithm>
+#include <iostream>
+#include <vector>
+
 #include <cassert>
 #include <cstdint>
-#include <vector>
+
 #include <glm/glm.hpp>
 
-int32_t d2i(double d) {
-    if(d > 0){
-        return (int32_t)(d + 0.5);
-    } else if(d < 0) {
-        return (int32_t)(d - 0.5);
-    } else {
-        return 0;
-    }
-};
+using glm::dvec3;
+using glm::vec3;
 
-// shadows glm type
-struct uvec3 {
-    uint32_t x;
-    uint32_t y;
-    uint32_t z;
-};
-
-
-// shadows glm type
-struct ivec3 {
-    int32_t x;
-    int32_t y;
-    int32_t z;
-};
-
-// shadows glm type
-struct vec3 {
+struct unionvec3 {
     union {
         float radio;
         float r;
@@ -54,27 +35,98 @@ struct vec3 {
 };
 
 struct vec9 {
-    vec3 lo; // frequencies below the visible spectrum
-    vec3 rgb;
-    vec3 hi; // frequencies above the visible spectrum
+    unionvec3 lo; // frequencies below the visible spectrum
+    unionvec3 rgb;
+    unionvec3 hi; // frequencies above the visible spectrum
 };
 
+int16_t d2hi(double in) {
+    if(in > 0.0) return (int16_t)(in + 0.5);
+    if(in < 0.0) return (int16_t)(in - 0.5);
+    return 0;
+}
 
-// shadows glm type
-struct dvec3 {
-    double x;
-    double y;
-    double z;
+struct hvec3 {
+    int16_t x;
+    int16_t y;
+    int16_t z;
 
-    double length() { return ((glm::dvec3*)this)->length(); }
-    dvec3 operator+(double other) { return dvec3 { x + other, y + other, z + other }; }
-    dvec3 operator/(double other) {
-        double factor = 1.0 / other;
-        return dvec3{ x * factor, y * factor, z * factor };
+    hvec3() { x = 0; y = 0; z = 0; }
+    hvec3(int16_t in) { x = in; y = in; z = in; }
+    constexpr hvec3(int16_t px, int16_t py, int16_t pz) : x(px), y(py), z(pz) {}
+//    constexpr hvec3(int16_t px, int16_t py, int16_t pz) { x = px; y = py; z = pz; }
+    hvec3(dvec3 in) {
+        x = d2hi(in.x);
+        y = d2hi(in.y);
+        z = d2hi(in.z);
     }
-    ivec3 int32() { return ivec3{ d2i(x), d2i(y), d2i(z) }; }
-    uvec3 uint32() { return uvec3{ (uint32_t)x, (uint32_t)y, (uint32_t)z }; }
+
+    static hvec3 max(hvec3 lhs, hvec3 rhs) {
+        return hvec3{
+                glm::max(lhs.x, rhs.x),
+                glm::max(lhs.y, rhs.y),
+                glm::max(lhs.z, rhs.z)};
+    }
+
+    static hvec3 min(hvec3 lhs, hvec3 rhs) {
+        return hvec3{
+                glm::min(lhs.x, rhs.x),
+                glm::min(lhs.y, rhs.y),
+                glm::min(lhs.z, rhs.z)};
+    }
 };
+
+constexpr hvec3 operator*(const hvec3 lhs, const int16_t rhs) {
+    return hvec3(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs);
+}
+
+constexpr hvec3 operator/(const hvec3 lhs, const int16_t rhs) {
+    assert(rhs != 0);
+    return hvec3(lhs.x / rhs, lhs.y / rhs, lhs.z / rhs);
+}
+
+constexpr hvec3 operator+(const hvec3 lhs, const int16_t rhs) {
+    return hvec3(lhs.x + rhs, lhs.y + rhs, lhs.z + rhs);
+}
+
+constexpr hvec3 operator-(const hvec3 lhs, const int16_t rhs) {
+    return hvec3(lhs.x - rhs, lhs.y - rhs, lhs.z - rhs);
+}
+
+constexpr hvec3 operator+(const hvec3 lhs, const hvec3 rhs) {
+    return hvec3(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z);
+}
+
+constexpr hvec3 operator-(const hvec3 lhs, const hvec3 rhs) {
+    return hvec3(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z);
+}
+
+
+constexpr dvec3 operator*(const dvec3 lhs, const double rhs) {
+    return dvec3(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs);
+}
+
+constexpr dvec3 operator/(const dvec3 lhs, const double rhs) {
+    assert(rhs != 0.0);
+    double factor = 1.0 / rhs;
+    return dvec3(lhs.x * factor, lhs.y * factor, lhs.z * factor);
+}
+
+constexpr dvec3 operator+(const dvec3 lhs, const double rhs) {
+    return dvec3(lhs.x + rhs, lhs.y + rhs, lhs.z + rhs);
+}
+
+constexpr dvec3 operator-(const dvec3 lhs, const double rhs) {
+    return dvec3(lhs.x - rhs, lhs.y - rhs, lhs.z - rhs);
+}
+
+constexpr dvec3 operator+(const dvec3 lhs, const vec3 rhs) {
+    return dvec3(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z);
+}
+
+constexpr dvec3 operator-(const dvec3 lhs, const vec3 rhs) {
+    return dvec3(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z);
+}
 
 struct Mesh {
     // put some vertices and triangles here
@@ -138,213 +190,109 @@ struct PhysicsObject {
 
 struct CollisionShape {
     double radius;
-    dvec3 pos; // bounding sphere enclosing the shape .. yes I know we also have an AABB
-    // but not all collision shapes will have an AABB and also a sphere is a good starting point
-    // for creating the AABB quickly when the object moves and rotates without having to transform
-    // every vertex
+    dvec3 pos; // center of the bounding sphere
     Mesh *convex_hull;
     PhysicsObject *object;
 };
 
-// returns the number of children by counting high bits in the bit field
-int count_bits(uint64_t v) {
-    int c = 0;
-    while(v != 0) {
-        v &= v - 1; // clear the least significant bit set
-        c += 1;
-    }
-    return c;
-}
-
-int count_bits_builtin(uint64_t v) {
-    #ifdef _MSC_VER
-        return __popcnt64(v);
-    #elif defined(__GNUC__) || defined(__clang__)
-        return __builtin_popcountll(v);
-    #else
-        return count_bits(v);
-    #endif
-}
-
-// https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
-// expects a bit field with a single bit set to high
-// returns the index of that bit
-uint32_t which_bit(uint64_t input){
-    uint64_t masks[] = {
-        0xaaaaaaaaaaaaaaaa,
-        0xcccccccccccccccc,
-        0xf0f0f0f0f0f0f0f0,
-        0xff00ff00ff00ff00,
-        0xffff0000ffff0000,
-        0xffffffff00000000
-    };
-    uint32_t bit = 0;
-    for(uint32_t i = 0; i < 6; i++) {
-        bit += (!(!(input & masks[i]))) << i;
-    }
-    return bit;
-}
-
-uint32_t which_bit_builtin(uint64_t input) {
-    #ifdef _MSC_VER
-        unsigned long index;
-        _BitScanForward64(&index, input);
-        return (uint32_t)index;
-    #elif defined(__GNUC__) || defined(__clang__)
-        return __builtin_ctzll(input);
-    #else
-        return which_bit(input);
-    #endif
-}
-
-
-// returns an array of numbers indicating which bit in the bit field represents
-// the child node at the same index in the children array
-//
-// example:
-// bit_field 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0001 0000 0001 0001
-// children [node, node, node]
-// decode: [0,4,12]
-// then you can zip decode with children and get something like [(0, node), (4, node), (12, node)]
-void decode(uint64_t bit_field, uint8_t *results, uint32_t &num_results) {
-    uint64_t v = bit_field;
-    int i = 0;
-    while(v != 0) {
-        uint64_t prev = v;
-        v &= v - 1; // clear the least significant bit set
-        uint64_t diff = v ^ prev;
-        results[i++] = which_bit(diff);
-    }
-    return;
-}
-
-void decode_gpt4_version(uint64_t bit_field, uint8_t *results) {
-    uint64_t v = bit_field;
-    int i = 0;
-    while(v != 0) {
-        uint64_t bit_set = v & (~(v - 1)); // isolate the lowest set bit
-        results[i++] = which_bit_builtin(bit_set);
-        v &= v - 1; // clear the least significant bit set
-    }
-}
+struct AABB {
+	hvec3 max;
+	hvec3 min;
+};
 
 struct ctleaf {
-    // axis-aligned bounding box enclosing the entire object
-    uvec3 hi;
-    uvec3 lo;
-    CollisionShape *shape;
+    CollisionShape *shape;// 8 bytes
+    // axis-aligned bounding box enclosing the bounding sphere of the shape
+    hvec3 hi; // 6 bytes (total 14)
+    hvec3 lo; // 6 bytes (total 20)
 };
 
+AABB calculateBounds(ctleaf* p, uint32_t first, uint32_t last) {
+    AABB bounds;
+    bounds.min = hvec3(32767);
+    bounds.max = hvec3(-32768);
+    for (uint32_t i = first; i <= last; ++i) {
+        bounds.min = hvec3::min(bounds.min, p[i].lo);
+        bounds.max = hvec3::max(bounds.max, p[i].hi);
+    }
+    return bounds;
+}
+
 struct ctnode {
-    union{
-        uint64_t occupancy; // if occupancy is empty, the first and only child is a collision shape
-        uint64_t num_leaves; // if the node is at max depth, occupancy instead is the number of leaves
+    hvec3 hi; // 6 bytes
+    hvec3 lo; // 6 bytes (total 12)
+    uint32_t count; // 4 bytes (total 16)
+    union{ // 4 bytes (total 20)
+        uint32_t left_child;
+        uint32_t first_leaf;
     };
-    union{
-        ctnode *first_child; // could also have been a uint32
-        ctleaf *first_leaf;
-    };
+
+    void setBounds(AABB bounds) { hi = bounds.max; lo = bounds.min; }
+
+    void subdivide(ctnode* nodes, uint32_t* poolPtr, ctleaf* primitives, uint32_t first, uint32_t last) {
+        if (first == last) {
+            this->first_leaf = first;
+            this->count = 1;
+            return;
+        }
+        this->left_child = *poolPtr;
+        *poolPtr += 2;
+        ctnode *left = &nodes[left_child];
+        ctnode *right = &nodes[left_child + 1];
+
+        // sort the primitives and split them in a dumb way that is not optimal but better than worst case
+        hvec3 size = hi - lo;
+        if(size.y > size.x && size.y > size.z) {
+            std::sort(primitives + first, primitives + last + 1, [](const ctleaf& a, const ctleaf& b) -> bool {
+                return a.lo.x + a.hi.x < b.hi.x + b.lo.x;
+            });
+        }
+        else if (size.y > size.x && size.y > size.z) {
+            std::sort(primitives + first, primitives + last + 1, [](const ctleaf& a, const ctleaf& b) -> bool {
+                return a.lo.y + a.hi.y < b.hi.y + b.lo.y;
+            });
+        }
+        else {
+            std::sort(primitives + first, primitives + last + 1, [](const ctleaf& a, const ctleaf& b) -> bool {
+                return a.lo.z + a.hi.z < b.hi.z + b.lo.z;
+            });
+        }
+        uint32_t split = (first + last) >> 1;
+
+        left->setBounds(calculateBounds(primitives, first, split));
+        right->setBounds(calculateBounds(primitives, split + 1, last));
+        left->subdivide(nodes, poolPtr, primitives, first, split);
+        right->subdivide(nodes, poolPtr, primitives, split + 1, last);
+        this->count = last - first + 1;
+    }
 };
+
+ctnode* constructBVH(ctleaf* leaves, int N) {
+	AABB globalBounds = calculateBounds(leaves, 0, N);
+	ctnode* nodes = (ctnode*) malloc(sizeof(ctnode) * (2 * N));
+	ctnode& root = nodes[0];
+	root.setBounds(globalBounds);
+	root.count = N;
+	uint32_t poolPtr = 1;
+	root.subdivide(nodes, &poolPtr, leaves, 0, N - 1);
+//	glBindBuffer(GL_SHADER_STORAGE_BUFFER, TLASBuffer);
+//	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(ctnode) * poolPtr, nodes, GL_STATIC_DRAW);
+	return(nodes);
+}
+
 
 #define MAX_MAX_DEPTH 16
 struct CollisionTree {
-    int MAX_DEPTH = 6;
-    dvec3 pos; // relative to the coordinate system of its parent object, whatever that is
-    int num_items;
-    ctnode root = { 0 };
+    dvec3 pos;
+    ctnode *root = 0;
+    std::vector<CollisionShape> shapes;
 
-    void compress() {
-        
+    CollisionTree(dvec3 origo) {
+        pos = origo;
+        root = 0;
     }
 
-    // the shape's coordinates must already be in the tree's coordinate system
-    void insert(CollisionShape* shape) {
-        
-        uint32_t tree_dim = 2 << (2 * MAX_DEPTH);
-
-        // assert that the object doesn't intersect the edge of the tree? but it should be allowed to intersect.
-        assert(abs(shape->pos.x) + shape->radius <= (double)tree_dim);
-        assert(abs(shape->pos.y) + shape->radius <= (double)tree_dim);
-        assert(abs(shape->pos.z) + shape->radius <= (double)tree_dim);
-
-        // this shit is complicated.. I could save myself so much trouble by adapting the BVH from the ray tracer instead
-        // performance would probably be better too
-
-        // shift it so that 0,0,0 is at the bottom corner of the tree's coordinate space
-        // scale it so that 4m equals 1 node at max depth
-        ctleaf leaf;
-        leaf.hi = ((shape->pos + (tree_dim * 2.0) + shape->radius) / 4.0).uint32();
-        leaf.lo = ((shape->pos + (tree_dim * 2.0) + -shape->radius) / 4.0).uint32();
-
-
-        uint32_t path[MAX_MAX_DEPTH];
-        for(uint32_t i = MAX_DEPTH; i > 0; --i) {
-            path[i] = (pos.x & 3) | ((pos.y & 3) << 2) | ((pos.z & 3) << 4);
-        }
-        ctnode *current_node = &root;
-        for(uint32_t i = 0; i < MAX_DEPTH; ++i) {
-            
-
-            uint64_t bit = 1 << path[i];
-            
-            uint8_t decoded[64] = {0};
-            uint32_t num_children = 0;
-            decode(current_node->occupancy, decoded, num_children);
-            uint32_t index = 0;
-
-            
-            for(uint32_t j = 0; j < num_children; j++){
-                index = j;
-                if(decoded[j] == path[i]) {
-                    // node exists
-                } else if(decoded[j] > path[i]) {
-                    // node doesn't exist and we must insert it before some of its siblings
-                }
-            }
-            // node doesn't exist and there are no sibling nodes after it
-        }
-    }
-
-    // the shape's coordinates must already be in the tree's coordinate system
-    void buildTree(CollisionShape *shapes, uint64_t num_shapes) {
-        if(!num_shapes){
-            root = NULL;
-            num_items = 0;
-            return;
-        }
-        root->first_child = (ctnode*)calloc(64, sizeof(ctnode));
-        for(uint64_t i; i < num_shapes; i++) {
-            insert(&shapes[i]);
-        }
-
-        compress();
-    }
 };
-
-
-// resolution at bottom level: 4m
-// 1 level up: 16
-// 2 -> 64
-// 3 -> 256
-// 4 -> 1024 (one zone? maybe zones should be bigger, 1 km is fairly short range for mech/aircraft/spaceship weapons)
-// 5 -> 4096
-// 6 -> 16384
-// 7 -> 65536 (nice round number)
-// A tree shouldn't be too big, it should represent a frame of reference for the physics engine
-// We want to keep the numbers small to counter floating point stability issues
-// Better to have many trees and move more frequently between them
-
-
-
-// I want the tree to be packed in a contiguous array so that lookups can benefit maximally from
-// cpu cache and prefetching. The physics engine can do all the position updates in a single
-// batch and then we can update and repack the tree before we do lookups.
-// Additional data can be kept in one or more separate arrays whose structures mirror the tree.
-
-// 5800x3d
-// 32 KB L1 data cache at 4 or 5 cycles
-// 512 KB L2 cache at 14 cycles
-// 96 MB shared L3 cache at 47 cycles
 
 struct Celestial {
     dvec3 pos;
@@ -429,4 +377,10 @@ reuse texture patterns with different colors.
 
 
 */
+
+// 5800x3d
+// 32 KB L1 data cache at 4 or 5 cycles
+// 512 KB L2 cache at 14 cycles
+// 96 MB shared L3 cache at 47 cycles
+
 

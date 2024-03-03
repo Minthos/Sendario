@@ -14,7 +14,7 @@ auto now = std::chrono::high_resolution_clock::now;
 
 int winW = 1920;
 int winH = 1080;
-float canvasScale = 0.5;
+float canvasScale = 1.0;
 int canvasW = winW * canvasScale;
 int canvasH = winH * canvasScale;
 unsigned int frameCount = 0;
@@ -164,7 +164,7 @@ void BVHNode::subdivide(BVHNode* nodes, uint* poolPtr, Sphere* primitives, Morto
     *poolPtr += 2;
     BVHNode *left = &nodes[leftFirst];
     BVHNode *right = &nodes[leftFirst + 1];
-    uint split = first + last >> 1;
+    uint split = (first + last) >> 1;
 //    uint split = findSplit(mortonPrims, first, last);
     left->setBounds(calculateBounds(primitives, mortonPrims, first, split));
     right->setBounds(calculateBounds(primitives, mortonPrims, split + 1, last));
