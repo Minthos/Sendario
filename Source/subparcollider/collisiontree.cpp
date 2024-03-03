@@ -1,6 +1,32 @@
+#include <cassert>
 #include <cstdint>
 #include <vector>
 #include <glm/glm.hpp>
+
+int32_t d2i(double d) {
+    if(d > 0){
+        return (int32_t)(d + 0.5);
+    } else if(d < 0) {
+        return (int32_t)(d - 0.5);
+    } else {
+        return 0;
+    }
+};
+
+// shadows glm type
+struct uvec3 {
+    uint32_t x;
+    uint32_t y;
+    uint32_t z;
+};
+
+
+// shadows glm type
+struct ivec3 {
+    int32_t x;
+    int32_t y;
+    int32_t z;
+};
 
 // shadows glm type
 struct vec3 {
@@ -33,20 +59,22 @@ struct vec9 {
     vec3 hi; // frequencies above the visible spectrum
 };
 
+
 // shadows glm type
 struct dvec3 {
     double x;
     double y;
     double z;
-};
 
-// shadows glm type
-struct ivec3 {
-    int x;
-    int y;
-    int z;
+    double length() { return ((glm::dvec3*)this)->length(); }
+    dvec3 operator+(double other) { return dvec3 { x + other, y + other, z + other }; }
+    dvec3 operator/(double other) {
+        double factor = 1.0 / other;
+        return dvec3{ x * factor, y * factor, z * factor };
+    }
+    ivec3 int32() { return ivec3{ d2i(x), d2i(y), d2i(z) }; }
+    uvec3 uint32() { return uvec3{ (uint32_t)x, (uint32_t)y, (uint32_t)z }; }
 };
-
 
 struct Mesh {
     // put some vertices and triangles here
@@ -63,7 +91,7 @@ struct Motor {
 };
 
 struct Joint {
-    dvec3 origin;
+    dvec3 pos;
     dvec3 axis;
     Motor motor;
 };
@@ -110,7 +138,7 @@ struct PhysicsObject {
 
 struct CollisionShape {
     double radius;
-    dvec3 center; // bounding sphere enclosing the shape .. yes I know we also have an AABB
+    dvec3 pos; // bounding sphere enclosing the shape .. yes I know we also have an AABB
     // but not all collision shapes will have an AABB and also a sphere is a good starting point
     // for creating the AABB quickly when the object moves and rotates without having to transform
     // every vertex
@@ -141,7 +169,7 @@ int count_bits_builtin(uint64_t v) {
 // https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
 // expects a bit field with a single bit set to high
 // returns the index of that bit
-uint8_t which_bit(uint64_t input){
+uint32_t which_bit(uint64_t input){
     uint64_t masks[] = {
         0xaaaaaaaaaaaaaaaa,
         0xcccccccccccccccc,
@@ -150,18 +178,18 @@ uint8_t which_bit(uint64_t input){
         0xffff0000ffff0000,
         0xffffffff00000000
     };
-    uint8_t bit = 0;
+    uint32_t bit = 0;
     for(uint32_t i = 0; i < 6; i++) {
         bit += (!(!(input & masks[i]))) << i;
     }
     return bit;
 }
 
-uint8_t which_bit_builtin(uint64_t input) {
+uint32_t which_bit_builtin(uint64_t input) {
     #ifdef _MSC_VER
         unsigned long index;
         _BitScanForward64(&index, input);
-        return (uint8_t)index;
+        return (uint32_t)index;
     #elif defined(__GNUC__) || defined(__clang__)
         return __builtin_ctzll(input);
     #else
@@ -178,7 +206,7 @@ uint8_t which_bit_builtin(uint64_t input) {
 // children [node, node, node]
 // decode: [0,4,12]
 // then you can zip decode with children and get something like [(0, node), (4, node), (12, node)]
-void decode(uint64_t bit_field, uint8_t *results) {
+void decode(uint64_t bit_field, uint8_t *results, uint32_t &num_results) {
     uint64_t v = bit_field;
     int i = 0;
     while(v != 0) {
@@ -202,8 +230,8 @@ void decode_gpt4_version(uint64_t bit_field, uint8_t *results) {
 
 struct ctleaf {
     // axis-aligned bounding box enclosing the entire object
-    ivec3 hi;
-    ivec3 lo;
+    uvec3 hi;
+    uvec3 lo;
     CollisionShape *shape;
 };
 
@@ -218,6 +246,82 @@ struct ctnode {
     };
 };
 
+#define MAX_MAX_DEPTH 16
+struct CollisionTree {
+    int MAX_DEPTH = 6;
+    dvec3 pos; // relative to the coordinate system of its parent object, whatever that is
+    int num_items;
+    ctnode root = { 0 };
+
+    void compress() {
+        
+    }
+
+    // the shape's coordinates must already be in the tree's coordinate system
+    void insert(CollisionShape* shape) {
+        
+        uint32_t tree_dim = 2 << (2 * MAX_DEPTH);
+
+        // assert that the object doesn't intersect the edge of the tree? but it should be allowed to intersect.
+        assert(abs(shape->pos.x) + shape->radius <= (double)tree_dim);
+        assert(abs(shape->pos.y) + shape->radius <= (double)tree_dim);
+        assert(abs(shape->pos.z) + shape->radius <= (double)tree_dim);
+
+        // this shit is complicated.. I could save myself so much trouble by adapting the BVH from the ray tracer instead
+        // performance would probably be better too
+
+        // shift it so that 0,0,0 is at the bottom corner of the tree's coordinate space
+        // scale it so that 4m equals 1 node at max depth
+        ctleaf leaf;
+        leaf.hi = ((shape->pos + (tree_dim * 2.0) + shape->radius) / 4.0).uint32();
+        leaf.lo = ((shape->pos + (tree_dim * 2.0) + -shape->radius) / 4.0).uint32();
+
+
+        uint32_t path[MAX_MAX_DEPTH];
+        for(uint32_t i = MAX_DEPTH; i > 0; --i) {
+            path[i] = (pos.x & 3) | ((pos.y & 3) << 2) | ((pos.z & 3) << 4);
+        }
+        ctnode *current_node = &root;
+        for(uint32_t i = 0; i < MAX_DEPTH; ++i) {
+            
+
+            uint64_t bit = 1 << path[i];
+            
+            uint8_t decoded[64] = {0};
+            uint32_t num_children = 0;
+            decode(current_node->occupancy, decoded, num_children);
+            uint32_t index = 0;
+
+            
+            for(uint32_t j = 0; j < num_children; j++){
+                index = j;
+                if(decoded[j] == path[i]) {
+                    // node exists
+                } else if(decoded[j] > path[i]) {
+                    // node doesn't exist and we must insert it before some of its siblings
+                }
+            }
+            // node doesn't exist and there are no sibling nodes after it
+        }
+    }
+
+    // the shape's coordinates must already be in the tree's coordinate system
+    void buildTree(CollisionShape *shapes, uint64_t num_shapes) {
+        if(!num_shapes){
+            root = NULL;
+            num_items = 0;
+            return;
+        }
+        root->first_child = (ctnode*)calloc(64, sizeof(ctnode));
+        for(uint64_t i; i < num_shapes; i++) {
+            insert(&shapes[i]);
+        }
+
+        compress();
+    }
+};
+
+
 // resolution at bottom level: 4m
 // 1 level up: 16
 // 2 -> 64
@@ -229,15 +333,6 @@ struct ctnode {
 // A tree shouldn't be too big, it should represent a frame of reference for the physics engine
 // We want to keep the numbers small to counter floating point stability issues
 // Better to have many trees and move more frequently between them
-struct CollisionTree {
-    dvec3 origo;
-    int num_items;
-    ctnode *root;
-
-    void buildTree(CollisionShape *shapes, uint64_t num_shapes) {
-        
-    }
-};
 
 
 

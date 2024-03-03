@@ -44,4 +44,17 @@ Wet areas produce vegetation
 
 
 
+----
+
+Galaxy and star generation
+
+I should download the GAIA GDR3 dataset and convert it to a binary format. PostGIS may be a good idea for this data.
+
+Sending the entire dataset to each client is probably overkill. Instead maybe some 3d textures
+representing the Milky Way and nearby galaxies and progressively lower detail 3d textures of the rest of the universe.
+
+Then the server can generate a point cloud representing stars within reasonable travel distance
+of the player to be rendered individually and the client can generate a skybox from the 3d textures
+for anything outside that range.
+
 
