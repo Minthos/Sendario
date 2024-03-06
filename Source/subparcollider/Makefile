@@ -16,16 +16,17 @@ CPP_SRC := lintedrender5.cpp sdlwrapper.cpp
 SWIFT_SRC := main.swift gptphysics.swift spatialtypes.swift boxoid.swift gamelogic.swift
 OBJC_HEADERS := subparcollider-Bridging-Header.h
 LIBS := -lglfw -lGL -lGLEW -lm -lSDL2
+NEW_LIBS := -lGL -lGLEW -lglut -lGLU -lm -lglfw
 LIBDIR := -L/usr/local/lib
 INCDIR := -I/usr/local/include
 
 main_optimized: $(NEW_SRC)
-	g++ -O3 -march=native -c $(NEW_SRC) $(LIBS)
-	g++ -O3 -march=native $(NEW_SRC:.cpp=.o) -o takeoff $(LIBDIR) $(INCDIR) $(LIBS)
+	g++ -O3 -march=native -c $(NEW_SRC) $(NEW_LIBS)
+	g++ -O3 -march=native $(NEW_SRC:.cpp=.o) -o takeoff $(LIBDIR) $(INCDIR) $(NEW_LIBS)
 
 main_debug: $(NEW_SRC)
-	g++ -g3 -D DEBUG -march=native -c $(NEW_SRC) $(LIBS)
-	g++ -g3 -D DEBUG -march=native $(NEW_SRC:.cpp=.o) -o takeoff $(LIBDIR) $(INCDIR) $(LIBS)
+	g++ -g3 -D DEBUG -march=native -c $(NEW_SRC) $(NEW_LIBS)
+	g++ -g3 -D DEBUG -march=native $(NEW_SRC:.cpp=.o) -o takeoff $(NEW_LIBS)
 
 old_optimized: $(CPP_SRC) $(SWIFT_SRC)
 	g++ -O3 -march=native -c $(CPP_SRC) -fpermissive -fPIC $(LIBS)

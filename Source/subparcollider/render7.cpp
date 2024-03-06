@@ -1,4 +1,5 @@
 #include <GL/glew.h>
+#include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <vector>
@@ -74,8 +75,8 @@ GLuint mkShader(string name) {
     char *vert_src = readShaderSource(vert_path.c_str());
     char *frag_src = readShaderSource(frag_path.c_str());
 
-    GLuint vert;// = compileShader(GL_VERTEX_SHADER, vert_src);
-    GLuint frag;// = compileShader(GL_FRAGMENT_SHADER, frag_src);
+    GLuint vert = compileShader(GL_VERTEX_SHADER, vert_src);
+    GLuint frag = compileShader(GL_FRAGMENT_SHADER, frag_src);
     free(vert_src);
     free(frag_src);
     GLuint program = glCreateProgram();
@@ -118,12 +119,36 @@ void convertMeshToOpenGLBuffers(const dMesh& mesh, GLuint& vao, GLuint& vbo, GLu
     glBindVertexArray(0);
 }
 
-void setupRenderer(const dMesh& mesh) {
-    shaderProgram = mkShader("box");
 
-    convertMeshToOpenGLBuffers(mesh, vao, vbo, ebo);
+void initializeGLFW() {
+    if (!glfwInit()) {
+        std::cerr << "Failed to initialize GLFW\n";
+        exit(EXIT_FAILURE);
+    }
+
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4); // Target version
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3); // Target version
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 }
 
+GLFWwindow* createWindow(int width, int height, const char* title) {
+    GLFWwindow* window = glfwCreateWindow(width, height, title, NULL, NULL);
+    if (!window) {
+        std::cerr << "Failed to create GLFW window\n";
+        glfwTerminate();
+        exit(EXIT_FAILURE);
+    }
+    glfwMakeContextCurrent(window);
+    return window;
+}
+
+void initializeGLEW() {
+    glewExperimental = GL_TRUE; // Ensure GLEW uses more modern techniques for managing OpenGL functionality
+    if (glewInit() != GLEW_OK) {
+        std::cerr << "Failed to initialize GLEW\n";
+        exit(EXIT_FAILURE);
+    }
+}
 
 void render(const dMesh& mesh) {
     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
@@ -141,11 +166,28 @@ void render(const dMesh& mesh) {
 }
 
 int main() {
-    dMesh m = dMesh::createBox(dvec3(0), 1.0, 1.0, 1.0);
-    setupRenderer(m);
-    while(true){
-        render(m);
+    initializeGLFW();
+    GLFWwindow* window = createWindow(800, 600, "OpenGL Renderer");
+    initializeGLEW();
+    shaderProgram = mkShader("box");
+
+    dMesh mesh = dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0);
+    convertMeshToOpenGLBuffers(mesh, vao, vbo, ebo);
+
+    // Main loop
+    while (!glfwWindowShouldClose(window)) {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear the buffers
+
+        // Rendering code here (e.g., render function)
+        render(mesh);
+
+        glfwSwapBuffers(window); // Swap the front and back buffers
+        glfwPollEvents(); // Poll for and process events
     }
+
+    mesh.destroy(); // Clean up mesh data
+    glfwTerminate(); // Clean up and close the GLFW window
+    return 0;
 }
 
 
