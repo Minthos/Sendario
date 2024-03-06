@@ -1,3 +1,5 @@
+#include "collisiontree.h"
+
 #include <algorithm>
 #include <iostream>
 #include <vector>
@@ -13,70 +15,33 @@ using glm::vec3;
 using glm::dmat4;
 using glm::dmat3;
 
-struct unionvec3 {
-    union {
-        float radio;
-        float r;
-        float red;
-        float uv;
-        float x;
-    };
-    union {
-        float microwave;
-        float g;
-        float green;
-        float xray;
-        float y;
-    };
-    union {
-        float ir;
-        float b;
-        float blue;
-        float gamma;
-        float z;
-    };
-};
-
-struct vec9 {
-    unionvec3 lo; // frequencies below the visible spectrum
-    unionvec3 rgb;
-    unionvec3 hi; // frequencies above the visible spectrum
-};
-
 int16_t d2hi(double in) {
     if(in > 0.0) return (int16_t)(in + 0.5);
     if(in < 0.0) return (int16_t)(in - 0.5);
     return 0;
 }
 
-struct hvec3 {
-    int16_t x;
-    int16_t y;
-    int16_t z;
+hvec3::hvec3() { x = 0; y = 0; z = 0; }
+hvec3::hvec3(int16_t in) { x = in; y = in; z = in; }
+hvec3::hvec3(dvec3 in) {
+    x = d2hi(in.x);
+    y = d2hi(in.y);
+    z = d2hi(in.z);
+}
 
-    hvec3() { x = 0; y = 0; z = 0; }
-    hvec3(int16_t in) { x = in; y = in; z = in; }
-    constexpr hvec3(int16_t px, int16_t py, int16_t pz) : x(px), y(py), z(pz) {}
-    hvec3(dvec3 in) {
-        x = d2hi(in.x);
-        y = d2hi(in.y);
-        z = d2hi(in.z);
-    }
+hvec3 hvec3::max(hvec3 lhs, hvec3 rhs) {
+    return hvec3{
+            glm::max(lhs.x, rhs.x),
+            glm::max(lhs.y, rhs.y),
+            glm::max(lhs.z, rhs.z)};
+}
 
-    static hvec3 max(hvec3 lhs, hvec3 rhs) {
-        return hvec3{
-                glm::max(lhs.x, rhs.x),
-                glm::max(lhs.y, rhs.y),
-                glm::max(lhs.z, rhs.z)};
-    }
-
-    static hvec3 min(hvec3 lhs, hvec3 rhs) {
-        return hvec3{
-                glm::min(lhs.x, rhs.x),
-                glm::min(lhs.y, rhs.y),
-                glm::min(lhs.z, rhs.z)};
-    }
-};
+hvec3 hvec3::min(hvec3 lhs, hvec3 rhs) {
+    return hvec3{
+            glm::min(lhs.x, rhs.x),
+            glm::min(lhs.y, rhs.y),
+            glm::min(lhs.z, rhs.z)};
+}
 
 constexpr hvec3 operator*(const hvec3 lhs, const int16_t rhs) {
     return hvec3(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs);
@@ -130,14 +95,8 @@ constexpr dvec3 operator-(const dvec3 lhs, const vec3 rhs) {
     return dvec3(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z);
 }
 
-struct dTri;
-
-struct dTri {
-    uint32_t verts[3];
-    glm::dvec3 normal;
-
-    dTri() {}
-    dTri(uint32_t pverts[3], dvec3* vertData, dvec3 center) {
+dTri::dTri() {}
+dTri::dTri(uint32_t pverts[3], dvec3* vertData, dvec3 center) {
         verts[0] = pverts[0];
         verts[1] = pverts[1];
         verts[2] = pverts[2];
@@ -147,16 +106,8 @@ struct dTri {
             normal = -normal;
         }
     }
-};
 
-struct dMesh {
-    dvec3 center;
-    dvec3 *verts;
-    dTri *tris;
-    uint32_t num_verts;
-    uint32_t num_tris;
-
-    void destroy() {
+    void dMesh::destroy() {
         free(verts);
         verts = 0;
         tris = 0;
@@ -164,7 +115,7 @@ struct dMesh {
         num_tris = 0;
     }
 
-    dMesh(dvec3 pcenter, dvec3* pverts, uint32_t pnumVerts, dTri* ptris, uint32_t pnumTris) {
+    dMesh::dMesh(dvec3 pcenter, dvec3* pverts, uint32_t pnumVerts, dTri* ptris, uint32_t pnumTris) {
         center = pcenter;
         verts = pverts;
         num_verts = pnumVerts;
@@ -172,7 +123,7 @@ struct dMesh {
         num_tris = pnumTris;
     }
 
-    static dMesh createBox(dvec3 center, double width, double height, double depth) {
+    dMesh dMesh::createBox(dvec3 center, double width, double height, double depth) {
         const int numVertices = 8;
         const int numTriangles = 12;
 
@@ -208,68 +159,7 @@ struct dMesh {
 
         return dMesh(center, vertices, numVertices, triangles, numTriangles);
     }
-};
 
-struct CollisionShape;
-
-struct Motor {
-    double max_force;
-    double min_force; // negative values for motors that can produce power in both directions
-    double max_power; // both positive and negative if applicable
-};
-
-struct Joint {
-    dvec3 pos;
-    dvec3 axis;
-    Motor motor;
-};
-
-struct JointHinge: Joint {
-    double target_angle;
-    double angle;
-    double max_angle;
-    double min_angle;
-};
-
-struct JointSlide: Joint {
-    double target_extension;
-    double extension;
-    double max_extension;
-    double min_extension;
-};
-
-struct Joint6dof: Joint {
-    dvec3 target_angle;
-    dvec3 angle;
-};
-
-enum physics_state {
-    active,
-    sleeping,
-    immovable // immovable objects are things like terrain and buildings. They can become active in dire circumstances.
-};
-
-struct PhysicsObject {
-    CollisionShape *shape; // for objects with no parent this should be the total shape of the object including all descendants.
-    // for objects with a parent it should only represent a single shape, not its children.
-    PhysicsObject *parent;
-    Joint *joint; // joint can only represent the connection to parent. directed acyclic graph is the only valid topology.
-    PhysicsObject **children; // both direct and indirect children
-
-    enum physics_state state;
-    double mass;
-    dmat3 inertia_tensor;
-    dvec3 pos; // center of coordinate transforms? the center of mass can shift so this should be the geometric center instead
-    dvec3 vel;
-    dvec3 rot;
-    dvec3 spin;
-};
-
-struct CollisionShape {
-    double radius; // radius of the bounding sphere for simplified math. Not all objects need a collision mesh.
-    dMesh *convex_hull; // concave hull?
-    PhysicsObject *object;
-};
 
 // Thoughts on convex/concave hull
 //
@@ -287,18 +177,6 @@ struct CollisionShape {
 // 5. we update the BVH
 // 6. we can now read from the BVH and write to the physics objects to our heart's content for the rest of the tick
 
-struct ctleaf {
-    CollisionShape *shape;// 8 bytes
-
-    // axis-aligned bounding box
-    hvec3 hi; // 6 bytes (total 14)
-    hvec3 lo; // 6 bytes (total 20)
-};
-
-struct AABB {
-	hvec3 max;
-	hvec3 min;
-};
 
 AABB calculateBounds(ctleaf* p, uint32_t first, uint32_t last) {
     AABB bounds;
@@ -311,18 +189,9 @@ AABB calculateBounds(ctleaf* p, uint32_t first, uint32_t last) {
     return bounds;
 }
 
-struct ctnode {
-    hvec3 hi; // 6 bytes
-    hvec3 lo; // 6 bytes (total 12)
-    uint32_t count; // 4 bytes (total 16)
-    union{ // 4 bytes (total 20)
-        uint32_t left_child;
-        uint32_t first_leaf;
-    };
+    void ctnode::setBounds(AABB bounds) { hi = bounds.max; lo = bounds.min; }
 
-    void setBounds(AABB bounds) { hi = bounds.max; lo = bounds.min; }
-
-    void subdivide(ctnode* nodes, uint32_t* poolPtr, ctleaf* primitives, uint32_t first, uint32_t last) {
+    void ctnode::subdivide(ctnode* nodes, uint32_t* poolPtr, ctleaf* primitives, uint32_t first, uint32_t last) {
         if (first == last) {
             this->first_leaf = first;
             this->count = 1;
@@ -360,7 +229,7 @@ struct ctnode {
         right->subdivide(nodes, poolPtr, primitives, split + 1, last);
         this->count = last - first + 1;
     }
-};
+
 
 ctnode* constructBVH(ctleaf* leaves, int N) {
 	AABB globalBounds = calculateBounds(leaves, 0, N);
@@ -377,43 +246,15 @@ ctnode* constructBVH(ctleaf* leaves, int N) {
 
 
 #define MAX_MAX_DEPTH 16
-struct CollisionTree {
-    dvec3 pos;
-    ctnode *root = 0;
-    std::vector<CollisionShape> shapes;
-
-    CollisionTree(dvec3 origo) {
+CollisionTree::CollisionTree(dvec3 origo) {
         pos = origo;
         root = 0;
     }
 
-};
 
 // TODO:
 // we should put all the zones into a zone BVH for each celestial so it's easy to find the correct zone for any location near a celestial
 // for zones not near a celestial we need a solution with a bigger coordinate system than 16 bits
-
-struct Celestial {
-    dvec3 pos;
-    dvec3 vel;
-    dvec3 rot;
-    dvec3 spin;
-    double mass;
-    double radius;
-    double surface_temp_min;
-    double surface_temp_max;
-    vec9 radiance;
-
-    Celestial *nearest_star;
-    std::vector<Celestial> orbiting_bodies;
-};
-
-struct Zone {
-    Zone *neighbors[6]; // +x, -x, +y, -y, +z, -z
-
-    CollisionTree tree;
-    Celestial *frame_of_reference;
-};
 
 
 /*
