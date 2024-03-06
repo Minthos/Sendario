@@ -4,17 +4,19 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <vector>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
-#include <string>
-#include <sstream>
 #include <fstream>
 #include <iostream>
+#include <string>
+#include <sstream>
+#include <vector>
 
 #include "collisiontree.h"
 
 
+auto now = std::chrono::high_resolution_clock::now;
 using std::string;
 
 GLuint shaderProgram; // Assume this is setup and linked with your shaders
@@ -102,6 +104,10 @@ GLuint loadTexture(const char* filename) {
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
 
+    if (glewIsSupported("GL_EXT_texture_filter_anisotropic")) {
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 4.0f);
+    }
+
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -114,28 +120,46 @@ GLuint loadTexture(const char* filename) {
     return texture;
 }
 
+struct texvert {
+    glm::vec3 xyz;
+    glm::vec2 uv;
+
+    texvert(glm::vec3 a, glm::vec2 b) { xyz = a; uv = b; }
+};
+
 void convertMeshToOpenGLBuffers(const dMesh& mesh, GLuint& vao, GLuint& vbo, GLuint& ebo) {
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
 
-    std::vector<GLfloat> vertices;
+    std::vector<texvert> vertices;
     std::vector<GLuint> indices;
 
-    for (uint32_t i = 0; i < mesh.num_verts; ++i) {
-        vertices.push_back(static_cast<GLfloat>(mesh.verts[i].x));
-        vertices.push_back(static_cast<GLfloat>(mesh.verts[i].y));
-        vertices.push_back(static_cast<GLfloat>(mesh.verts[i].z));
-        vertices.push_back(i & 1 ? 0.0f : 1.0f);
-        vertices.push_back(i & 2 ? 0.0f : 1.0f);
-    }
+    uint32_t faces[6 * 4] =
+        {0, 1, 2, 3, // top
+        0, 1, 4, 5, // front
+        0, 2, 4, 6, // left
+        7, 5, 3, 1, // right
+        7, 6, 3, 2, // back
+        7, 6, 5, 4}; // bottom
 
-    for (uint32_t i = 0; i < mesh.num_tris; ++i) {
-        indices.insert(indices.end(), {mesh.tris[i].verts[0], mesh.tris[i].verts[1], mesh.tris[i].verts[2]});
+    for (uint32_t i = 0; i < 6; ++i) {
+        dTri* t1 = &mesh.tris[i * 2];
+        dTri* t2 = &mesh.tris[i * 2 + 1];
+
+        texvert verts[4] = {
+            texvert(vec3(mesh.verts[faces[i * 4]]), glm::vec2(0.0f, 0.0f)),
+            texvert(vec3(mesh.verts[faces[i * 4 + 1]]), glm::vec2(1.0f, 0.0f)),
+            texvert(vec3(mesh.verts[faces[i * 4 + 2]]), glm::vec2(0.0f, 1.0f)),
+            texvert(vec3(mesh.verts[faces[i * 4 + 3]]), glm::vec2(1.0f, 1.0f))};
+       
+        vertices.insert(vertices.end(), {verts[0], verts[1], verts[2], verts[3]});
+        indices.insert(indices.end(), {i * 4, i * 4 + 1, i * 4 + 2});
+        indices.insert(indices.end(), {i * 4 + 1, i * 4 + 2, i * 4 + 3});
     }
 
     glGenBuffers(1, &vbo);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(texvert), vertices.data(), GL_STATIC_DRAW);
 
     glGenBuffers(1, &ebo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
@@ -188,10 +212,13 @@ void initializeGLEW() {
 
 int screenwidth = 3840;
 int screenheight = 2160;
+int frames_rendered = 0;
+auto prevFrameTime = now();
 
 void render(const dMesh& mesh) {
     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
-    glm::mat4 view = glm::lookAt(glm::vec3(4,3,3), glm::vec3(0,0,0), glm::vec3(0,1,0));
+    model = glm::rotate(model, frames_rendered++ * 0.002f, glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::mat4 view = glm::lookAt(glm::vec3(2,1.5,1.5), glm::vec3(0,0,0), glm::vec3(0,1,0));
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenwidth / (float)screenheight, 0.1f, 100.0f);
 
     glUseProgram(shaderProgram);
@@ -202,15 +229,25 @@ void render(const dMesh& mesh) {
     glBindVertexArray(vao);
     glDrawElements(GL_TRIANGLES, mesh.num_tris * 3, GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
+    if(frames_rendered % 60 == 0){
+    	auto frameDuration = std::chrono::duration_cast<std::chrono::microseconds>(now() - prevFrameTime).count();
+        prevFrameTime = now();
+        std::cout << 60000000.0 / frameDuration << '\n';
+    }
 }
 
 int main() {
     initializeGLFW();
     GLFWwindow* window = createWindow(screenwidth, screenheight, "Takeoff Sendario");
     initializeGLEW();
+    
+    glEnable(GL_DEPTH_TEST);
+//    glDisable(GL_CULL_FACE);
+
     shaderProgram = mkShader("box");
 
-    GLuint texture = loadTexture("textures/F90hjZAbkAAeCkk.jpeg");
+    GLuint texture = loadTexture("textures/isqswjwki55a1.png");
+//    GLuint texture = loadTexture("textures/F90hjZAbkAAeCkk.jpeg");
     glActiveTexture(GL_TEXTURE0); // Activate the texture unit first
     glBindTexture(GL_TEXTURE_2D, texture); // Bind your loaded texture
     glUniform1i(glGetUniformLocation(shaderProgram, "ourTexture"), 0); // Set the texture uniform
