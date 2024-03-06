@@ -1,3 +1,5 @@
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -11,6 +13,7 @@
 #include <iostream>
 
 #include "collisiontree.h"
+
 
 using std::string;
 
@@ -87,6 +90,30 @@ GLuint mkShader(string name) {
     return program;
 }
 
+GLuint loadTexture(const char* filename) {
+    int width, height, channels;
+    unsigned char* data = stbi_load(filename, &width, &height, &channels, 0);
+    if (!data) {
+        std::cerr << "Failed to load texture" << std::endl;
+        exit(1);
+    }
+
+    GLuint texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, channels == 4 ? GL_RGBA : GL_RGB, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    stbi_image_free(data);
+    return texture;
+}
+
 void convertMeshToOpenGLBuffers(const dMesh& mesh, GLuint& vao, GLuint& vbo, GLuint& ebo) {
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
@@ -98,7 +125,8 @@ void convertMeshToOpenGLBuffers(const dMesh& mesh, GLuint& vao, GLuint& vbo, GLu
         vertices.push_back(static_cast<GLfloat>(mesh.verts[i].x));
         vertices.push_back(static_cast<GLfloat>(mesh.verts[i].y));
         vertices.push_back(static_cast<GLfloat>(mesh.verts[i].z));
-        // TODO: also convert triangle normals
+        vertices.push_back(i & 1 ? 0.0f : 1.0f);
+        vertices.push_back(i & 2 ? 0.0f : 1.0f);
     }
 
     for (uint32_t i = 0; i < mesh.num_tris; ++i) {
@@ -113,8 +141,16 @@ void convertMeshToOpenGLBuffers(const dMesh& mesh, GLuint& vao, GLuint& vbo, GLu
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void*)0);
+//    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void*)0);
+//    glEnableVertexAttribArray(0);
+
+    // Position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)0);
     glEnableVertexAttribArray(0);
+
+    // Texture coordinate attribute
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+    glEnableVertexAttribArray(1);
 
     glBindVertexArray(0);
 }
@@ -126,8 +162,8 @@ void initializeGLFW() {
         exit(EXIT_FAILURE);
     }
 
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4); // Target version
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3); // Target version
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 }
 
@@ -143,17 +179,20 @@ GLFWwindow* createWindow(int width, int height, const char* title) {
 }
 
 void initializeGLEW() {
-    glewExperimental = GL_TRUE; // Ensure GLEW uses more modern techniques for managing OpenGL functionality
+    glewExperimental = GL_TRUE;
     if (glewInit() != GLEW_OK) {
         std::cerr << "Failed to initialize GLEW\n";
         exit(EXIT_FAILURE);
     }
 }
 
+int screenwidth = 3840;
+int screenheight = 2160;
+
 void render(const dMesh& mesh) {
     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
     glm::mat4 view = glm::lookAt(glm::vec3(4,3,3), glm::vec3(0,0,0), glm::vec3(0,1,0));
-    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)800 / (float)600, 0.1f, 100.0f);
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenwidth / (float)screenheight, 0.1f, 100.0f);
 
     glUseProgram(shaderProgram);
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, &model[0][0]);
@@ -167,26 +206,30 @@ void render(const dMesh& mesh) {
 
 int main() {
     initializeGLFW();
-    GLFWwindow* window = createWindow(800, 600, "OpenGL Renderer");
+    GLFWwindow* window = createWindow(screenwidth, screenheight, "Takeoff Sendario");
     initializeGLEW();
     shaderProgram = mkShader("box");
+
+    GLuint texture = loadTexture("textures/F90hjZAbkAAeCkk.jpeg");
+    glActiveTexture(GL_TEXTURE0); // Activate the texture unit first
+    glBindTexture(GL_TEXTURE_2D, texture); // Bind your loaded texture
+    glUniform1i(glGetUniformLocation(shaderProgram, "ourTexture"), 0); // Set the texture uniform
 
     dMesh mesh = dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0);
     convertMeshToOpenGLBuffers(mesh, vao, vbo, ebo);
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear the buffers
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // Rendering code here (e.g., render function)
         render(mesh);
 
         glfwSwapBuffers(window); // Swap the front and back buffers
         glfwPollEvents(); // Poll for and process events
     }
 
-    mesh.destroy(); // Clean up mesh data
-    glfwTerminate(); // Clean up and close the GLFW window
+    mesh.destroy();
+    glfwTerminate();
     return 0;
 }
 
