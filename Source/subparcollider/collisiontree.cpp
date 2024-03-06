@@ -4,6 +4,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <cstring>
 
 #include <glm/glm.hpp>
 
@@ -131,82 +132,81 @@ constexpr dvec3 operator-(const dvec3 lhs, const vec3 rhs) {
 
 struct dTri;
 
-struct dEdge {
-    uint32_t verts[3];
-    dEdge* subdivisions[2];
-    dTri* tris[2];
-    dvec3 normal;
-    
-    dEdge() {}
-    dEdge(uint32_t vert0, uint32_t vert1) {
-        verts[0] = vert0;
-        verts[1] = vert1;
-        verts[2] = -1;
-        subdivisions[0] = nullptr;
-        subdivisions[1] = nullptr;
-        tris[0] = nullptr;
-        tris[1] = nullptr;
-    }
-};
-
 struct dTri {
     uint32_t verts[3];
-    dEdge *edges[3];
     glm::dvec3 normal;
 
     dTri() {}
-    dTri(uint32_t pverts[3], dEdge *pedges[3], dvec3* vertData, dvec3 center) {
+    dTri(uint32_t pverts[3], dvec3* vertData, dvec3 center) {
         verts[0] = pverts[0];
         verts[1] = pverts[1];
         verts[2] = pverts[2];
-        edges[0] = pedges[0];
-        edges[1] = pedges[1];
-        edges[2] = pedges[2];
-        // demand that all triangles are created in strict order
-        // first edge must connect points 1 and 2
-        assert(edges[0]->verts[0] == verts[0] || edges[0]->verts[1] == verts[0]);
-        assert(edges[0]->verts[0] == verts[1] || edges[0]->verts[1] == verts[1]);
-        // ssecond edge must connect points 2 and 3
-        assert(edges[1]->verts[0] == verts[1] || edges[1]->verts[1] == verts[1]);
-        assert(edges[1]->verts[0] == verts[2] || edges[1]->verts[1] == verts[2]);
-        // third edge must connect points 3 and 1
-        assert(edges[2]->verts[0] == verts[2] || edges[2]->verts[1] == verts[2]);
-        assert(edges[2]->verts[0] == verts[0] || edges[2]->verts[1] == verts[0]);
         normal = glm::normalize(glm::cross((vertData[verts[0]] - vertData[verts[1]]), (vertData[verts[0]] - vertData[verts[2]])));
-        float dotProduct = glm::dot(normal, vertData[verts[0]] - center);
-        if(dotProduct < 0.0f){
+        double dotProduct = glm::dot(normal, vertData[verts[0]] - center);
+        if(dotProduct < 0.0){
             normal = -normal;
         }
     }
 };
 
-void setEdgePtrs(dTri* tri) {
-    for(int i = 0; i < 3; i++) {
-        if(tri->edges[i]->tris[0] == nullptr) {
-            tri->edges[i]->tris[0] = tri;
-        } else {
-            tri->edges[i]->tris[1] = tri;
-        }
-    }
-}
-
 struct dMesh {
     dvec3 center;
     dvec3 *verts;
     dTri *tris;
-    dEdge *edges;
     uint32_t num_verts;
     uint32_t num_tris;
-    uint32_t num_edges;
 
-    dMesh(dvec3 pcenter, dvec3* pverts, uint32_t pnumVerts, dTri* ptris, uint32_t pnumTris, dEdge* pedges, uint32_t pnumEdges) {
+    void destroy() {
+        free(verts);
+        verts = 0;
+        tris = 0;
+        num_verts = 0;
+        num_tris = 0;
+    }
+
+    dMesh(dvec3 pcenter, dvec3* pverts, uint32_t pnumVerts, dTri* ptris, uint32_t pnumTris) {
         center = pcenter;
         verts = pverts;
         num_verts = pnumVerts;
         tris = ptris;
         num_tris = pnumTris;
-        edges = pedges;
-        num_edges = pnumEdges;
+    }
+
+    static dMesh createBox(dvec3 center, double width, double height, double depth) {
+        const int numVertices = 8;
+        const int numTriangles = 12;
+
+        dvec3 *vertices = (dvec3*)malloc(numVertices * sizeof(dvec3) + numTriangles * sizeof(dTri));
+        dTri *triangles = (dTri*)&vertices[numVertices];
+
+        double halfwidth = width / 2.0;
+        double halfheight = height / 2.0;
+        double halfdepth = depth / 2.0;
+
+        int vertexIndex = 0;
+        for (int i = 0; i < 8; ++i) {
+            double xCoord = i & 4 ? halfwidth : -halfwidth;
+            double yCoord = i & 2 ? halfheight : -halfheight;
+            double zCoord = i & 1 ? halfdepth : -halfdepth;
+            vertices[vertexIndex++] = center + dvec3(xCoord, yCoord, zCoord);
+        }
+
+        uint32_t faces[6 * 4] =
+            {0, 1, 2, 3, // top
+            0, 1, 4, 5, // front
+            0, 2, 4, 6, // left
+            7, 5, 3, 1, // right
+            7, 6, 3, 2, // back
+            7, 6, 5, 4}; // bottom
+
+        for(int i = 0; i < 6; i++) {
+            uint32_t tri1[3] = {faces[i * 4], faces[i * 4 + 1], faces[i * 4 + 2]};
+            uint32_t tri2[3] = {faces[i * 4 + 1], faces[i * 4 + 2], faces[i * 4 + 3]};
+            triangles[i * 2] = dTri(tri1, vertices, center);
+            triangles[i * 2 + 1] = dTri(tri2, vertices, center);
+        }
+
+        return dMesh(center, vertices, numVertices, triangles, numTriangles);
     }
 };
 
@@ -278,10 +278,7 @@ struct CollisionShape {
 // simple hull mesh and the main body can have a hull mesh that combines the outer surface into one mesh except protruding 
 // and jointed features since they will be tested separately.
 
-
-// TODO: calculate the bounding box from the collision shape. should probably use the convex hull
-// to get a tighter fit than the bounding sphere.
-//
+// TODO: calculate the bounding box from the collision shape.
 // 1. physics objects move, rotate, appear and disappear
 // 2. we calculate a transformation matrix from the object's new rotation
 // 3. we transform each point in the collision shape's mesh to calculate a new bounding box (but leave the mesh untransformed)
@@ -336,7 +333,7 @@ struct ctnode {
         ctnode *left = &nodes[left_child];
         ctnode *right = &nodes[left_child + 1];
 
-        // sort the primitives and split them in a dumb way that is not optimal but better than worst case
+        // sort the primitives
         hvec3 size = hi - lo;
         if(size.y > size.x && size.y > size.z) {
             std::sort(primitives + first, primitives + last + 1, [](const ctleaf& a, const ctleaf& b) -> bool {
@@ -353,6 +350,8 @@ struct ctnode {
                 return a.lo.z + a.hi.z < b.hi.z + b.lo.z;
             });
         }
+        // split them in a dumb way that is not optimal but better than worst case
+        // here we could instead do a binary search to find the geometric middle or even search for the biggest gap
         uint32_t split = (first + last) >> 1;
 
         left->setBounds(calculateBounds(primitives, first, split));
