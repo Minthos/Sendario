@@ -128,13 +128,17 @@ struct texvert {
     texvert(glm::vec3 a, glm::vec2 b) { xyz = a; uv = b; }
 };
 
+// TODO: integrate this with the physics system somehow
 struct GameObject {
     dMesh mesh;
     GLuint shader;
     GLuint texture;
     GLuint vao, vbo, ebo;
 
-    GameObject(dMesh pmesh) { mesh = pmesh; }
+    glm::mat4 prev;
+    bool firstTime;
+
+    GameObject(dMesh pmesh) { mesh = pmesh; firstTime = true; }
 };
 
 void convertMeshToOpenGLBuffers(GameObject& obj) {
@@ -243,17 +247,24 @@ void reshape(GLFWwindow* window, int width, int height) {
     screenheight = height;
 }
 
-void render(const GameObject& obj) {
-    std::cout << screenwidth << " x " << screenheight << "\n";
+void render(GameObject& obj) {
     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
     model = glm::rotate(model, frames_rendered * 0.002f, glm::vec3(0.0f, 1.0f, 0.0f));
     glm::mat4 view = glm::lookAt(glm::vec3(2,1.5,1.5), glm::vec3(0,0,0), glm::vec3(0,1,0));
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenwidth / (float)screenheight, 0.1f, 100.0f);
+    glm::mat4 transform = model * view * projection;
 
     glUseProgram(obj.shader);
-    glUniformMatrix4fv(glGetUniformLocation(obj.shader, "model"), 1, GL_FALSE, &model[0][0]);
-    glUniformMatrix4fv(glGetUniformLocation(obj.shader, "view"), 1, GL_FALSE, &view[0][0]);
-    glUniformMatrix4fv(glGetUniformLocation(obj.shader, "projection"), 1, GL_FALSE, &projection[0][0]);
+
+    if(obj.firstTime) {
+        glUniformMatrix4fv(glGetUniformLocation(obj.shader, "previous"), 1, GL_FALSE, &transform[0][0]);
+        glUniformMatrix4fv(glGetUniformLocation(obj.shader, "current"), 1, GL_FALSE, &transform[0][0]);
+    } else {
+        glUniformMatrix4fv(glGetUniformLocation(obj.shader, "previous"), 1, GL_FALSE, &obj.prev[0][0]);
+        glUniformMatrix4fv(glGetUniformLocation(obj.shader, "current"), 1, GL_FALSE, &transform[0][0]);
+    }
+
+    obj.prev = transform;
 
     glBindVertexArray(obj.vao);
     glDrawElements(GL_TRIANGLES, obj.mesh.num_tris * 3, GL_UNSIGNED_INT, 0);
