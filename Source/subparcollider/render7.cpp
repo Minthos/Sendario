@@ -12,6 +12,7 @@
 #include <map>
 #include <string>
 #include <sstream>
+#include <unistd.h>
 #include <unordered_map>
 #include <vector>
 
@@ -231,8 +232,8 @@ void initializeGLEW() {
     }
 }
 
-int screenwidth = 3840;
-int screenheight = 2160;
+int screenwidth = 1920;
+int screenheight = 1080;
 int frames_rendered = 0;
 auto prevFrameTime = now();
 
@@ -287,10 +288,13 @@ int main() {
             render(objs[i]);
         }
 
+        auto frameDuration = std::chrono::duration_cast<std::chrono::microseconds>(now() - prevFrameTime).count();
+        prevFrameTime = now();
+        if(frameDuration < 5000.0){
+			usleep(5000.0 - frameDuration);
+        }
         if(frames_rendered++ % 120 == 0){
-            auto frameDuration = std::chrono::duration_cast<std::chrono::microseconds>(now() - prevFrameTime).count();
-            prevFrameTime = now();
-            std::cout << 120000000.0 / frameDuration << " fps\n";
+            std::cout << frameDuration / 1000.0 << " ms\n";
         }
 
         glfwSwapBuffers(window);
