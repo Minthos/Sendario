@@ -94,6 +94,7 @@ struct dMesh {
     dMesh(dvec3 pcenter, dvec3* pverts, uint32_t pnumVerts, dTri* ptris, uint32_t pnumTris);
 
     public:
+    dMesh();
     static dMesh createBox(dvec3 center, double width, double height, double depth);
 };
 

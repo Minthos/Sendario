@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <string>
 #include <sstream>
 #include <vector>
@@ -19,9 +20,8 @@
 auto now = std::chrono::high_resolution_clock::now;
 using std::string;
 
-GLuint shaderProgram;
-GLuint vao, vbo, ebo;
-
+std::map<string, GLuint> shaders;
+std::map<string, GLuint> textures;
 
 char* readShaderSource(const char* filePath) {
     FILE* file = fopen(filePath, "rb");
@@ -126,24 +126,21 @@ struct texvert {
     texvert(glm::vec3 a, glm::vec2 b) { xyz = a; uv = b; }
 };
 
-void convertMeshToOpenGLBuffers(const dMesh& mesh, GLuint& vao, GLuint& vbo, GLuint& ebo) {
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
+struct GameObject {
+    dMesh mesh;
+    GLuint shader;
+    GLuint texture;
+    GLuint vao, vbo, ebo;
+
+    GameObject(dMesh pmesh) { mesh = pmesh; }
+};
+
+void convertMeshToOpenGLBuffers(GameObject& obj) {
+    glGenVertexArrays(1, &obj.vao);
+    glBindVertexArray(obj.vao);
 
     std::vector<texvert> vertices;
     std::vector<GLuint> indices;
-
-
-/*
-    // original orientation, texture rotates 90 degrees between each face
-    uint32_t faces[6 * 4] =
-        {0, 1, 2, 3, // top
-        0, 1, 4, 5, // front
-        0, 2, 4, 6, // left
-        7, 5, 3, 1, // right
-        7, 6, 3, 2, // back
-        7, 6, 5, 4}; // bottom
-*/
 
     // this ordering reverses the texture on two sides so a texture tiles correctly horizontally
     uint32_t faces[6 * 4] =
@@ -161,14 +158,14 @@ void convertMeshToOpenGLBuffers(const dMesh& mesh, GLuint& vao, GLuint& vbo, GLu
         glm::vec2(0.0f, 0.0f)};
 
     for (uint32_t i = 0; i < 6; ++i) {
-        dTri* t1 = &mesh.tris[i * 2];
-        dTri* t2 = &mesh.tris[i * 2 + 1];
+        dTri* t1 = &obj.mesh.tris[i * 2];
+        dTri* t2 = &obj.mesh.tris[i * 2 + 1];
 
         texvert verts[4] = {
-            texvert(vec3(mesh.verts[faces[i * 4    ]]), texture_corners[0]),
-            texvert(vec3(mesh.verts[faces[i * 4 + 1]]), texture_corners[1]),
-            texvert(vec3(mesh.verts[faces[i * 4 + 2]]), texture_corners[2]),
-            texvert(vec3(mesh.verts[faces[i * 4 + 3]]), texture_corners[3])};
+            texvert(vec3(obj.mesh.verts[faces[i * 4    ]]), texture_corners[0]),
+            texvert(vec3(obj.mesh.verts[faces[i * 4 + 1]]), texture_corners[1]),
+            texvert(vec3(obj.mesh.verts[faces[i * 4 + 2]]), texture_corners[2]),
+            texvert(vec3(obj.mesh.verts[faces[i * 4 + 3]]), texture_corners[3])};
        
         vertices.insert(vertices.end(), {verts[0], verts[1], verts[2], verts[3]});
 
@@ -183,16 +180,13 @@ void convertMeshToOpenGLBuffers(const dMesh& mesh, GLuint& vao, GLuint& vbo, GLu
         }
     }
 
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glGenBuffers(1, &obj.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, obj.vbo);
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(texvert), vertices.data(), GL_STATIC_DRAW);
 
-    glGenBuffers(1, &ebo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glGenBuffers(1, &obj.ebo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj.ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
-
-//    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void*)0);
-//    glEnableVertexAttribArray(0);
 
     // Position attribute
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)0);
@@ -241,25 +235,20 @@ int screenheight = 2160;
 int frames_rendered = 0;
 auto prevFrameTime = now();
 
-void render(const dMesh& mesh) {
+void render(const GameObject& obj) {
     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
-    model = glm::rotate(model, frames_rendered++ * 0.002f, glm::vec3(0.0f, 1.0f, 0.0f));
+    model = glm::rotate(model, frames_rendered * 0.002f, glm::vec3(0.0f, 1.0f, 0.0f));
     glm::mat4 view = glm::lookAt(glm::vec3(2,1.5,1.5), glm::vec3(0,0,0), glm::vec3(0,1,0));
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenwidth / (float)screenheight, 0.1f, 100.0f);
 
-    glUseProgram(shaderProgram);
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, &model[0][0]);
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, &view[0][0]);
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, &projection[0][0]);
+    glUseProgram(obj.shader);
+    glUniformMatrix4fv(glGetUniformLocation(obj.shader, "model"), 1, GL_FALSE, &model[0][0]);
+    glUniformMatrix4fv(glGetUniformLocation(obj.shader, "view"), 1, GL_FALSE, &view[0][0]);
+    glUniformMatrix4fv(glGetUniformLocation(obj.shader, "projection"), 1, GL_FALSE, &projection[0][0]);
 
-    glBindVertexArray(vao);
-    glDrawElements(GL_TRIANGLES, mesh.num_tris * 3, GL_UNSIGNED_INT, 0);
+    glBindVertexArray(obj.vao);
+    glDrawElements(GL_TRIANGLES, obj.mesh.num_tris * 3, GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
-    if(frames_rendered % 60 == 0){
-    	auto frameDuration = std::chrono::duration_cast<std::chrono::microseconds>(now() - prevFrameTime).count();
-        prevFrameTime = now();
-        std::cout << 60000000.0 / frameDuration << '\n';
-    }
 }
 
 int main() {
@@ -269,29 +258,47 @@ int main() {
     
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
+    
+    shaders["box"] = mkShader("box");
+    textures["isqswjwki55a1.png"] = loadTexture("textures/isqswjwki55a1.png");
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, textures["isqswjwki55a1.png"]);
+    glUniform1i(glGetUniformLocation(shaders["box"], "tex"), 0);
 
-    shaderProgram = mkShader("box");
+    std::vector<GameObject> objs;
+    objs.push_back(dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0));
+    objs.push_back(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 1.0));
+    objs.push_back(dMesh::createBox(glm::dvec3(-1.2, 0.0, 0.0), 1.0, 1.0, 1.0));
 
-    GLuint texture = loadTexture("textures/isqswjwki55a1.png");
-//    GLuint texture = loadTexture("textures/F90hjZAbkAAeCkk.jpeg");
-    glActiveTexture(GL_TEXTURE0); // Activate the texture unit first
-    glBindTexture(GL_TEXTURE_2D, texture); // Bind your loaded texture
-    glUniform1i(glGetUniformLocation(shaderProgram, "ourTexture"), 0); // Set the texture uniform
 
-    dMesh mesh = dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0);
-    convertMeshToOpenGLBuffers(mesh, vao, vbo, ebo);
+    for(int i = 0; i < objs.size(); i++) {
+        convertMeshToOpenGLBuffers(objs[i]);
+        objs[i].shader = shaders["box"];
+        objs[i].texture = textures["isqswjwki55a1.png"];
+    }
+
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        render(mesh);
+        for(int i = 0; i < objs.size(); i++) {
+            render(objs[i]);
+        }
 
-        glfwSwapBuffers(window); // Swap the front and back buffers
-        glfwPollEvents(); // Poll for and process events
+        if(frames_rendered++ % 120 == 0){
+            auto frameDuration = std::chrono::duration_cast<std::chrono::microseconds>(now() - prevFrameTime).count();
+            prevFrameTime = now();
+            std::cout << 120000000.0 / frameDuration << " fps\n";
+        }
+
+        glfwSwapBuffers(window);
+        glfwPollEvents();
     }
 
-    mesh.destroy();
+    for(int i = 0; i < objs.size(); i++) {
+        objs[i].mesh.destroy();
+    }
     glfwTerminate();
     return 0;
 }

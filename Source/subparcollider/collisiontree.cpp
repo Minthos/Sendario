@@ -97,68 +97,70 @@ constexpr dvec3 operator-(const dvec3 lhs, const vec3 rhs) {
 
 dTri::dTri() {}
 dTri::dTri(uint32_t pverts[3], dvec3* vertData, dvec3 center) {
-        verts[0] = pverts[0];
-        verts[1] = pverts[1];
-        verts[2] = pverts[2];
-        normal = glm::normalize(glm::cross((vertData[verts[0]] - vertData[verts[1]]), (vertData[verts[0]] - vertData[verts[2]])));
-        double dotProduct = glm::dot(normal, vertData[verts[0]] - center);
-        if(dotProduct < 0.0){
-            normal = -normal;
-        }
+    verts[0] = pverts[0];
+    verts[1] = pverts[1];
+    verts[2] = pverts[2];
+    normal = glm::normalize(glm::cross((vertData[verts[0]] - vertData[verts[1]]), (vertData[verts[0]] - vertData[verts[2]])));
+    double dotProduct = glm::dot(normal, vertData[verts[0]] - center);
+    if(dotProduct < 0.0){
+        normal = -normal;
+    }
+}
+
+void dMesh::destroy() {
+    free(verts);
+    verts = 0;
+    tris = 0;
+    num_verts = 0;
+    num_tris = 0;
+}
+
+dMesh::dMesh(dvec3 pcenter, dvec3* pverts, uint32_t pnumVerts, dTri* ptris, uint32_t pnumTris) {
+    center = pcenter;
+    verts = pverts;
+    num_verts = pnumVerts;
+    tris = ptris;
+    num_tris = pnumTris;
+}
+
+dMesh::dMesh() {}
+
+dMesh dMesh::createBox(dvec3 center, double width, double height, double depth) {
+    const int numVertices = 8;
+    const int numTriangles = 12;
+
+    dvec3 *vertices = (dvec3*)malloc(numVertices * sizeof(dvec3) + numTriangles * sizeof(dTri));
+    dTri *triangles = (dTri*)&vertices[numVertices];
+
+    double halfwidth = width / 2.0;
+    double halfheight = height / 2.0;
+    double halfdepth = depth / 2.0;
+
+    int vertexIndex = 0;
+    for (int i = 0; i < 8; ++i) {
+        double xCoord = i & 1 ? halfwidth : -halfwidth;
+        double yCoord = i & 4 ? halfheight : -halfheight;
+        double zCoord = i & 2 ? halfdepth : -halfdepth;
+        vertices[vertexIndex++] = center + dvec3(xCoord, yCoord, zCoord);
     }
 
-    void dMesh::destroy() {
-        free(verts);
-        verts = 0;
-        tris = 0;
-        num_verts = 0;
-        num_tris = 0;
+    uint32_t faces[6 * 4] =
+        {0, 1, 2, 3, // top
+        0, 1, 4, 5, // front
+        0, 2, 4, 6, // left
+        7, 5, 3, 1, // right
+        7, 6, 3, 2, // back
+        7, 6, 5, 4}; // bottom
+
+    for(int i = 0; i < 6; i++) {
+        uint32_t tri1[3] = {faces[i * 4], faces[i * 4 + 1], faces[i * 4 + 2]};
+        uint32_t tri2[3] = {faces[i * 4 + 1], faces[i * 4 + 2], faces[i * 4 + 3]};
+        triangles[i * 2] = dTri(tri1, vertices, center);
+        triangles[i * 2 + 1] = dTri(tri2, vertices, center);
     }
 
-    dMesh::dMesh(dvec3 pcenter, dvec3* pverts, uint32_t pnumVerts, dTri* ptris, uint32_t pnumTris) {
-        center = pcenter;
-        verts = pverts;
-        num_verts = pnumVerts;
-        tris = ptris;
-        num_tris = pnumTris;
-    }
-
-    dMesh dMesh::createBox(dvec3 center, double width, double height, double depth) {
-        const int numVertices = 8;
-        const int numTriangles = 12;
-
-        dvec3 *vertices = (dvec3*)malloc(numVertices * sizeof(dvec3) + numTriangles * sizeof(dTri));
-        dTri *triangles = (dTri*)&vertices[numVertices];
-
-        double halfwidth = width / 2.0;
-        double halfheight = height / 2.0;
-        double halfdepth = depth / 2.0;
-
-        int vertexIndex = 0;
-        for (int i = 0; i < 8; ++i) {
-            double xCoord = i & 1 ? halfwidth : -halfwidth;
-            double yCoord = i & 4 ? halfheight : -halfheight;
-            double zCoord = i & 2 ? halfdepth : -halfdepth;
-            vertices[vertexIndex++] = center + dvec3(xCoord, yCoord, zCoord);
-        }
-
-        uint32_t faces[6 * 4] =
-            {0, 1, 2, 3, // top
-            0, 1, 4, 5, // front
-            0, 2, 4, 6, // left
-            7, 5, 3, 1, // right
-            7, 6, 3, 2, // back
-            7, 6, 5, 4}; // bottom
-
-        for(int i = 0; i < 6; i++) {
-            uint32_t tri1[3] = {faces[i * 4], faces[i * 4 + 1], faces[i * 4 + 2]};
-            uint32_t tri2[3] = {faces[i * 4 + 1], faces[i * 4 + 2], faces[i * 4 + 3]};
-            triangles[i * 2] = dTri(tri1, vertices, center);
-            triangles[i * 2 + 1] = dTri(tri2, vertices, center);
-        }
-
-        return dMesh(center, vertices, numVertices, triangles, numTriangles);
-    }
+    return dMesh(center, vertices, numVertices, triangles, numTriangles);
+}
 
 
 // Thoughts on convex/concave hull
@@ -189,46 +191,46 @@ AABB calculateBounds(ctleaf* p, uint32_t first, uint32_t last) {
     return bounds;
 }
 
-    void ctnode::setBounds(AABB bounds) { hi = bounds.max; lo = bounds.min; }
+void ctnode::setBounds(AABB bounds) { hi = bounds.max; lo = bounds.min; }
 
-    void ctnode::subdivide(ctnode* nodes, uint32_t* poolPtr, ctleaf* primitives, uint32_t first, uint32_t last) {
-        if (first == last) {
-            this->first_leaf = first;
-            this->count = 1;
-            return;
-        }
-        this->left_child = *poolPtr;
-        *poolPtr += 2;
-        ctnode *left = &nodes[left_child];
-        ctnode *right = &nodes[left_child + 1];
-
-        // sort the primitives
-        hvec3 size = hi - lo;
-        if(size.y > size.x && size.y > size.z) {
-            std::sort(primitives + first, primitives + last + 1, [](const ctleaf& a, const ctleaf& b) -> bool {
-                return a.lo.x + a.hi.x < b.hi.x + b.lo.x;
-            });
-        }
-        else if (size.y > size.x && size.y > size.z) {
-            std::sort(primitives + first, primitives + last + 1, [](const ctleaf& a, const ctleaf& b) -> bool {
-                return a.lo.y + a.hi.y < b.hi.y + b.lo.y;
-            });
-        }
-        else {
-            std::sort(primitives + first, primitives + last + 1, [](const ctleaf& a, const ctleaf& b) -> bool {
-                return a.lo.z + a.hi.z < b.hi.z + b.lo.z;
-            });
-        }
-        // split them in a dumb way that is not optimal but better than worst case
-        // here we could instead do a binary search to find the geometric middle or even search for the biggest gap
-        uint32_t split = (first + last) >> 1;
-
-        left->setBounds(calculateBounds(primitives, first, split));
-        right->setBounds(calculateBounds(primitives, split + 1, last));
-        left->subdivide(nodes, poolPtr, primitives, first, split);
-        right->subdivide(nodes, poolPtr, primitives, split + 1, last);
-        this->count = last - first + 1;
+void ctnode::subdivide(ctnode* nodes, uint32_t* poolPtr, ctleaf* primitives, uint32_t first, uint32_t last) {
+    if (first == last) {
+        this->first_leaf = first;
+        this->count = 1;
+        return;
     }
+    this->left_child = *poolPtr;
+    *poolPtr += 2;
+    ctnode *left = &nodes[left_child];
+    ctnode *right = &nodes[left_child + 1];
+
+    // sort the primitives
+    hvec3 size = hi - lo;
+    if(size.y > size.x && size.y > size.z) {
+        std::sort(primitives + first, primitives + last + 1, [](const ctleaf& a, const ctleaf& b) -> bool {
+            return a.lo.x + a.hi.x < b.hi.x + b.lo.x;
+        });
+    }
+    else if (size.y > size.x && size.y > size.z) {
+        std::sort(primitives + first, primitives + last + 1, [](const ctleaf& a, const ctleaf& b) -> bool {
+            return a.lo.y + a.hi.y < b.hi.y + b.lo.y;
+        });
+    }
+    else {
+        std::sort(primitives + first, primitives + last + 1, [](const ctleaf& a, const ctleaf& b) -> bool {
+            return a.lo.z + a.hi.z < b.hi.z + b.lo.z;
+        });
+    }
+    // split them in a dumb way that is not optimal but better than worst case
+    // here we could instead do a binary search to find the geometric middle or even search for the biggest gap
+    uint32_t split = (first + last) >> 1;
+
+    left->setBounds(calculateBounds(primitives, first, split));
+    right->setBounds(calculateBounds(primitives, split + 1, last));
+    left->subdivide(nodes, poolPtr, primitives, first, split);
+    right->subdivide(nodes, poolPtr, primitives, split + 1, last);
+    this->count = last - first + 1;
+}
 
 
 ctnode* constructBVH(ctleaf* leaves, int N) {
