@@ -133,7 +133,7 @@ void convertMeshToOpenGLBuffers(const dMesh& mesh, GLuint& vao, GLuint& vbo, GLu
 
     std::vector<texvert> vertices;
     std::vector<GLuint> indices;
-
+/*
     uint32_t faces[6 * 4] =
         {0, 1, 2, 3, // top
         0, 1, 4, 5, // front
@@ -141,16 +141,30 @@ void convertMeshToOpenGLBuffers(const dMesh& mesh, GLuint& vao, GLuint& vbo, GLu
         7, 5, 3, 1, // right
         7, 6, 3, 2, // back
         7, 6, 5, 4}; // bottom
+*/
+    uint32_t faces[6 * 4] =
+        {0, 1, 2, 3, // top
+        0, 1, 4, 5, // front
+        0, 2, 4, 6, // left
+        3, 1, 7, 5, // right
+        3, 2, 7, 6, // back
+        4, 5, 6, 7}; // bottom
+
+    glm::vec2 texture_corners[4] = {
+        glm::vec2(1.0f, 1.0f),
+        glm::vec2(0.0f, 1.0f),
+        glm::vec2(1.0f, 0.0f),
+        glm::vec2(0.0f, 0.0f)};
 
     for (uint32_t i = 0; i < 6; ++i) {
         dTri* t1 = &mesh.tris[i * 2];
         dTri* t2 = &mesh.tris[i * 2 + 1];
 
         texvert verts[4] = {
-            texvert(vec3(mesh.verts[faces[i * 4]]), glm::vec2(0.0f, 0.0f)),
-            texvert(vec3(mesh.verts[faces[i * 4 + 1]]), glm::vec2(1.0f, 0.0f)),
-            texvert(vec3(mesh.verts[faces[i * 4 + 2]]), glm::vec2(0.0f, 1.0f)),
-            texvert(vec3(mesh.verts[faces[i * 4 + 3]]), glm::vec2(1.0f, 1.0f))};
+            texvert(vec3(mesh.verts[faces[i * 4    ]]), texture_corners[0]),
+            texvert(vec3(mesh.verts[faces[i * 4 + 1]]), texture_corners[1]),
+            texvert(vec3(mesh.verts[faces[i * 4 + 2]]), texture_corners[2]),
+            texvert(vec3(mesh.verts[faces[i * 4 + 3]]), texture_corners[3])};
        
         vertices.insert(vertices.end(), {verts[0], verts[1], verts[2], verts[3]});
         indices.insert(indices.end(), {i * 4, i * 4 + 1, i * 4 + 2});

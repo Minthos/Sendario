@@ -136,9 +136,9 @@ dTri::dTri(uint32_t pverts[3], dvec3* vertData, dvec3 center) {
 
         int vertexIndex = 0;
         for (int i = 0; i < 8; ++i) {
-            double xCoord = i & 4 ? halfwidth : -halfwidth;
-            double yCoord = i & 2 ? halfheight : -halfheight;
-            double zCoord = i & 1 ? halfdepth : -halfdepth;
+            double xCoord = i & 1 ? halfwidth : -halfwidth;
+            double yCoord = i & 4 ? halfheight : -halfheight;
+            double zCoord = i & 2 ? halfdepth : -halfdepth;
             vertices[vertexIndex++] = center + dvec3(xCoord, yCoord, zCoord);
         }
 
