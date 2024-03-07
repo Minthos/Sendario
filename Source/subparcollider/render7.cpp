@@ -237,7 +237,14 @@ int screenheight = 1080;
 int frames_rendered = 0;
 auto prevFrameTime = now();
 
+void reshape(GLFWwindow* window, int width, int height) {
+    glViewport(0, 0, width, height);
+    screenwidth = width;
+    screenheight = height;
+}
+
 void render(const GameObject& obj) {
+    std::cout << screenwidth << " x " << screenheight << "\n";
     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
     model = glm::rotate(model, frames_rendered * 0.002f, glm::vec3(0.0f, 1.0f, 0.0f));
     glm::mat4 view = glm::lookAt(glm::vec3(2,1.5,1.5), glm::vec3(0,0,0), glm::vec3(0,1,0));
@@ -256,6 +263,7 @@ void render(const GameObject& obj) {
 int main() {
     initializeGLFW();
     GLFWwindow* window = createWindow(screenwidth, screenheight, "Takeoff Sendario");
+    glfwSetWindowSizeCallback(window, reshape);
     initializeGLEW();
     
     glEnable(GL_DEPTH_TEST);
