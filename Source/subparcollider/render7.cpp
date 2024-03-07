@@ -19,11 +19,10 @@
 auto now = std::chrono::high_resolution_clock::now;
 using std::string;
 
-GLuint shaderProgram; // Assume this is setup and linked with your shaders
-GLuint vao, vbo, ebo; // VAO, VBO, and EBO handlers
+GLuint shaderProgram;
+GLuint vao, vbo, ebo;
 
 
-// Function to read shader from file
 char* readShaderSource(const char* filePath) {
     FILE* file = fopen(filePath, "rb");
     if (file == NULL) {
@@ -50,7 +49,7 @@ char* readShaderSource(const char* filePath) {
         exit(EXIT_FAILURE);
     }
 
-    buffer[length] = '\0'; // Null-terminate the string
+    buffer[length] = '\0';
 
     fclose(file);
     return buffer;
@@ -108,10 +107,10 @@ GLuint loadTexture(const char* filename) {
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 4.0f);
     }
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_CLAMP_TO_EDGE);
 
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, channels == 4 ? GL_RGBA : GL_RGB, GL_UNSIGNED_BYTE, data);
     glGenerateMipmap(GL_TEXTURE_2D);
@@ -133,7 +132,10 @@ void convertMeshToOpenGLBuffers(const dMesh& mesh, GLuint& vao, GLuint& vbo, GLu
 
     std::vector<texvert> vertices;
     std::vector<GLuint> indices;
+
+
 /*
+    // original orientation, texture rotates 90 degrees between each face
     uint32_t faces[6 * 4] =
         {0, 1, 2, 3, // top
         0, 1, 4, 5, // front
@@ -142,13 +144,15 @@ void convertMeshToOpenGLBuffers(const dMesh& mesh, GLuint& vao, GLuint& vbo, GLu
         7, 6, 3, 2, // back
         7, 6, 5, 4}; // bottom
 */
+
+    // this ordering reverses the texture on two sides so a texture tiles correctly horizontally
     uint32_t faces[6 * 4] =
         {0, 1, 2, 3, // top
         0, 1, 4, 5, // front
         0, 2, 4, 6, // left
         3, 1, 7, 5, // right
         3, 2, 7, 6, // back
-        4, 5, 6, 7}; // bottom
+        5, 4, 7, 6}; // bottom
 
     glm::vec2 texture_corners[4] = {
         glm::vec2(1.0f, 1.0f),
@@ -167,8 +171,16 @@ void convertMeshToOpenGLBuffers(const dMesh& mesh, GLuint& vao, GLuint& vbo, GLu
             texvert(vec3(mesh.verts[faces[i * 4 + 3]]), texture_corners[3])};
        
         vertices.insert(vertices.end(), {verts[0], verts[1], verts[2], verts[3]});
-        indices.insert(indices.end(), {i * 4, i * 4 + 1, i * 4 + 2});
-        indices.insert(indices.end(), {i * 4 + 1, i * 4 + 2, i * 4 + 3});
+
+        // correct the winding order so we can use backface culling
+        bool ccw = ((i == 2) || (i == 3) || (i == 5) || (i == 0));
+        if(ccw) {
+            indices.insert(indices.end(), {i * 4, i * 4 + 1, i * 4 + 2});
+            indices.insert(indices.end(), {i * 4 + 3, i * 4 + 2, i * 4 + 1});
+        } else {
+            indices.insert(indices.end(), {i * 4 + 1, i * 4 + 2, i * 4 + 3});
+            indices.insert(indices.end(), {i * 4 + 2, i * 4 + 1, i * 4});
+        }
     }
 
     glGenBuffers(1, &vbo);
@@ -256,7 +268,7 @@ int main() {
     initializeGLEW();
     
     glEnable(GL_DEPTH_TEST);
-//    glDisable(GL_CULL_FACE);
+    glEnable(GL_CULL_FACE);
 
     shaderProgram = mkShader("box");
 
