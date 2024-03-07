@@ -236,8 +236,8 @@ void initializeGLEW() {
     }
 }
 
-int screenwidth = 1920;
-int screenheight = 1080;
+int screenwidth = 3840;
+int screenheight = 2123;
 int frames_rendered = 0;
 auto prevFrameTime = now();
 
@@ -247,12 +247,76 @@ void reshape(GLFWwindow* window, int width, int height) {
     screenheight = height;
 }
 
+GLuint framebuffer, colorTex, velocityTex;
+GLuint ppshader;
+GLuint quadVAO, quadVBO;
+float quadVertices[] = {
+    // positions   // texCoords
+    -1.0f,  1.0f,  0.0f, 1.0f,
+    -1.0f, -1.0f,  0.0f, 0.0f,
+     1.0f, -1.0f,  1.0f, 0.0f,
+
+    -1.0f,  1.0f,  0.0f, 1.0f,
+     1.0f, -1.0f,  1.0f, 0.0f,
+     1.0f,  1.0f,  1.0f, 1.0f
+};
+
+void setupFramebuffer(int width, int height) {
+    // Generate and bind framebuffer
+    glGenFramebuffers(1, &framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+
+    // Create color attachment texture
+    glGenTextures(1, &colorTex);
+    glBindTexture(GL_TEXTURE_2D, colorTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTex, 0);
+
+    // Create velocity attachment texture
+    glGenTextures(1, &velocityTex);
+    glBindTexture(GL_TEXTURE_2D, velocityTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, width, height, 0, GL_RG, GL_FLOAT, nullptr); // Using GL_RG32F for 2-component float
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, velocityTex, 0);
+
+    GLuint depthRBO;
+    glGenRenderbuffers(1, &depthRBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, depthRBO);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, screenwidth, screenheight);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthRBO);
+
+    // Specify the list of draw buffers.
+    GLenum drawBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+    glDrawBuffers(2, drawBuffers);
+
+    // Check framebuffer status
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cerr << "Framebuffer not complete!" << std::endl;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0); // Unbind framebuffer
+
+    // new stuff
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &quadVBO);
+    glBindVertexArray(quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+}
+
 void render(GameObject& obj) {
     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
     model = glm::rotate(model, frames_rendered * 0.002f, glm::vec3(0.0f, 1.0f, 0.0f));
     glm::mat4 view = glm::lookAt(glm::vec3(2,1.5,1.5), glm::vec3(0,0,0), glm::vec3(0,1,0));
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenwidth / (float)screenheight, 0.1f, 100.0f);
-    glm::mat4 transform = model * view * projection;
+    //glm::mat4 transform = model * view * projection;
+    glm::mat4 transform = projection * view * model;
 
     glUseProgram(obj.shader);
 
@@ -265,7 +329,9 @@ void render(GameObject& obj) {
     }
 
     obj.prev = transform;
+    obj.firstTime = false;
 
+    glBindTexture(GL_TEXTURE_2D, obj.texture);
     glBindVertexArray(obj.vao);
     glDrawElements(GL_TRIANGLES, obj.mesh.num_tris * 3, GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
@@ -276,6 +342,11 @@ int main() {
     GLFWwindow* window = createWindow(screenwidth, screenheight, "Takeoff Sendario");
     glfwSetWindowSizeCallback(window, reshape);
     initializeGLEW();
+
+    setupFramebuffer(screenwidth, screenheight);
+    ppshader = mkShader("pp_motionblur");
+    glUseProgram(ppshader);
+    glUniform1i(glGetUniformLocation(ppshader, "screenTexture"), 0);
     
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
@@ -301,11 +372,24 @@ int main() {
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         for(int i = 0; i < objs.size(); i++) {
             render(objs[i]);
         }
+
+        // Bind back to the default framebuffer
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear the default framebuffer
+        glUseProgram(ppshader);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, colorTex);
+        glBindVertexArray(quadVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        glfwSwapBuffers(window);
+
 
         auto frameDuration = std::chrono::duration_cast<std::chrono::microseconds>(now() - prevFrameTime).count();
         prevFrameTime = now();
@@ -316,13 +400,17 @@ int main() {
             std::cout << frameDuration / 1000.0 << " ms\n";
         }
 
-        glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
     for(int i = 0; i < objs.size(); i++) {
         objs[i].mesh.destroy();
     }
+
+    glDeleteFramebuffers(1, &framebuffer);
+    glDeleteTextures(1, &colorTex);
+    glDeleteTextures(1, &velocityTex);
+
     glfwTerminate();
     return 0;
 }
