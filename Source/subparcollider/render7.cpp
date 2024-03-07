@@ -12,6 +12,7 @@
 #include <map>
 #include <string>
 #include <sstream>
+#include <unordered_map>
 #include <vector>
 
 #include "collisiontree.h"
@@ -20,8 +21,8 @@
 auto now = std::chrono::high_resolution_clock::now;
 using std::string;
 
-std::map<string, GLuint> shaders;
-std::map<string, GLuint> textures;
+std::unordered_map<string, GLuint> shaders;
+std::unordered_map<string, GLuint> textures;
 
 char* readShaderSource(const char* filePath) {
     FILE* file = fopen(filePath, "rb");
@@ -109,8 +110,8 @@ GLuint loadTexture(const char* filename) {
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, channels == 4 ? GL_RGBA : GL_RGB, GL_UNSIGNED_BYTE, data);
     glGenerateMipmap(GL_TEXTURE_2D);
