@@ -1,4 +1,20 @@
 
+----
+
+Transparent crystals
+
+inspired by the crystals in isqswjwki55a1.png it would be cool to have crystals that are transparent.
+
+however, if they intersect the terrain surface they will reveal the surface and not properly look like they are
+embedded in it. I need a (ray tracing? some kind of z-buffer hack?) shader that can pass through terrain
+intersections inside the object and render the intersected terrain's material on the backface of the object instead.
+
+I should have some planets/moons rich in these colorful crystals and make them useful to the players. Maybe bonuses
+to lasers and armor vs lasers, maybe some of them are heisenbergite
+
+----
+
+
 Shadow rendering
 
 For each occupied and visible node of the physics tree, do a tree traversal towards the star and store a pointer to all
