@@ -43,3 +43,9 @@ void main() {
     FragColor = color / sum_weight;
 }
 
+
+// TODO:
+// Instead of reading from points along the +- velocity vector, we should write to points along it.
+// That means that we have to accumulate the weight in the 4th component of the output buffer and
+// do a second pass where we divide the color values for each pixel by the accumulated weight.
+
