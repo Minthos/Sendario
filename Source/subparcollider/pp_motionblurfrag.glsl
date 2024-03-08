@@ -5,17 +5,22 @@ in vec2 TexCoords;
 
 uniform sampler2D screenTexture;
 uniform sampler2D velocityTexture;
+uniform float upscaling_factor;
+uniform float inv_strength;
 uniform int mode;
 
 void main() {
+    vec2 coords = TexCoords * upscaling_factor;
+    
     if(mode == 0){
-        FragColor = texture(screenTexture, TexCoords);
+        FragColor = texture(screenTexture, coords);
         return;
     }
 
+
     int iterations = 16;
-    vec2 velocity = texture(velocityTexture, TexCoords).xy;
-    velocity /= (iterations * 3);
+    vec2 velocity = texture(velocityTexture, coords).xy;
+    velocity /= (0.5 * iterations * (1 + inv_strength));
 
     // suppress motion blur for slow-moving pixels
     float magnitude = velocity.length;
@@ -28,17 +33,20 @@ void main() {
 
     if(mode == 1) { // weighted mode makes the blur weaker further from the object, sharpening the image
         for(int i = -iterations; i < iterations; i++){
-            float weight = 1.0 / (3 + abs(i));
-            color += weight * texture(screenTexture, TexCoords + i * velocity);
+            float weight = 1.0 / (2 + abs(i));
+            color += weight * texture(screenTexture, coords + i * velocity);
             sum_weight += weight;
         }
     }
     else if(mode == 2) { // linear mode gives a stronger, smoother blur
         for(int i = -iterations; i < iterations; i++){
             float weight = 1.0;
-            color += weight * texture(screenTexture, TexCoords + i * velocity);
+            color += weight * texture(screenTexture, coords + i * velocity);
             sum_weight += weight;
         }
+    } else {
+        color = texture(screenTexture, coords);
+        sum_weight = 1.0;
     }
     FragColor = color / sum_weight;
 }

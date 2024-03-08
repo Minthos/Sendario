@@ -19,6 +19,13 @@
 #include "collisiontree.h"
 
 
+// Rendering quality settings
+float anisotropy = 16.0f; // should be 4 with no upscaling, 16 with upscaling
+int upscaling_factor = 2; // 1 (no upscaling) and 2 (4 samples per pixel) are good values
+int motion_blur_mode = 1; // 0: off, 1: nonlinear (sharp), 2: linear (blurry)
+float motion_blur_invstr = 2.0f; // motion blur amount. 0: very high, 1: high, 2: medium, 3: low, 5: very low
+
+
 auto now = std::chrono::high_resolution_clock::now;
 using std::string;
 
@@ -106,7 +113,7 @@ GLuint loadTexture(const char* filename) {
     glBindTexture(GL_TEXTURE_2D, texture);
 
     if (glewIsSupported("GL_EXT_texture_filter_anisotropic")) {
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 4.0f);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, anisotropy);
     }
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -239,8 +246,6 @@ void initializeGLEW() {
 int screenwidth = 3840;
 int screenheight = 2123;
 int frames_rendered = 0;
-int motion_blur_mode = 1;
-int motion_blur_invstr = 5;
 auto prevFrameTime = now();
 GLuint framebuffer, colorTex, velocityTex;
 GLuint ppshader;
@@ -261,10 +266,14 @@ void initializeFramebuffer() {
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
     glGenTextures(1, &colorTex);
     glBindTexture(GL_TEXTURE_2D, colorTex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glGenTextures(1, &velocityTex);
     glBindTexture(GL_TEXTURE_2D, velocityTex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glGenVertexArrays(1, &quadVAO);
@@ -282,9 +291,13 @@ void initializeFramebuffer() {
 void setupTextures(int width, int height) {
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTex, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, velocityTex, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     GLenum drawBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
@@ -293,7 +306,10 @@ void setupTextures(int width, int height) {
         std::cerr << "Framebuffer not complete!" << std::endl;
 }
 
-void resizeFramebuffer(int width, int height) {
+void resizeFramebuffer(int w, int h) {
+    int width = w * upscaling_factor;
+    int height = h * upscaling_factor;
+    glViewport(0, 0, width, height);
     glBindTexture(GL_TEXTURE_2D, colorTex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
     glBindTexture(GL_TEXTURE_2D, velocityTex);
@@ -305,20 +321,21 @@ void resizeFramebuffer(int width, int height) {
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthRBO);
     setupTextures(width, height);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cerr << "Framebuffer not complete!" << std::endl;
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void reshape(GLFWwindow* window, int width, int height) {
-    glViewport(0, 0, width, height);
     screenwidth = width;
     screenheight = height;
     resizeFramebuffer(screenwidth, screenheight);
 }
 
-
 void render(GameObject& obj) {
     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
-    model = glm::rotate(model, frames_rendered * 0.005f, glm::vec3(0.0f, 1.0f, 0.0f));
+    model = glm::rotate(model, frames_rendered * 0.01f, glm::vec3(0.0f, 1.0f, 0.0f));
     glm::mat4 view = glm::lookAt(glm::vec3(2,1.5,1.5), glm::vec3(0,0,0), glm::vec3(0,1,0));
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenwidth / (float)screenheight, 0.1f, 100.0f);
     glm::mat4 transform = projection * view * model;
@@ -397,8 +414,9 @@ int main() {
         glBindTexture(GL_TEXTURE_2D, velocityTex);
         glUniform1i(glGetUniformLocation(ppshader, "velocityTexture"), 1); // Pass texture unit 1 to the shader
 
-        GLint modeLoc = glGetUniformLocation(ppshader, "mode");
-        glUniform1i(modeLoc, motion_blur_mode);
+        glUniform1i(glGetUniformLocation(ppshader, "mode"), motion_blur_mode);
+        glUniform1f(glGetUniformLocation(ppshader, "inv_strength"), motion_blur_invstr);
+        glUniform1f(glGetUniformLocation(ppshader, "upscaling_factor"), upscaling_factor);
 
         // render the color+velocity buffer to the screen buffer with a quad and apply post-processing
         glBindVertexArray(quadVAO);
@@ -409,7 +427,7 @@ int main() {
         auto frameDuration = std::chrono::duration_cast<std::chrono::microseconds>(now() - prevFrameTime).count();
         glfwSwapBuffers(window);
 
-//        usleep(400000);
+//        usleep(40000);
 
 
         if(++frames_rendered % 40 == 0){
