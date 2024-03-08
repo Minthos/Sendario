@@ -20,7 +20,7 @@ void main() {
     vec4 curPos = current * vec4(vertexPosition, 1.0);
     vec4 prevPos = previous * vec4(vertexPosition, 1.0);
 
-    velocity = curPos.xy - prevPos.xy;
+    velocity = curPos.xy / curPos.w - prevPos.xy / prevPos.w;
     gl_Position = curPos;
     texCoord = vertexTexCoord;
 }

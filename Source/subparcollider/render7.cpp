@@ -240,6 +240,7 @@ int screenwidth = 3840;
 int screenheight = 2123;
 int frames_rendered = 0;
 int motion_blur_mode = 1;
+int motion_blur_invstr = 5;
 auto prevFrameTime = now();
 
 void reshape(GLFWwindow* window, int width, int height) {
@@ -313,7 +314,7 @@ void setupFramebuffer(int width, int height) {
 
 void render(GameObject& obj) {
     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
-    model = glm::rotate(model, frames_rendered * 0.03f, glm::vec3(0.0f, 1.0f, 0.0f));
+    model = glm::rotate(model, frames_rendered * 0.02f, glm::vec3(0.0f, 1.0f, 0.0f));
     glm::mat4 view = glm::lookAt(glm::vec3(2,1.5,1.5), glm::vec3(0,0,0), glm::vec3(0,1,0));
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenwidth / (float)screenheight, 0.1f, 100.0f);
     glm::mat4 transform = projection * view * model;
@@ -391,9 +392,7 @@ int main() {
         glBindTexture(GL_TEXTURE_2D, velocityTex);
         glUniform1i(glGetUniformLocation(ppshader, "velocityTexture"), 1); // Pass texture unit 1 to the shader
 
-//        GLint iterationsLoc = glGetUniformLocation(ppshader, "iterations");
         GLint modeLoc = glGetUniformLocation(ppshader, "mode");
-//        glUniform1i(iterationsLoc, 16);
         glUniform1i(modeLoc, motion_blur_mode);
 
         // render the color+velocity buffer to the screen buffer with a quad and apply post-processing
@@ -405,14 +404,11 @@ int main() {
         auto frameDuration = std::chrono::duration_cast<std::chrono::microseconds>(now() - prevFrameTime).count();
         glfwSwapBuffers(window);
 
-        usleep(1000000);
+//        usleep(400000);
 
-        if(++frames_rendered % 60 == 0){
+
+        if(++frames_rendered % 40 == 0){
             std::cout << frameDuration / 1000.0 << " ms (" << 1000000.0 / frameDuration <<" fps) \n";
-            motion_blur_mode++;
-            if(motion_blur_mode == 3){
-                motion_blur_mode = 0;
-            }
         }
         if(frameDuration < 5000.0){
 			usleep(5000.0 - frameDuration);
