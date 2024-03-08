@@ -4,7 +4,25 @@ out vec4 FragColor;
 in vec2 TexCoords;
 
 uniform sampler2D screenTexture;
+uniform sampler2D velocityTexture;
 
 void main() {
-    FragColor = texture(screenTexture, TexCoords);
+    vec2 velocity = texture(velocityTexture, TexCoords).xy;
+    velocity /= 24;
+    int iterations = 6;
+
+    vec4 color = vec4(0);
+    float sum_weight = 0.0;
+    for(int i = 0; i < iterations; i++){
+        float weight = iterations - i;
+        color += weight * texture(screenTexture, TexCoords - i * velocity);
+        sum_weight += weight;
+    }
+    for(int i = 1; i < iterations; i++){
+        float weight = iterations - i;
+        color += weight * texture(screenTexture, TexCoords + i * velocity);
+        sum_weight += weight;
+    }
+    FragColor = color / sum_weight;
 }
+

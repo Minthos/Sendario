@@ -312,25 +312,22 @@ void setupFramebuffer(int width, int height) {
 
 void render(GameObject& obj) {
     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
-    model = glm::rotate(model, frames_rendered * 0.002f, glm::vec3(0.0f, 1.0f, 0.0f));
+    model = glm::rotate(model, frames_rendered * 0.01f, glm::vec3(0.0f, 1.0f, 0.0f));
     glm::mat4 view = glm::lookAt(glm::vec3(2,1.5,1.5), glm::vec3(0,0,0), glm::vec3(0,1,0));
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenwidth / (float)screenheight, 0.1f, 100.0f);
-    //glm::mat4 transform = model * view * projection;
     glm::mat4 transform = projection * view * model;
 
     glUseProgram(obj.shader);
-
+    glUniformMatrix4fv(glGetUniformLocation(obj.shader, "current"), 1, GL_FALSE, &transform[0][0]);
     if(obj.firstTime) {
         glUniformMatrix4fv(glGetUniformLocation(obj.shader, "previous"), 1, GL_FALSE, &transform[0][0]);
-        glUniformMatrix4fv(glGetUniformLocation(obj.shader, "current"), 1, GL_FALSE, &transform[0][0]);
     } else {
         glUniformMatrix4fv(glGetUniformLocation(obj.shader, "previous"), 1, GL_FALSE, &obj.prev[0][0]);
-        glUniformMatrix4fv(glGetUniformLocation(obj.shader, "current"), 1, GL_FALSE, &transform[0][0]);
     }
-
     obj.prev = transform;
     obj.firstTime = false;
 
+    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, obj.texture);
     glBindVertexArray(obj.vao);
     glDrawElements(GL_TRIANGLES, obj.mesh.num_tris * 3, GL_UNSIGNED_INT, 0);
@@ -372,6 +369,7 @@ int main() {
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
+        prevFrameTime = now();
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -382,22 +380,36 @@ int main() {
         // Bind back to the default framebuffer
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear the default framebuffer
+
         glUseProgram(ppshader);
-        glActiveTexture(GL_TEXTURE0);
+        glActiveTexture(GL_TEXTURE0); // Activate the first texture unit for the color texture
         glBindTexture(GL_TEXTURE_2D, colorTex);
+        glUniform1i(glGetUniformLocation(ppshader, "screenTexture"), 0); // Pass texture unit 0 to the shader
+
+        glActiveTexture(GL_TEXTURE1); // Activate the second texture unit for the velocity texture
+        glBindTexture(GL_TEXTURE_2D, velocityTex);
+        glUniform1i(glGetUniformLocation(ppshader, "velocityTexture"), 1); // Pass texture unit 1 to the shader
+
+//        glUseProgram(ppshader);
+//        glActiveTexture(GL_TEXTURE0);
+//        glBindTexture(GL_TEXTURE_2D, colorTex);
+
+        // render the color+velocity buffer to the screen buffer with a quad and apply post-processing
         glBindVertexArray(quadVAO);
         glDrawArrays(GL_TRIANGLES, 0, 6);
-
-        glfwSwapBuffers(window);
-
+        glBindTexture(GL_TEXTURE_2D, 0); // Unbind velocity texture
+        glBindFramebuffer(GL_FRAMEBUFFER, 0); // Bind back to the default framebuffer
 
         auto frameDuration = std::chrono::duration_cast<std::chrono::microseconds>(now() - prevFrameTime).count();
-        prevFrameTime = now();
+        glfwSwapBuffers(window);
+
+//        usleep(500000);
+
+        if(frames_rendered++ % 120 == 0){
+            std::cout << frameDuration / 1000.0 << " ms (" << 1000000.0 / frameDuration <<" fps) \n";
+        }
         if(frameDuration < 5000.0){
 			usleep(5000.0 - frameDuration);
-        }
-        if(frames_rendered++ % 120 == 0){
-            std::cout << frameDuration / 1000.0 << " ms\n";
         }
 
         glfwPollEvents();
