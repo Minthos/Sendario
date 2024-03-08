@@ -242,13 +242,6 @@ int frames_rendered = 0;
 int motion_blur_mode = 1;
 int motion_blur_invstr = 5;
 auto prevFrameTime = now();
-
-void reshape(GLFWwindow* window, int width, int height) {
-    glViewport(0, 0, width, height);
-    screenwidth = width;
-    screenheight = height;
-}
-
 GLuint framebuffer, colorTex, velocityTex;
 GLuint ppshader;
 GLuint quadVAO, quadVBO;
@@ -263,44 +256,17 @@ float quadVertices[] = {
      1.0f,  1.0f,  1.0f, 1.0f
 };
 
-void setupFramebuffer(int width, int height) {
-    // Generate and bind framebuffer
+void initializeFramebuffer() {
     glGenFramebuffers(1, &framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-
-    // Create color attachment texture
     glGenTextures(1, &colorTex);
     glBindTexture(GL_TEXTURE_2D, colorTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTex, 0);
-
-    // Create velocity attachment texture
     glGenTextures(1, &velocityTex);
     glBindTexture(GL_TEXTURE_2D, velocityTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, width, height, 0, GL_RG, GL_FLOAT, nullptr); // Using GL_RG32F for 2-component float
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, velocityTex, 0);
-
-    GLuint depthRBO;
-    glGenRenderbuffers(1, &depthRBO);
-    glBindRenderbuffer(GL_RENDERBUFFER, depthRBO);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, screenwidth, screenheight);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthRBO);
-
-    // Specify the list of draw buffers.
-    GLenum drawBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-    glDrawBuffers(2, drawBuffers);
-
-    // Check framebuffer status
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        std::cerr << "Framebuffer not complete!" << std::endl;
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0); // Unbind framebuffer
-
-    // new stuff
     glGenVertexArrays(1, &quadVAO);
     glGenBuffers(1, &quadVBO);
     glBindVertexArray(quadVAO);
@@ -310,11 +276,49 @@ void setupFramebuffer(int width, int height) {
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
+
+void setupTextures(int width, int height) {
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTex, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, velocityTex, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    GLenum drawBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+    glDrawBuffers(2, drawBuffers);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cerr << "Framebuffer not complete!" << std::endl;
+}
+
+void resizeFramebuffer(int width, int height) {
+    glBindTexture(GL_TEXTURE_2D, colorTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+    glBindTexture(GL_TEXTURE_2D, velocityTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, width, height, 0, GL_RG, GL_FLOAT, nullptr);
+    GLuint depthRBO;
+    glGenRenderbuffers(1, &depthRBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, depthRBO);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthRBO);
+    setupTextures(width, height);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void reshape(GLFWwindow* window, int width, int height) {
+    glViewport(0, 0, width, height);
+    screenwidth = width;
+    screenheight = height;
+    resizeFramebuffer(screenwidth, screenheight);
+}
+
 
 void render(GameObject& obj) {
     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
-    model = glm::rotate(model, frames_rendered * 0.02f, glm::vec3(0.0f, 1.0f, 0.0f));
+    model = glm::rotate(model, frames_rendered * 0.005f, glm::vec3(0.0f, 1.0f, 0.0f));
     glm::mat4 view = glm::lookAt(glm::vec3(2,1.5,1.5), glm::vec3(0,0,0), glm::vec3(0,1,0));
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenwidth / (float)screenheight, 0.1f, 100.0f);
     glm::mat4 transform = projection * view * model;
@@ -342,7 +346,8 @@ int main() {
     glfwSetWindowSizeCallback(window, reshape);
     initializeGLEW();
 
-    setupFramebuffer(screenwidth, screenheight);
+    initializeFramebuffer();
+    resizeFramebuffer(screenwidth, screenheight);
     ppshader = mkShader("pp_motionblur");
     glUseProgram(ppshader);
     glUniform1i(glGetUniformLocation(ppshader, "screenTexture"), 0);
