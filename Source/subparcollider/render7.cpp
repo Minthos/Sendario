@@ -390,9 +390,13 @@ int main() {
         glBindTexture(GL_TEXTURE_2D, velocityTex);
         glUniform1i(glGetUniformLocation(ppshader, "velocityTexture"), 1); // Pass texture unit 1 to the shader
 
-//        glUseProgram(ppshader);
-//        glActiveTexture(GL_TEXTURE0);
-//        glBindTexture(GL_TEXTURE_2D, colorTex);
+        // motion blur setting
+        // 1: off
+        // 4: low
+        // 10: smooth
+        // 16: very smooth
+        GLint iterationsLoc = glGetUniformLocation(ppshader, "iterations");
+        glUniform1i(iterationsLoc, 10);
 
         // render the color+velocity buffer to the screen buffer with a quad and apply post-processing
         glBindVertexArray(quadVAO);

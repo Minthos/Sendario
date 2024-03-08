@@ -5,11 +5,11 @@ in vec2 TexCoords;
 
 uniform sampler2D screenTexture;
 uniform sampler2D velocityTexture;
+uniform int iterations;
 
 void main() {
     vec2 velocity = texture(velocityTexture, TexCoords).xy;
     velocity /= 24;
-    int iterations = 6;
 
     vec4 color = vec4(0);
     float sum_weight = 0.0;
