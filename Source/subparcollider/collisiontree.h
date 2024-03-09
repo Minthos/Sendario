@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <iostream>
 #include <vector>
+#include <boost/align/aligned_allocator.hpp>
 
 #include <cassert>
 #include <cstdint>
@@ -14,6 +15,21 @@ using glm::dvec3;
 using glm::vec3;
 using glm::dmat4;
 using glm::dmat3;
+using glm::dquat;
+
+// right now (2024) Intel and AMD cpus have 64 byte cache lines and Apple's M series have 128 bytes.
+// Apple can suck a dick because they hate free software (opengl is deprecated on mac).
+struct cacheline {
+    void *ptr[8];
+};
+
+struct mempool {
+    std::vector<cacheline, boost::alignment::aligned_allocator<cacheline, 64>> data;
+    std::vector<cacheline*> recycler;
+
+    cacheline* alloc();
+    void free(cacheline *line);
+};
 
 struct unionvec3 {
     union {
@@ -82,7 +98,6 @@ struct dTri {
 };
 
 struct dMesh {
-    dvec3 center;
     dvec3 *verts;
     dTri *tris;
     uint32_t num_verts;
@@ -91,7 +106,7 @@ struct dMesh {
     void destroy();
 
     private:
-    dMesh(dvec3 pcenter, dvec3* pverts, uint32_t pnumVerts, dTri* ptris, uint32_t pnumTris);
+    dMesh(dvec3* pverts, uint32_t pnumVerts, dTri* ptris, uint32_t pnumTris);
 
     public:
     dMesh();
@@ -133,8 +148,9 @@ struct Joint6dof: Joint {
 
 enum physics_state {
     active,
-    sleeping,
-    immovable // immovable objects are things like terrain and buildings. They can become active in dire circumstances.
+    sleeping, // the forces acting on it are in equilibrium and it's not moving
+    immovable, // immovable objects are things like terrain and buildings. They can become active in dire circumstances.
+    ghost // can be attached to other objects but does not collide with anything and is not affected by any forces
 };
 
 struct PhysicsObject {
@@ -143,6 +159,8 @@ struct PhysicsObject {
     PhysicsObject *parent;
     Joint *joint; // joint can only represent the connection to parent. directed acyclic graph is the only valid topology.
     PhysicsObject **children; // both direct and indirect children
+    cacheline *active_collisions; // placeholder for now. idea is to use a cacheline as backing storage for a linked list
+    // of 7 object pointers and 1 next pointer. most collisions will only involve 2 objects.
 
     enum physics_state state;
     double mass;
@@ -155,7 +173,7 @@ struct PhysicsObject {
 
 struct CollisionShape {
     double radius; // radius of the bounding sphere for simplified math. Not all objects need a collision mesh.
-    dMesh *convex_hull; // concave hull?
+    dMesh *mesh;
     PhysicsObject *object;
 };
 

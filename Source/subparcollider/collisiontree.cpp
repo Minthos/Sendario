@@ -15,6 +15,21 @@ using glm::vec3;
 using glm::dmat4;
 using glm::dmat3;
 
+cacheline* mempool::alloc() {
+    if(recycler.size() > 0) {
+        cacheline* rax = recycler.back();
+        recycler.pop_back();
+        return(rax);
+    } else {
+        data.push_back({0});
+        return &data.back();
+    }
+}
+
+void mempool::free(cacheline *line) {
+    recycler.push_back(line);
+}
+
 int16_t d2hi(double in) {
     if(in > 0.0) return (int16_t)(in + 0.5);
     if(in < 0.0) return (int16_t)(in - 0.5);
@@ -115,8 +130,7 @@ void dMesh::destroy() {
     num_tris = 0;
 }
 
-dMesh::dMesh(dvec3 pcenter, dvec3* pverts, uint32_t pnumVerts, dTri* ptris, uint32_t pnumTris) {
-    center = pcenter;
+dMesh::dMesh(dvec3* pverts, uint32_t pnumVerts, dTri* ptris, uint32_t pnumTris) {
     verts = pverts;
     num_verts = pnumVerts;
     tris = ptris;
@@ -159,7 +173,7 @@ dMesh dMesh::createBox(dvec3 center, double width, double height, double depth) 
         triangles[i * 2 + 1] = dTri(tri2, vertices, center);
     }
 
-    return dMesh(center, vertices, numVertices, triangles, numTriangles);
+    return dMesh(vertices, numVertices, triangles, numTriangles);
 }
 
 

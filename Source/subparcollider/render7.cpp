@@ -136,6 +136,7 @@ struct texvert {
 };
 
 // TODO: integrate this with the physics system somehow
+// also allow each game object to have multiple meshes, textures and transformation matrices
 struct GameObject {
     dMesh mesh;
     GLuint shader;
@@ -382,7 +383,6 @@ int main() {
     objs.push_back(dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0));
     objs.push_back(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 1.0));
     objs.push_back(dMesh::createBox(glm::dvec3(-1.2, 0.0, 0.0), 1.0, 1.0, 1.0));
-
 
     for(int i = 0; i < objs.size(); i++) {
         convertMeshToOpenGLBuffers(objs[i]);
