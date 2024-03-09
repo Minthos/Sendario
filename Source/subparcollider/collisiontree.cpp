@@ -164,16 +164,19 @@ dMesh dMesh::createBox(dvec3 center, double width, double height, double depth) 
 mempool collision_pool;
 
 PhysicsObject::PhysicsObject(dMesh pmesh, PhysicsObject *pparent) {
+    bzero(this, sizeof(PhysicsObject));
     parent = pparent;
-    joint = 0;
-    limbs = 0;
-    components = 0;
     active_collisions = collision_pool.alloc();
     mesh = pmesh;
     radius = 1.0; // TODO: calculate radius from mesh (easy, just loop over all the vertices)
     state = active;
     mass = 1.0;
-    temperature = 0.0;
+}
+
+glm::vec3 PhysicsObject::zoneSpacePosition() {
+    if(!parent){
+        return glm::vec3(pos.x, pos.y, pos.z);
+    }
 }
 
 // Thoughts on convex/concave hull

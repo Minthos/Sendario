@@ -171,6 +171,7 @@ struct PhysicsObject {
     double temperature;
 
     PhysicsObject(dMesh pmesh, PhysicsObject *pparent);
+    glm::vec3 zoneSpacePosition();
 };
 
 struct ctleaf {
