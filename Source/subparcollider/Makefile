@@ -20,13 +20,13 @@ NEW_LIBS := -lGL -lGLEW -lglut -lGLU -lm -lglfw
 LIBDIR := -L/usr/local/lib
 INCDIR := -I/usr/local/include
 
-main_optimized: $(NEW_SRC)
-	g++ -O3 -march=native -c $(NEW_SRC) $(NEW_LIBS)
-	g++ -O3 -march=native $(NEW_SRC:.cpp=.o) -o takeoff $(LIBDIR) $(INCDIR) $(NEW_LIBS)
+takeoff: $(NEW_SRC:.cpp=.o)
+	g++ -O4 -march=native $(NEW_SRC:.cpp=.o) -o takeoff $(LIBDIR) $(INCDIR) $(NEW_LIBS)
+#	g++ -O2 -march=native -c $(NEW_SRC) $(NEW_LIBS)
 
-main_debug: $(NEW_SRC)
+takeoff_debug: $(NEW_SRC)
 	g++ -g3 -D DEBUG -march=native -c $(NEW_SRC) $(NEW_LIBS)
-	g++ -g3 -D DEBUG -march=native $(NEW_SRC:.cpp=.o) -o takeoff $(NEW_LIBS)
+	g++ -g3 -D DEBUG -march=native $(NEW_SRC:.cpp=.o) -o takeoff_debug $(LIBDIR) $(INCDIR) $(NEW_LIBS)
 
 old_optimized: $(CPP_SRC) $(SWIFT_SRC)
 	g++ -O3 -march=native -c $(CPP_SRC) -fpermissive -fPIC $(LIBS)
@@ -36,8 +36,8 @@ old_debug: $(CPP_SRC) $(SWIFT_SRC)
 	g++ -g -c $(CPP_SRC) -fpermissive -fPIC $(LIBS)
 	swiftc -j8 -g -D DEBUG -import-objc-header $(OBJC_HEADERS) $(SWIFT_SRC) $(CPP_SRC:.cpp=.o) -o subparcollider $(LIBDIR) $(INCDIR) $(LIBS)
 
-optimized: main_optimized
-debug: main_debug
+optimized: takeoff
+debug: takeoff_debug
 old: old_optimized
 
 .PHONY: optimized debug
@@ -45,5 +45,5 @@ old: old_optimized
 .DEFAULT_GOAL := optimized
 
 clean:
-	rm *.o lintedrender5.cpp subparcollider rt rtdebug takeoff
+	rm *.o lintedrender5.cpp subparcollider rt rtdebug takeoff takeoff_debug
 
