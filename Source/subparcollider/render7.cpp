@@ -1,8 +1,8 @@
+#include "collisiontree.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <chrono>
 #include <cstdio>
@@ -16,14 +16,13 @@
 #include <unordered_map>
 #include <vector>
 
-#include "collisiontree.h"
 
 
 // Rendering quality settings
 float anisotropy = 16.0f; // should be 4 with no upscaling, 16 with upscaling
 int upscaling_factor = 2; // 1 (no upscaling) and 2 (4 samples per pixel) are good values
 int motion_blur_mode = 1; // 0: off, 1: nonlinear (sharp), 2: linear (blurry)
-float motion_blur_invstr = 2.0f; // motion blur amount. 0: very high, 1: high, 2: medium, 3: low, 5: very low
+float motion_blur_invstr = 3.0f; // motion blur amount. 0: very high, 1: high, 2: medium, 3: low, 5: very low
 
 
 auto now = std::chrono::high_resolution_clock::now;
@@ -135,10 +134,8 @@ struct texvert {
     texvert(glm::vec3 a, glm::vec2 b) { xyz = a; uv = b; }
 };
 
-// TODO: integrate this with the physics system somehow
-// also allow each game object to have multiple meshes, textures and transformation matrices
-struct GameObject {
-    dMesh mesh;
+struct RenderObject {
+    PhysicsObject *po;
     GLuint shader;
     GLuint texture;
     GLuint vao, vbo, ebo;
@@ -146,10 +143,14 @@ struct GameObject {
     glm::mat4 prev;
     bool firstTime;
 
-    GameObject(dMesh pmesh) { mesh = pmesh; firstTime = true; }
+    RenderObject(PhysicsObject *ppo) { po = ppo; firstTime = true; }
 };
 
-void convertMeshToOpenGLBuffers(GameObject& obj) {
+struct GameObject {
+    std::vector<RenderObject*> ro;
+};
+
+void convertMeshToOpenGLBuffers(RenderObject& obj) {
     glGenVertexArrays(1, &obj.vao);
     glBindVertexArray(obj.vao);
 
@@ -172,14 +173,14 @@ void convertMeshToOpenGLBuffers(GameObject& obj) {
         glm::vec2(0.0f, 0.0f)};
 
     for (uint32_t i = 0; i < 6; ++i) {
-        dTri* t1 = &obj.mesh.tris[i * 2];
-        dTri* t2 = &obj.mesh.tris[i * 2 + 1];
+        dTri* t1 = &obj.po->mesh.tris[i * 2];
+        dTri* t2 = &obj.po->mesh.tris[i * 2 + 1];
 
         texvert verts[4] = {
-            texvert(vec3(obj.mesh.verts[faces[i * 4    ]]), texture_corners[0]),
-            texvert(vec3(obj.mesh.verts[faces[i * 4 + 1]]), texture_corners[1]),
-            texvert(vec3(obj.mesh.verts[faces[i * 4 + 2]]), texture_corners[2]),
-            texvert(vec3(obj.mesh.verts[faces[i * 4 + 3]]), texture_corners[3])};
+            texvert(vec3(obj.po->mesh.verts[faces[i * 4    ]]), texture_corners[0]),
+            texvert(vec3(obj.po->mesh.verts[faces[i * 4 + 1]]), texture_corners[1]),
+            texvert(vec3(obj.po->mesh.verts[faces[i * 4 + 2]]), texture_corners[2]),
+            texvert(vec3(obj.po->mesh.verts[faces[i * 4 + 3]]), texture_corners[3])};
        
         vertices.insert(vertices.end(), {verts[0], verts[1], verts[2], verts[3]});
 
@@ -334,7 +335,7 @@ void reshape(GLFWwindow* window, int width, int height) {
     resizeFramebuffer(screenwidth, screenheight);
 }
 
-void render(GameObject& obj) {
+void render(RenderObject& obj) {
     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
     model = glm::rotate(model, frames_rendered * 0.01f, glm::vec3(0.0f, 1.0f, 0.0f));
     glm::mat4 view = glm::lookAt(glm::vec3(2,1.5,1.5), glm::vec3(0,0,0), glm::vec3(0,1,0));
@@ -354,7 +355,7 @@ void render(GameObject& obj) {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, obj.texture);
     glBindVertexArray(obj.vao);
-    glDrawElements(GL_TRIANGLES, obj.mesh.num_tris * 3, GL_UNSIGNED_INT, 0);
+    glDrawElements(GL_TRIANGLES, obj.po->mesh.num_tris * 3, GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
 }
 
@@ -379,10 +380,10 @@ int main() {
     glBindTexture(GL_TEXTURE_2D, textures["isqswjwki55a1.png"]);
     glUniform1i(glGetUniformLocation(shaders["box"], "tex"), 0);
 
-    std::vector<GameObject> objs;
-    objs.push_back(dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0));
-    objs.push_back(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 1.0));
-    objs.push_back(dMesh::createBox(glm::dvec3(-1.2, 0.0, 0.0), 1.0, 1.0, 1.0));
+    std::vector<RenderObject> objs;
+    objs.push_back(RenderObject(new PhysicsObject(dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0), NULL)));
+    objs.push_back(RenderObject(new PhysicsObject(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 1.0), NULL)));
+    objs.push_back(RenderObject(new PhysicsObject(dMesh::createBox(glm::dvec3(-1.2, 0.0, 0.0), 1.0, 1.0, 1.0), NULL)));
 
     for(int i = 0; i < objs.size(); i++) {
         convertMeshToOpenGLBuffers(objs[i]);
@@ -441,7 +442,7 @@ int main() {
     }
 
     for(int i = 0; i < objs.size(); i++) {
-        objs[i].mesh.destroy();
+        objs[i].po->mesh.destroy();
     }
 
     glDeleteFramebuffers(1, &framebuffer);

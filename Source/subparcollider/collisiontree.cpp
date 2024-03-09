@@ -1,20 +1,5 @@
 #include "collisiontree.h"
 
-#include <algorithm>
-#include <iostream>
-#include <vector>
-
-#include <cassert>
-#include <cstdint>
-#include <cstring>
-
-#include <glm/glm.hpp>
-
-using glm::dvec3;
-using glm::vec3;
-using glm::dmat4;
-using glm::dmat3;
-
 cacheline* mempool::alloc() {
     if(recycler.size() > 0) {
         cacheline* rax = recycler.back();
@@ -176,6 +161,20 @@ dMesh dMesh::createBox(dvec3 center, double width, double height, double depth) 
     return dMesh(vertices, numVertices, triangles, numTriangles);
 }
 
+mempool collision_pool;
+
+PhysicsObject::PhysicsObject(dMesh pmesh, PhysicsObject *pparent) {
+    parent = pparent;
+    joint = 0;
+    limbs = 0;
+    components = 0;
+    active_collisions = collision_pool.alloc();
+    mesh = pmesh;
+    radius = 1.0; // TODO: calculate radius from mesh (easy, just loop over all the vertices)
+    state = active;
+    mass = 1.0;
+    temperature = 0.0;
+}
 
 // Thoughts on convex/concave hull
 //
@@ -263,9 +262,9 @@ ctnode* constructBVH(ctleaf* leaves, int N) {
 
 #define MAX_MAX_DEPTH 16
 CollisionTree::CollisionTree(dvec3 origo) {
-        pos = origo;
-        root = 0;
-    }
+    pos = origo;
+    root = 0;
+}
 
 
 // TODO:

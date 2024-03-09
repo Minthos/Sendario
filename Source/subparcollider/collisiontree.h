@@ -10,6 +10,7 @@
 #include <cstring>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 using glm::dvec3;
 using glm::vec3;
@@ -113,8 +114,6 @@ struct dMesh {
     static dMesh createBox(dvec3 center, double width, double height, double depth);
 };
 
-struct CollisionShape;
-
 struct Motor {
     double max_force;
     double min_force; // negative values for motors that can produce power in both directions
@@ -154,31 +153,28 @@ enum physics_state {
 };
 
 struct PhysicsObject {
-    CollisionShape *shape; // for objects with no parent this should be the total shape of the object including all descendants.
-    // for objects with a parent it should only represent a single shape, not its children.
     PhysicsObject *parent;
     Joint *joint; // joint can only represent the connection to parent. directed acyclic graph is the only valid topology.
-    PhysicsObject **children; // both direct and indirect children
-    cacheline *active_collisions; // placeholder for now. idea is to use a cacheline as backing storage for a linked list
-    // of 7 object pointers and 1 next pointer. most collisions will only involve 2 objects.
+    PhysicsObject **limbs; // limbs are subassemblies connected via joints
+    PhysicsObject **components; // components are rigidly attached to the object
+    cacheline *active_collisions; // I will use this later to implement multi-body collisions
 
+    dMesh mesh;
+    double radius; // radius of the bounding sphere for simplified math. Not all objects need a collision mesh.
     enum physics_state state;
     double mass;
     dmat3 inertia_tensor;
     dvec3 pos; // center of coordinate transforms? the center of mass can shift so this should be the geometric center instead
     dvec3 vel;
-    dvec3 rot;
-    dvec3 spin;
-};
+    dquat rot;
+    dquat spin;
+    double temperature;
 
-struct CollisionShape {
-    double radius; // radius of the bounding sphere for simplified math. Not all objects need a collision mesh.
-    dMesh *mesh;
-    PhysicsObject *object;
+    PhysicsObject(dMesh pmesh, PhysicsObject *pparent);
 };
 
 struct ctleaf {
-    CollisionShape *shape;// 8 bytes
+    PhysicsObject *object;
 
     // axis-aligned bounding box
     hvec3 hi; // 6 bytes (total 14)
@@ -200,7 +196,7 @@ struct ctnode {
     };
 
     void setBounds(AABB bounds);
-    void subdivide(ctnode* nodes, uint32_t* poolPtr, ctleaf* primitives, uint32_t first, uint32_t last);
+    void subdivide(ctnode *nodes, uint32_t *poolPtr, ctleaf *primitives, uint32_t first, uint32_t last);
 };
 
 
@@ -208,7 +204,6 @@ struct ctnode {
 struct CollisionTree {
     dvec3 pos;
     ctnode *root = 0;
-    std::vector<CollisionShape> shapes;
 
     CollisionTree(dvec3 origo);
 };
