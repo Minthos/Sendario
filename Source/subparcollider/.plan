@@ -1,0 +1,53 @@
+
+define surface level as 0 in lieu of terrain procgen
+render a flattened box for every occupied node in the ctree that borders 0
+
+
+
+
+physics engine: record and replay
+every second: snapshot of the physics state
+every tick: only the variables that changed
+
+
+
+
+
+
+representing the player's UI state
+rts, controlling a vehicle, controlling a character
+
+
+representing players, npcs
+"owner" class, can own many creatures and vehicles
+"creature" class, both player characters and NPCs
+
+
+representing the world, its resources and objects not owned by anyone in particular
+
+
+
+representing the market, contracts, communications, politics, factions, fleets/squads
+
+
+
+
+
+
+shadows
+
+we can cast a few shadow rays from the z buffer at a low resolution as a first pass
+if 4 points in a square have the same value (shaded or lit) fill in the area between them with the same value
+optionally cast an extra ray for points with wildly different z-value than its neighbors
+for the remaining points, cast additional rays to find the edge
+if the ray is long, stop at a low resolution and blur the edge
+if it's short, trace the edge at a high resolution
+finally fill in the areas on both sides of the edge
+
+
+
+
+collisions
+
+
+

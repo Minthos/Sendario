@@ -21,8 +21,8 @@
 // Rendering quality settings
 float anisotropy = 16.0f; // should be 4 with no upscaling, 16 with upscaling
 int upscaling_factor = 2; // 1 (no upscaling) and 2 (4 samples per pixel) are good values
-int motion_blur_mode = 1; // 0: off, 1: nonlinear (sharp), 2: linear (blurry)
-float motion_blur_invstr = 2.0f; // motion blur amount. 0: very high, 1: high, 2: medium, 3: low, 5: very low
+int motion_blur_mode = 1; // 0 = off, 1 = nonlinear (sharp), 2 = linear (blurry)
+float motion_blur_invstr = 5.0f; // motion blur amount. 1.0 = very high. 5.0 = low.
 
 
 auto now = std::chrono::high_resolution_clock::now;
@@ -385,6 +385,7 @@ int main() {
     objs.push_back(GameObject());
     GameObject *spinningCube = &objs[0];
 
+    // TODO: gather these components under a parent physics object
     spinningCube->ro.push_back(RenderObject(new PhysicsObject(dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0), NULL)));
     spinningCube->ro.push_back(RenderObject(new PhysicsObject(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 1.0), NULL)));
     spinningCube->ro.push_back(RenderObject(new PhysicsObject(dMesh::createBox(glm::dvec3(-1.2, 0.0, 0.0), 1.0, 1.0, 1.0), NULL)));
@@ -439,7 +440,13 @@ int main() {
         glBindFramebuffer(GL_FRAMEBUFFER, 0); // Bind back to the default framebuffer
 
         auto frameDuration = std::chrono::duration_cast<std::chrono::microseconds>(now() - prevFrameTime).count();
-        glfwSwapBuffers(window);
+
+
+        // uncomment to see how fast the game can run when not limited by the monitor's refresh rate
+//        if(frames_rendered % 100 == 0) {
+            glfwSwapBuffers(window);
+            glfwPollEvents();
+//        }
 
 //        usleep(40000);
 
@@ -447,11 +454,10 @@ int main() {
         if(++frames_rendered % 40 == 0){
             std::cout << frameDuration / 1000.0 << " ms (theoretically " << 1000000.0 / frameDuration <<" fps) \n";
         }
-        if(frameDuration < 5000.0){
-			usleep(5000.0 - frameDuration);
+        if(frameDuration < 1000.0){ // limit the game to 1000 fps if the system/libraries don't limit it for us
+			usleep(1000.0 - frameDuration);
         }
 
-        glfwPollEvents();
     }
 
     for(int i = 0; i < objs.size(); i++) {
