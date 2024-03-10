@@ -29,8 +29,10 @@ representing the world, its resources and objects not owned by anyone in particu
 
 representing the market, contracts, communications, politics, factions, fleets/squads
 
+need a simple way to flag owners as friends or foes of each other for basic combat functionality
 
-
+I want to implement some guns (fixed angle, turret, point defense) and a homing missile to have at least
+some basic combat functionality.
 
 
 
