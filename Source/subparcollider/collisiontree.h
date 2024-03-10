@@ -152,6 +152,18 @@ enum physics_state {
     ghost // can be attached to other objects but does not collide with anything and is not affected by any forces
 };
 
+
+// mesh vertices should be expressed in the main object's coordinate space, which means that they will have to be
+// recalculated when a component detaches from the main object
+// the benefit is that when collision testing a small object against a large object we don't have to transform the
+// vertices of the large object, only transform the small object into the large object's coordinate space.
+// limbs attached to joints should be exeptions to this because they need to rotate around the joint
+// so for every joint we have to calculate a combined transformation matrix of the parent and the joint
+
+// impacts that cause damage should create a new, recessed vertex at the impact point with depth proportional
+// to the damage. For damage that would cause a dent deeper than the component the component can be destroyed.
+
+
 struct PhysicsObject {
     PhysicsObject *parent;
     Joint *joint; // joint can only represent the connection to parent. directed acyclic graph is the only valid topology.
@@ -160,11 +172,11 @@ struct PhysicsObject {
     cacheline *active_collisions; // I will use this later to implement multi-body collisions
 
     dMesh mesh;
-    double radius; // radius of the bounding sphere for simplified math. Not all objects need a collision mesh.
+    double radius; // radius of the bounding sphere for early elimination
     enum physics_state state;
     double mass;
     dmat3 inertia_tensor;
-    dvec3 pos; // center of coordinate transforms? the center of mass can shift so this should be the geometric center instead
+    dvec3 pos; // center of the bounding sphere, not center of mass
     dvec3 vel;
     dquat rot;
     dquat spin;

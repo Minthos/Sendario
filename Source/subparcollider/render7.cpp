@@ -157,7 +157,7 @@ void convertMeshToOpenGLBuffers(RenderObject *obj) {
     std::vector<texvert> vertices;
     std::vector<GLuint> indices;
 
-    // this ordering reverses the texture on two sides so a texture tiles correctly horizontally
+    // this ordering reverses the texture on two sides so a texture tiles "correctly" horizontally
     uint32_t faces[6 * 4] =
         {0, 1, 2, 3, // top
         0, 1, 4, 5, // front
@@ -336,11 +336,11 @@ void reshape(GLFWwindow* window, int width, int height) {
 }
 
 void render(RenderObject *obj) {
-    glm::mat4 model = glm::translate(glm::mat4(1.0f), obj->po->zoneSpacePosition());
-    model = glm::rotate(model, frames_rendered * 0.01f, glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::mat4 translation = glm::translate(glm::mat4(1.0f), obj->po->zoneSpacePosition());
+    glm::mat4 rotation = glm::mat4(glm::quat(obj->po->rot));
     glm::mat4 view = glm::lookAt(glm::vec3(2,1.5,1.5), glm::vec3(0,0,0), glm::vec3(0,1,0));
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenwidth / (float)screenheight, 0.1f, 100.0f);
-    glm::mat4 transform = projection * view * model;
+    glm::mat4 transform = projection * view * translation * rotation;
 
     glUseProgram(obj->shader);
     glUniformMatrix4fv(glGetUniformLocation(obj->shader, "current"), 1, GL_FALSE, &transform[0][0]);
@@ -405,6 +405,12 @@ int main() {
 
         for(int i = 0; i < objs.size(); i++) {
             for(int j = 0; j < objs[i].ro.size(); j++) {
+                objs[i].ro[j].po->rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * objs[i].ro[j].po->rot;
+                if((frames_rendered / 400) % 2){
+                    objs[i].ro[j].po->pos += dvec3(0.01, 0.01, 0.01);
+                } else {
+                    objs[i].ro[j].po->pos -= dvec3(0.01, 0.01, 0.01);
+                }
                 render(&objs[i].ro[j]);
             }
         }

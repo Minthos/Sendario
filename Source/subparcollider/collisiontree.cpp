@@ -171,6 +171,7 @@ PhysicsObject::PhysicsObject(dMesh pmesh, PhysicsObject *pparent) {
     radius = 1.0; // TODO: calculate radius from mesh (easy, just loop over all the vertices)
     state = active;
     mass = 1.0;
+    rot = glm::dquat(1.0, 0.0, 0.0, 0.0);
 }
 
 glm::vec3 PhysicsObject::zoneSpacePosition() {
