@@ -11,7 +11,7 @@ rt: gl4.cpp
 rtdebug: gl4.cpp
 	g++ -g3 -DDEBUG gl4.cpp -o rtdebug -lGL -lGLEW -lglut -lGLU -lm -L/usr/local/lib -I/usr/local/include
 
-NEW_SRC := collisiontree.cpp render7.cpp
+NEW_SRC := physics.cpp client.cpp
 CPP_SRC := lintedrender5.cpp sdlwrapper.cpp
 SWIFT_SRC := main.swift gptphysics.swift spatialtypes.swift boxoid.swift gamelogic.swift
 OBJC_HEADERS := subparcollider-Bridging-Header.h

@@ -42,8 +42,8 @@ we can cast a few shadow rays from the z buffer at a low resolution as a first p
 if 4 points in a square have the same value (shaded or lit) fill in the area between them with the same value
 optionally cast an extra ray for points with wildly different z-value than its neighbors
 for the remaining points, cast additional rays to find the edge
-if the ray is long, stop at a low resolution and blur the edge
-if it's short, trace the edge at a high resolution
+if the ray to the obscuring object is long relative to the size and position of the light source,
+stop at a low resolution and blur the edge. if it's short, trace the edge at a high resolution
 finally fill in the areas on both sides of the edge
 
 
