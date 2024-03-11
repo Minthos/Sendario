@@ -1,6 +1,15 @@
 
+Test the ctree
+
+Render some terrain
+
+Implement gravity and basic collision testing
+
 define surface level as 0 in lieu of terrain procgen
-render a flattened box for every occupied node in the ctree that borders 0
+render a flattened box for every occupied node in the ctree at ground level
+
+render a transparent box for every occupied node in the ctree
+
 
 
 
@@ -19,8 +28,8 @@ rts, controlling a vehicle, controlling a character
 
 
 representing players, npcs
-"owner" class, can own many creatures and vehicles
-"creature" class, both player characters and NPCs
+"owner" class, can own many units and vehicles
+"unit" class: player characters, NPCs, vehicles
 
 
 representing the world, its resources and objects not owned by anyone in particular

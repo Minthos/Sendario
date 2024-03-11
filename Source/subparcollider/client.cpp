@@ -386,8 +386,8 @@ int main() {
     Unit *spinningCube = &units[0];
 
     spinningCube->addComponent(dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0));
-    spinningCube->addComponent(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 1.0));
-    spinningCube->addComponent(dMesh::createBox(glm::dvec3(-1.2, 0.0, 0.0), 1.0, 1.0, 1.0));
+    spinningCube->addComponent(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 0.01));
+    spinningCube->addComponent(dMesh::createBox(glm::dvec3(-1.2, 0.0, 0.0), 1.0, 0.05, 1.0));
 
     std::vector<RenderObject> ros;
 
@@ -395,7 +395,7 @@ int main() {
     ros.push_back(RenderObject(&spinningCube->body));
 
     for(int i = 0; i < spinningCube->components.size(); i++) {
-//        ros.push_back(RenderObject(&spinningCube->components[i]));
+        ros.push_back(RenderObject(&spinningCube->components[i]));
     }
 
     
@@ -411,14 +411,14 @@ int main() {
         prevFrameTime = now();
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        if((frames_rendered / 400) % 2){
+            ros[0].po->pos += dvec3(0.01, 0.01, 0.01);
+        } else {
+            ros[0].po->pos -= dvec3(0.01, 0.01, 0.01);
+        }
 
         for(int j = 0; j < ros.size(); j++) {
-            ros[j].po->rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * ros[j].po->rot;
-            if((frames_rendered / 400) % 2){
-                ros[j].po->pos += dvec3(0.01, 0.01, 0.01);
-            } else {
-                ros[j].po->pos -= dvec3(0.01, 0.01, 0.01);
-            }
+            ros[j].po->rot = glm::angleAxis(0.01 * (j + 1), glm::dvec3(0.0, 1.0, 0.0)) * ros[j].po->rot;
             render(&ros[j]);
         }
 
