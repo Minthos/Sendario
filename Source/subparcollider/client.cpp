@@ -147,7 +147,10 @@ struct RenderObject {
 };
 
 
-void convertMeshToOpenGLBuffers(RenderObject *obj) {
+// uploads a mesh composed of one or more box meshes to the gpu
+// other mesh shapes are not currently supported.
+// TODO: find a better way to set texture coordinates.
+void upload_boxen_mesh(RenderObject *obj) {
     glGenVertexArrays(1, &obj->vao);
     glBindVertexArray(obj->vao);
 
@@ -169,20 +172,20 @@ void convertMeshToOpenGLBuffers(RenderObject *obj) {
         glm::vec2(1.0f, 0.0f),
         glm::vec2(0.0f, 0.0f)};
 
-    for (uint32_t i = 0; i < 6; ++i) {
+    for (uint32_t i = 0; i < obj->po->mesh.num_tris / 2; ++i) {
         dTri* t1 = &obj->po->mesh.tris[i * 2];
         dTri* t2 = &obj->po->mesh.tris[i * 2 + 1];
 
         texvert verts[4] = {
-            texvert(vec3(obj->po->mesh.verts[faces[i * 4    ]]), texture_corners[0]),
-            texvert(vec3(obj->po->mesh.verts[faces[i * 4 + 1]]), texture_corners[1]),
-            texvert(vec3(obj->po->mesh.verts[faces[i * 4 + 2]]), texture_corners[2]),
-            texvert(vec3(obj->po->mesh.verts[faces[i * 4 + 3]]), texture_corners[3])};
+            texvert(vec3(obj->po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4    ]]), texture_corners[0]),
+            texvert(vec3(obj->po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4 + 1]]), texture_corners[1]),
+            texvert(vec3(obj->po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4 + 2]]), texture_corners[2]),
+            texvert(vec3(obj->po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4 + 3]]), texture_corners[3])};
        
         vertices.insert(vertices.end(), {verts[0], verts[1], verts[2], verts[3]});
 
         // correct the winding order so we can use backface culling
-        bool ccw = ((i == 2) || (i == 3) || (i == 5) || (i == 0));
+        bool ccw = ((i % 6 == 2) || (i % 6 == 3) || (i % 6 == 5) || (i % 6 == 0));
         if(ccw) {
             indices.insert(indices.end(), {i * 4, i * 4 + 1, i * 4 + 2});
             indices.insert(indices.end(), {i * 4 + 3, i * 4 + 2, i * 4 + 1});
@@ -392,12 +395,12 @@ int main() {
     ros.push_back(RenderObject(&spinningCube->body));
 
     for(int i = 0; i < spinningCube->components.size(); i++) {
-    //    ros.push_back(RenderObject(&spinningCube->components[i]));
+//        ros.push_back(RenderObject(&spinningCube->components[i]));
     }
 
     
     for(int i = 0; i < ros.size(); i++) {
-        convertMeshToOpenGLBuffers(&ros[i]);
+        upload_boxen_mesh(&ros[i]);
         ros[i].shader = shaders["box"];
         ros[i].texture = textures["isqswjwki55a1.png"];
     }

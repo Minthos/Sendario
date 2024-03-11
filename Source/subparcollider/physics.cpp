@@ -10,6 +10,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/norm.hpp>
 
 using std::string;
 
@@ -342,7 +343,7 @@ struct PhysicsObject {
     enum physics_state state;
     double mass;
     dmat3 inertia_tensor;
-    dvec3 pos; // center of the bounding sphere, not center of mass
+    dvec3 pos; // center of the coordinate system (and therefore the bounding sphere), not center of mass
     dvec3 vel;
     dquat rot;
     dquat spin;
@@ -361,10 +362,21 @@ struct PhysicsObject {
         parent = pparent;
         active_collisions = collision_pool.alloc();
         mesh = pmesh;
-        radius = 1.0; // TODO: calculate radius from mesh (easy, just loop over all the vertices)
+        radius = calculateRadius();
         state = active;
         mass = 1.0;
         rot = glm::dquat(1.0, 0.0, 0.0, 0.0);
+    }
+
+    // this just assumes that pos is at the center, of course in practice it will often not be
+    double calculateRadius() {
+        double greatestRsquared = 0.0;
+        for(int i = 0; i < mesh.num_verts; i++){
+            dvec3 lvalue = mesh.verts[i] - pos;
+            double rSquared = glm::length2(*(glm::dvec3 *)&lvalue);
+            greatestRsquared = glm::max(greatestRsquared, rSquared);
+        }
+        return sqrt(greatestRsquared);
     }
 
     glm::vec3 zoneSpacePosition() {
@@ -450,6 +462,7 @@ struct Unit {
 
             body.components = &components[0];
             body.num_components = components.size();
+            body.radius = body.calculateRadius();
             components_dirty = false;
         }
     }
