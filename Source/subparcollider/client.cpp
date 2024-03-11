@@ -379,20 +379,23 @@ int main() {
 
 
     std::vector<Unit> units;
-    units.push_back(Unit(PhysicsObject(dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0), NULL)));
+    units.push_back(Unit());
     Unit *spinningCube = &units[0];
 
-    spinningCube->limbs.push_back(PhysicsObject(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 1.0), NULL));
-    spinningCube->limbs.push_back(PhysicsObject(dMesh::createBox(glm::dvec3(-1.2, 0.0, 0.0), 1.0, 1.0, 1.0), NULL));
+    spinningCube->addComponent(dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0));
+    spinningCube->addComponent(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 1.0));
+    spinningCube->addComponent(dMesh::createBox(glm::dvec3(-1.2, 0.0, 0.0), 1.0, 1.0, 1.0));
 
     std::vector<RenderObject> ros;
 
+    spinningCube->update();
     ros.push_back(RenderObject(&spinningCube->body));
 
-    for(int i = 0; i < spinningCube->limbs.size(); i++) {
-        ros.push_back(RenderObject(&spinningCube->limbs[i]));
+    for(int i = 0; i < spinningCube->components.size(); i++) {
+    //    ros.push_back(RenderObject(&spinningCube->components[i]));
     }
 
+    
     for(int i = 0; i < ros.size(); i++) {
         convertMeshToOpenGLBuffers(&ros[i]);
         ros[i].shader = shaders["box"];

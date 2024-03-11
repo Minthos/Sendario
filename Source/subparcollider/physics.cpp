@@ -201,13 +201,81 @@ struct dMesh {
 
     void destroy();
 
-    private:
-    dMesh(dvec3* pverts, uint32_t pnumVerts, dTri* ptris, uint32_t pnumTris);
-
-    public:
     dMesh();
+    dMesh(dvec3* pverts, uint32_t pnumVerts, dTri* ptris, uint32_t pnumTris);
+    
     static dMesh createBox(dvec3 center, double width, double height, double depth);
 };
+
+dTri::dTri() {}
+dTri::dTri(uint32_t pverts[3], dvec3* vertData, dvec3 center) {
+    verts[0] = pverts[0];
+    verts[1] = pverts[1];
+    verts[2] = pverts[2];
+    normal = glm::normalize(glm::cross((vertData[verts[0]] - vertData[verts[1]]), (vertData[verts[0]] - vertData[verts[2]])));
+    double dotProduct = glm::dot(normal, vertData[verts[0]] - center);
+    if(dotProduct < 0.0){
+        normal = -normal;
+    }
+}
+
+void dMesh::destroy() {
+    if(verts)
+        free(verts);
+    if(tris)
+        free(tris);
+    verts = 0;
+    tris = 0;
+    num_verts = 0;
+    num_tris = 0;
+}
+
+dMesh::dMesh(dvec3* pverts, uint32_t pnumVerts, dTri* ptris, uint32_t pnumTris) {
+    verts = pverts;
+    num_verts = pnumVerts;
+    tris = ptris;
+    num_tris = pnumTris;
+}
+
+dMesh::dMesh() {}
+
+dMesh dMesh::createBox(dvec3 center, double width, double height, double depth) {
+    const int numVertices = 8;
+    const int numTriangles = 12;
+
+    dvec3 *vertices = (dvec3*)malloc(numVertices * sizeof(dvec3) + numTriangles * sizeof(dTri));
+    dTri *triangles = (dTri*)&vertices[numVertices];
+
+    double halfwidth = width / 2.0;
+    double halfheight = height / 2.0;
+    double halfdepth = depth / 2.0;
+
+    int vertexIndex = 0;
+    for (int i = 0; i < 8; ++i) {
+        double xCoord = i & 1 ? halfwidth : -halfwidth;
+        double yCoord = i & 4 ? halfheight : -halfheight;
+        double zCoord = i & 2 ? halfdepth : -halfdepth;
+        vertices[vertexIndex++] = center + dvec3(xCoord, yCoord, zCoord);
+    }
+
+    uint32_t faces[6 * 4] =
+        {0, 1, 2, 3, // top
+        0, 1, 4, 5, // front
+        0, 2, 4, 6, // left
+        7, 5, 3, 1, // right
+        7, 6, 3, 2, // back
+        7, 6, 5, 4}; // bottom
+
+    for(int i = 0; i < 6; i++) {
+        uint32_t tri1[3] = {faces[i * 4], faces[i * 4 + 1], faces[i * 4 + 2]};
+        uint32_t tri2[3] = {faces[i * 4 + 1], faces[i * 4 + 2], faces[i * 4 + 3]};
+        triangles[i * 2] = dTri(tri1, vertices, center);
+        triangles[i * 2 + 1] = dTri(tri2, vertices, center);
+    }
+
+    return dMesh(vertices, numVertices, triangles, numTriangles);
+}
+
 
 struct Motor {
     double max_force;
@@ -263,8 +331,10 @@ mempool collision_pool;
 struct PhysicsObject {
     PhysicsObject *parent;
     Joint *joint; // joint can only represent the connection to parent. directed acyclic graph is the only valid topology.
-    PhysicsObject **limbs; // limbs are subassemblies connected via joints
-    PhysicsObject **components; // components are rigidly attached to the object
+    PhysicsObject *limbs; // limbs are subassemblies connected via joints
+    int num_limbs;
+    PhysicsObject *components; // components are rigidly attached to the object
+    int num_components;
     cacheline *active_collisions; // I will use this later to implement multi-body collisions
 
     dMesh mesh;
@@ -278,7 +348,13 @@ struct PhysicsObject {
     dquat spin;
     double temperature;
 
-    PhysicsObject() { bzero(this, sizeof(PhysicsObject)); }
+    PhysicsObject() {
+        bzero(this, sizeof(PhysicsObject));
+        active_collisions = collision_pool.alloc();
+        rot = glm::dquat(1.0, 0.0, 0.0, 0.0);
+        spin = glm::dquat(1.0, 0.0, 0.0, 0.0);
+        state = active;
+    }
 
     PhysicsObject(dMesh pmesh, PhysicsObject *pparent) {
         bzero(this, sizeof(PhysicsObject));
@@ -292,25 +368,14 @@ struct PhysicsObject {
     }
 
     glm::vec3 zoneSpacePosition() {
-        if(!parent){
-            return glm::vec3(pos.x, pos.y, pos.z);
+        dvec3 sum_pos = pos;
+        PhysicsObject *next = parent;
+        while(next){
+            sum_pos += parent->pos;
+            next = parent->parent;
         }
+        return glm::vec3(sum_pos.x, sum_pos.y, sum_pos.z);
     }
-};
-
-struct Celestial {
-    dvec3 pos;
-    dvec3 vel;
-    dvec3 rot;
-    dvec3 spin;
-    double mass;
-    double radius;
-    double surface_temp_min;
-    double surface_temp_max;
-    vec9 radiance;
-
-    Celestial *nearest_star;
-    std::vector<Celestial> orbiting_bodies;
 };
 
 struct unit_order {
@@ -327,82 +392,68 @@ struct Unit {
     uint64_t owner_id;
     PhysicsObject body;
     std::vector<PhysicsObject> limbs;
+    std::vector<PhysicsObject> components;
+    bool limbs_dirty;
+    bool components_dirty;
+
     std::deque<unit_order> order_queue;
     
-    Unit(PhysicsObject pbody) {
+    Unit() {
         bzero(this, sizeof(Unit));
         name = "prototype";
         id = unit_next_uid++;
-        body = pbody;
+        body = PhysicsObject();
+    }
+
+    void addLimb(dMesh pmesh) {
+        limbs.push_back(PhysicsObject(pmesh, &body));
+        limbs_dirty = true;
+    }
+
+    void addComponent(dMesh pmesh) {
+        components.push_back(PhysicsObject(pmesh, &body));
+        components_dirty = true;
+    }
+
+    void update() {
+        if(limbs_dirty){
+            body.limbs = &limbs[0];
+            body.num_limbs = limbs.size();
+            limbs_dirty = false;
+        }
+        if(components_dirty){
+            body.mesh.destroy();
+            
+            uint64_t num_tris = 0;
+            uint64_t num_verts = 0;
+            for(int i = 0; i < components.size(); i++){
+                num_tris += components[i].mesh.num_tris;
+                num_verts += components[i].mesh.num_verts;
+            }
+            dvec3 *verts = (dvec3 *)malloc(num_verts * sizeof(dvec3) + num_tris * sizeof(dTri));
+
+            uint64_t tri_idx = 0;
+            uint64_t vert_idx = 0;
+
+            for(int i = 0; i < components.size(); i++){
+                memcpy(&verts[vert_idx], components[i].mesh.verts, components[i].mesh.num_verts * sizeof(dvec3));
+                vert_idx += components[i].mesh.num_verts;
+            }
+
+            dTri *tris = (dTri*)&verts[vert_idx];
+            for(int i = 0; i < components.size(); i++){
+                memcpy(&tris[tri_idx], components[i].mesh.tris, components[i].mesh.num_tris * sizeof(dTri));
+                tri_idx += components[i].mesh.num_tris;
+            }
+            
+            body.mesh = dMesh(verts, num_verts, tris, num_tris);
+
+            body.components = &components[0];
+            body.num_components = components.size();
+            components_dirty = false;
+        }
     }
 };
-
-dTri::dTri() {}
-dTri::dTri(uint32_t pverts[3], dvec3* vertData, dvec3 center) {
-    verts[0] = pverts[0];
-    verts[1] = pverts[1];
-    verts[2] = pverts[2];
-    normal = glm::normalize(glm::cross((vertData[verts[0]] - vertData[verts[1]]), (vertData[verts[0]] - vertData[verts[2]])));
-    double dotProduct = glm::dot(normal, vertData[verts[0]] - center);
-    if(dotProduct < 0.0){
-        normal = -normal;
-    }
-}
-
-void dMesh::destroy() {
-    free(verts);
-    verts = 0;
-    tris = 0;
-    num_verts = 0;
-    num_tris = 0;
-}
-
-dMesh::dMesh(dvec3* pverts, uint32_t pnumVerts, dTri* ptris, uint32_t pnumTris) {
-    verts = pverts;
-    num_verts = pnumVerts;
-    tris = ptris;
-    num_tris = pnumTris;
-}
-
-dMesh::dMesh() {}
-
-dMesh dMesh::createBox(dvec3 center, double width, double height, double depth) {
-    const int numVertices = 8;
-    const int numTriangles = 12;
-
-    dvec3 *vertices = (dvec3*)malloc(numVertices * sizeof(dvec3) + numTriangles * sizeof(dTri));
-    dTri *triangles = (dTri*)&vertices[numVertices];
-
-    double halfwidth = width / 2.0;
-    double halfheight = height / 2.0;
-    double halfdepth = depth / 2.0;
-
-    int vertexIndex = 0;
-    for (int i = 0; i < 8; ++i) {
-        double xCoord = i & 1 ? halfwidth : -halfwidth;
-        double yCoord = i & 4 ? halfheight : -halfheight;
-        double zCoord = i & 2 ? halfdepth : -halfdepth;
-        vertices[vertexIndex++] = center + dvec3(xCoord, yCoord, zCoord);
-    }
-
-    uint32_t faces[6 * 4] =
-        {0, 1, 2, 3, // top
-        0, 1, 4, 5, // front
-        0, 2, 4, 6, // left
-        7, 5, 3, 1, // right
-        7, 6, 3, 2, // back
-        7, 6, 5, 4}; // bottom
-
-    for(int i = 0; i < 6; i++) {
-        uint32_t tri1[3] = {faces[i * 4], faces[i * 4 + 1], faces[i * 4 + 2]};
-        uint32_t tri2[3] = {faces[i * 4 + 1], faces[i * 4 + 2], faces[i * 4 + 3]};
-        triangles[i * 2] = dTri(tri1, vertices, center);
-        triangles[i * 2 + 1] = dTri(tri2, vertices, center);
-    }
-
-    return dMesh(vertices, numVertices, triangles, numTriangles);
-}
-
 
 // Thoughts on convex/concave hull
 //
@@ -453,6 +504,21 @@ struct CollisionTree {
     ctnode *root = 0;
 
     CollisionTree(dvec3 origo);
+};
+
+struct Celestial {
+    dvec3 pos;
+    dvec3 vel;
+    dvec3 rot;
+    dvec3 spin;
+    double mass;
+    double radius;
+    double surface_temp_min;
+    double surface_temp_max;
+    vec9 radiance;
+
+    Celestial *nearest_star;
+    std::vector<Celestial> orbiting_bodies;
 };
 
 struct Zone {
