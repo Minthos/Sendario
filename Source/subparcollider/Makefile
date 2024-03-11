@@ -23,7 +23,7 @@ CXXFLAGS := -O2 -march=native
 
 
 takeoff: $(NEW_SRC:.cpp=.o)
-	g++ -O2 -march=native $(NEW_SRC:.cpp=.o) -o takeoff $(LIBDIR) $(INCDIR) $(NEW_LIBS)
+	g++ -O2 -march=native client.o -o takeoff $(LIBDIR) $(INCDIR) $(NEW_LIBS)
 
 takeoff_debug: $(NEW_SRC)
 	g++ -g3 -D DEBUG -march=native -c $(NEW_SRC) $(NEW_LIBS)

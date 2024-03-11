@@ -1,4 +1,4 @@
-#include "physics.h"
+#include "physics.cpp"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include <GL/glew.h>
@@ -146,9 +146,6 @@ struct RenderObject {
     RenderObject(PhysicsObject *ppo) { po = ppo; firstTime = true; }
 };
 
-struct GameObject {
-    std::vector<RenderObject> ro;
-};
 
 void convertMeshToOpenGLBuffers(RenderObject *obj) {
     glGenVertexArrays(1, &obj->vao);
@@ -381,20 +378,25 @@ int main() {
     glUniform1i(glGetUniformLocation(shaders["box"], "tex"), 0);
 
 
-    std::vector<GameObject> objs;
-    objs.push_back(GameObject());
-    GameObject *spinningCube = &objs[0];
+    std::vector<Unit> units;
+    units.push_back(Unit(PhysicsObject(dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0), NULL)));
+    Unit *spinningCube = &units[0];
 
-    // TODO: gather these components under a parent physics object
-    spinningCube->ro.push_back(RenderObject(new PhysicsObject(dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0), NULL)));
-    spinningCube->ro.push_back(RenderObject(new PhysicsObject(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 1.0), NULL)));
-    spinningCube->ro.push_back(RenderObject(new PhysicsObject(dMesh::createBox(glm::dvec3(-1.2, 0.0, 0.0), 1.0, 1.0, 1.0), NULL)));
+    spinningCube->limbs.push_back(PhysicsObject(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 1.0), NULL));
+    spinningCube->limbs.push_back(PhysicsObject(dMesh::createBox(glm::dvec3(-1.2, 0.0, 0.0), 1.0, 1.0, 1.0), NULL));
 
-    for(int i = 0; i < spinningCube->ro.size(); i++) {
-        RenderObject *obj = &spinningCube->ro[i];
-        convertMeshToOpenGLBuffers(obj);
-        obj->shader = shaders["box"];
-        obj->texture = textures["isqswjwki55a1.png"];
+    std::vector<RenderObject> ros;
+
+    ros.push_back(RenderObject(&spinningCube->body));
+
+    for(int i = 0; i < spinningCube->limbs.size(); i++) {
+        ros.push_back(RenderObject(&spinningCube->limbs[i]));
+    }
+
+    for(int i = 0; i < ros.size(); i++) {
+        convertMeshToOpenGLBuffers(&ros[i]);
+        ros[i].shader = shaders["box"];
+        ros[i].texture = textures["isqswjwki55a1.png"];
     }
 
 
@@ -404,16 +406,14 @@ int main() {
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        for(int i = 0; i < objs.size(); i++) {
-            for(int j = 0; j < objs[i].ro.size(); j++) {
-                objs[i].ro[j].po->rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * objs[i].ro[j].po->rot;
-                if((frames_rendered / 400) % 2){
-                    objs[i].ro[j].po->pos += dvec3(0.01, 0.01, 0.01);
-                } else {
-                    objs[i].ro[j].po->pos -= dvec3(0.01, 0.01, 0.01);
-                }
-                render(&objs[i].ro[j]);
+        for(int j = 0; j < ros.size(); j++) {
+            ros[j].po->rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * ros[j].po->rot;
+            if((frames_rendered / 400) % 2){
+                ros[j].po->pos += dvec3(0.01, 0.01, 0.01);
+            } else {
+                ros[j].po->pos -= dvec3(0.01, 0.01, 0.01);
             }
+            render(&ros[j]);
         }
 
         // Bind back to the default framebuffer
@@ -460,10 +460,8 @@ int main() {
 
     }
 
-    for(int i = 0; i < objs.size(); i++) {
-        for(int j = 0; j < objs[i].ro.size(); j++) {
-            objs[i].ro[j].po->mesh.destroy();
-        }
+    for(int i = 0; i < ros.size(); i++) {
+        ros[i].po->mesh.destroy();
     }
 
     glDeleteFramebuffers(1, &framebuffer);
