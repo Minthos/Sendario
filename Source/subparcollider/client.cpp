@@ -417,12 +417,7 @@ int main() {
 
     for(int i = -2; i < 1; i++){
         for(int j = -2; j < 1; j++){
-            // 5 nines with no z-fighting
-            PhysicsObject greencube = PhysicsObject(dMesh::createBox(glm::dvec3(4.0 * i, -4.0, 4.0 * j), 3.99999, 3.99999, 3.99999), NULL);
-            grid.push_back(RenderObject(&greencube));
-            upload_boxen_mesh(&grid[grid.size()-1]);
-            grid[grid.size()-1].shader = shaders["box"];
-            grid[grid.size()-1].texture = textures["green_transparent_wireframe_box_64x64.png"];
+
         }
     }
 
@@ -446,22 +441,46 @@ int main() {
 
         spinningCube->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
        
-        CollisionTree t = CollisionTree(dvec3(0.0));
         ctleaf l = ctleaf(&spinningCube->body);
-        t.root = constructBVH(&l, 1);
+        CollisionTree t = CollisionTree(dvec3(0.0), &l, 1);
+
+        std::vector<ctnode*> stack;
+        stack.push_back(t.root);
+        while(stack.size()){
+            ctnode* node = stack[stack.size() - 1];
+            stack.pop_back();
+            if(node->count > 1) {
+                stack.push_back(&t.root[node->left_child]);
+                stack.push_back(&t.root[node->left_child + 1]);
+            } else {
+                ctleaf *leaf = &t.leaves[node->first_leaf];
+                render(leaf->object->ro);
+
+                // 5 nines with no z-fighting
+/*                PhysicsObject greencube = PhysicsObject(dMesh::createBox(glm::dvec3(4.0 * i, -4.0, 4.0 * j), 3.99999, 3.99999, 3.99999), NULL);
+                grid.push_back(RenderObject(&greencube));
+                upload_boxen_mesh(&grid[grid.size()-1]);
+                grid[grid.size()-1].shader = shaders["box"];
+                grid[grid.size()-1].texture = textures["green_transparent_wireframe_box_64x64.png"];
+*/
+            }
+        }
 
         // TODO: traverse tree, render objects in it
         // physics objects really should have a pointer to their render object
 
+        
+
         for(int j = 0; j < ros.size(); j++) {
-            render(&ros[j]);
+//            render(&ros[j]);
         }
         
+
         // TODO: traverse tree, render leaf nodes
 
         glDisable(GL_CULL_FACE);
         for(int j = 0; j < grid.size(); j++) {
-            render(&grid[j]);
+//            render(&grid[j]);
         }
         glEnable(GL_CULL_FACE);
 

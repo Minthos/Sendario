@@ -547,29 +547,21 @@ struct ctnode {
 };
 
 
-ctnode* constructBVH(ctleaf* leaves, int N) {
-	AABB globalBounds = calculateBounds(leaves, 0, N);
-	ctnode* nodes = (ctnode*) malloc(sizeof(ctnode) * (2 * N));
-	ctnode& root = nodes[0];
-	root.setBounds(globalBounds);
-	root.count = N;
-	uint32_t poolPtr = 1;
-	root.subdivide(nodes, &poolPtr, leaves, 0, N - 1);
-//	glBindBuffer(GL_SHADER_STORAGE_BUFFER, TLASBuffer);
-//	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(ctnode) * poolPtr, nodes, GL_STATIC_DRAW);
-	return(nodes);
-}
-
 
 #define MAX_MAX_DEPTH 16
 struct CollisionTree {
     dvec3 pos;
     ctnode *root = 0;
+    ctleaf *leaves = 0;
 
     void destroy() {
         if(root){
             free(root);
             root = 0;
+        }
+        if(leaves){
+//            free(leaves);
+            leaves = 0;
         }
     }
 
@@ -577,6 +569,21 @@ struct CollisionTree {
         pos = origo;
         root = 0;
     }
+
+    CollisionTree(dvec3 origo, ctleaf* pleaves, int N) {
+        pos = origo;
+        leaves = pleaves;
+        ctnode* nodes = (ctnode*) malloc(sizeof(ctnode) * (2 * N));
+        root = &nodes[0];
+        root->count = N;
+        AABB globalBounds = calculateBounds(pleaves, 0, N);
+        root->setBounds(globalBounds);
+        uint32_t poolPtr = 1;
+        root->subdivide(nodes, &poolPtr, leaves, 0, N - 1);
+    //	glBindBuffer(GL_SHADER_STORAGE_BUFFER, TLASBuffer);
+    //	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(ctnode) * poolPtr, nodes, GL_STATIC_DRAW);
+    }
+
 };
 
 struct Celestial {
