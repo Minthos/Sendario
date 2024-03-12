@@ -15,6 +15,10 @@ uniform mat4 previous;
 
 out vec2 texCoord;
 out vec2 velocity;
+out float linearDepth;
+out gl_PerVertex {
+    vec4 gl_Position;
+};
 
 void main() {
     vec4 curPos = current * vec4(vertexPosition, 1.0);
@@ -23,5 +27,6 @@ void main() {
     velocity = curPos.xy / curPos.w - prevPos.xy / prevPos.w;
     gl_Position = curPos;
     texCoord = vertexTexCoord;
+    linearDepth = gl_Position.z / gl_Position.w;
 }
 

@@ -21,7 +21,7 @@
 // Rendering quality settings
 float anisotropy = 16.0f; // should be 4 with no upscaling, 16 with upscaling
 int upscaling_factor = 2; // 1 (no upscaling) and 2 (4 samples per pixel) are good values
-int motion_blur_mode = 1; // 0 = off, 1 = nonlinear (sharp), 2 = linear (blurry)
+int motion_blur_mode = 0; // 0 = off, 1 = nonlinear (sharp), 2 = linear (blurry)
 float motion_blur_invstr = 5.0f; // motion blur amount. 1.0 = very high. 5.0 = low.
 
 
@@ -63,21 +63,21 @@ char* readShaderSource(const char* filePath) {
     return buffer;
 }
 
-void checkShader(GLenum status_enum, GLuint shader) {
+void checkShader(GLenum status_enum, GLuint shader, const char* name) {
     GLint success = 1;
     GLchar infoLog[512] = {0};
     glGetShaderiv(shader, status_enum, &success);
     if (!success) {
         glGetShaderInfoLog(shader, 512, NULL, infoLog);
-        fprintf(stderr, "Shader compilation error: %s\n", infoLog);
+        fprintf(stderr, "Shader compilation error: %s\n%s\n", name, infoLog);
     }
 }
 
-GLuint compileShader(GLenum shaderType, const char* source) {
+GLuint compileShader(GLenum shaderType, const char* source, const char* name) {
     GLuint shader = glCreateShader(shaderType);
     glShaderSource(shader, 1, &source, NULL);
     glCompileShader(shader);
-    checkShader(GL_COMPILE_STATUS, shader);
+    checkShader(GL_COMPILE_STATUS, shader, name);
     return shader;
 }
 
@@ -87,15 +87,15 @@ GLuint mkShader(string name) {
     char *vert_src = readShaderSource(vert_path.c_str());
     char *frag_src = readShaderSource(frag_path.c_str());
 
-    GLuint vert = compileShader(GL_VERTEX_SHADER, vert_src);
-    GLuint frag = compileShader(GL_FRAGMENT_SHADER, frag_src);
+    GLuint vert = compileShader(GL_VERTEX_SHADER, vert_src, vert_path.c_str());
+    GLuint frag = compileShader(GL_FRAGMENT_SHADER, frag_src, frag_path.c_str());
     free(vert_src);
     free(frag_src);
     GLuint program = glCreateProgram();
     glAttachShader(program, vert);
     glAttachShader(program, frag);
     glLinkProgram(program);
-    checkShader(GL_LINK_STATUS, program);
+    checkShader(GL_LINK_STATUS, program, name.c_str());
     return program;
 }
 
@@ -103,7 +103,7 @@ GLuint loadTexture(const char* filename, bool smooth) {
     int width, height, channels;
     unsigned char* data = stbi_load(filename, &width, &height, &channels, 0);
     if (!data) {
-        std::cerr << "Failed to load texture" << std::endl;
+        std::cerr << "Failed to load texture " << filename << std::endl;
         exit(1);
     }
 
@@ -316,7 +316,7 @@ void resizeFramebuffer(int w, int h) {
     int height = h * upscaling_factor;
     glViewport(0, 0, width, height);
     glBindTexture(GL_TEXTURE_2D, colorTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
     glBindTexture(GL_TEXTURE_2D, velocityTex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, width, height, 0, GL_RG, GL_FLOAT, nullptr);
     GLuint depthRBO;
@@ -410,23 +410,28 @@ int main() {
 
     std::vector<RenderObject> grid;
 
-    for(int i = 1; i < 2; i++){
-        for(int j = 1; j < 2; j++){
-            PhysicsObject greencube = PhysicsObject(dMesh::createBox(glm::dvec3(-i, -1.0, -j), 2.0, 2.0, 2.0), NULL);
+    for(int i = -2; i < 1; i++){
+        for(int j = -2; j < 1; j++){
+            PhysicsObject greencube = PhysicsObject(dMesh::createBox(glm::dvec3(4.0 * i, -4.0, 4.0 * j), 4.0, 4.0, 4.0), NULL);
             grid.push_back(RenderObject(&greencube));
             upload_boxen_mesh(&grid[grid.size()-1]);
             grid[grid.size()-1].shader = shaders["box"];
             grid[grid.size()-1].texture = textures["green_transparent_wireframe_box_64x64.png"];
         }
     }
-
+/*
+    std::sort(grid.begin(), grid.end(), [](const RenderObject& a, const RenderObject& b) -> bool {
+        glm::vec3 camera_pos = glm::vec3(2,1.5,1.5);
+        return glm::length2(a.po->pos - camera_pos) > glm::length2(b.po->pos - camera_pos);
+    });
+*/
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
         prevFrameTime = now();
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        if((frames_rendered / 400) % 2){
+        if((frames_rendered / 800) % 2){
             ros[0].po->pos += dvec3(0.01, 0.01, 0.01);
         } else {
             ros[0].po->pos -= dvec3(0.01, 0.01, 0.01);
