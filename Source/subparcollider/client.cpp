@@ -99,7 +99,7 @@ GLuint mkShader(string name) {
     return program;
 }
 
-GLuint loadTexture(const char* filename) {
+GLuint loadTexture(const char* filename, bool smooth) {
     int width, height, channels;
     unsigned char* data = stbi_load(filename, &width, &height, &channels, 0);
     if (!data) {
@@ -118,9 +118,12 @@ GLuint loadTexture(const char* filename) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, smooth ? GL_LINEAR : GL_NEAREST);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, channels == 4 ? GL_RGBA : GL_RGB, GL_UNSIGNED_BYTE, data);
+    std::cout << "loaded texture " << filename << " with " << channels << " channels\n";
+
+    GLint format = channels == 4 ? GL_RGBA : GL_RGB;
+    glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
     glGenerateMipmap(GL_TEXTURE_2D);
 
     stbi_image_free(data);
@@ -373,9 +376,12 @@ int main() {
     
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
-    
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_BLEND);
+
     shaders["box"] = mkShader("box");
-    textures["isqswjwki55a1.png"] = loadTexture("textures/isqswjwki55a1.png");
+    textures["isqswjwki55a1.png"] = loadTexture("textures/isqswjwki55a1.png", true);
+    textures["green_transparent_wireframe_box_64x64.png"] = loadTexture("textures/green_transparent_wireframe_box_64x64.png", false);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, textures["isqswjwki55a1.png"]);
     glUniform1i(glGetUniformLocation(shaders["box"], "tex"), 0);
@@ -393,16 +399,25 @@ int main() {
 
     spinningCube->update();
     ros.push_back(RenderObject(&spinningCube->body));
-
-    for(int i = 0; i < spinningCube->components.size(); i++) {
-        ros.push_back(RenderObject(&spinningCube->components[i]));
-    }
-
-    
+//    for(int i = 0; i < spinningCube->components.size(); i++) {
+//        ros.push_back(RenderObject(&spinningCube->components[i]));
+//    }    
     for(int i = 0; i < ros.size(); i++) {
         upload_boxen_mesh(&ros[i]);
         ros[i].shader = shaders["box"];
         ros[i].texture = textures["isqswjwki55a1.png"];
+    }
+
+    std::vector<RenderObject> grid;
+
+    for(int i = 1; i < 2; i++){
+        for(int j = 1; j < 2; j++){
+            PhysicsObject greencube = PhysicsObject(dMesh::createBox(glm::dvec3(-i, -1.0, -j), 2.0, 2.0, 2.0), NULL);
+            grid.push_back(RenderObject(&greencube));
+            upload_boxen_mesh(&grid[grid.size()-1]);
+            grid[grid.size()-1].shader = shaders["box"];
+            grid[grid.size()-1].texture = textures["green_transparent_wireframe_box_64x64.png"];
+        }
     }
 
 
@@ -417,10 +432,19 @@ int main() {
             ros[0].po->pos -= dvec3(0.01, 0.01, 0.01);
         }
 
+        spinningCube->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
+        
+
         for(int j = 0; j < ros.size(); j++) {
-            ros[j].po->rot = glm::angleAxis(0.01 * (j + 1), glm::dvec3(0.0, 1.0, 0.0)) * ros[j].po->rot;
             render(&ros[j]);
         }
+
+
+        glDisable(GL_CULL_FACE);
+        for(int j = 0; j < grid.size(); j++) {
+            render(&grid[j]);
+        }
+        glEnable(GL_CULL_FACE);
 
         // Bind back to the default framebuffer
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
