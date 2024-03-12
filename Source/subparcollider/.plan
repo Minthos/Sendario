@@ -1,4 +1,14 @@
 
+TODO: highest priority
+
+place the spinning cube into a ctree
+visualize the leaf nodes using green wireframe boxes
+
+
+
+
+
+
 Test the ctree
 
 Render some terrain
@@ -8,7 +18,6 @@ Implement gravity and basic collision testing
 define surface level as 0 in lieu of terrain procgen
 render a flattened box for every occupied node in the ctree at ground level
 
-render a transparent box for every occupied node in the ctree
 
 
 

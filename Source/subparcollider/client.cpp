@@ -397,11 +397,15 @@ int main() {
 
     std::vector<RenderObject> ros;
 
-    spinningCube->update();
+    spinningCube->bake();
+
     ros.push_back(RenderObject(&spinningCube->body));
+    spinningCube->body.ro = &ros[ros.size() - 1];
+
+
     for(int i = 0; i < spinningCube->components.size(); i++) {
-        ros.push_back(RenderObject(&spinningCube->components[i]));
-        ros[ros.size() - 1].po->rot = glm::angleAxis(3.14, glm::dvec3(0.0001, 0.0, 0.9999)) * ros[ros.size() - 1].po->rot;
+//        ros.push_back(RenderObject(&spinningCube->components[i]));
+//        ros[ros.size() - 1].po->rot = glm::angleAxis(3.14, glm::dvec3(0.0001, 0.0, 0.9999)) * ros[ros.size() - 1].po->rot;
     }    
     for(int i = 0; i < ros.size(); i++) {
         upload_boxen_mesh(&ros[i]);
@@ -413,7 +417,8 @@ int main() {
 
     for(int i = -2; i < 1; i++){
         for(int j = -2; j < 1; j++){
-            PhysicsObject greencube = PhysicsObject(dMesh::createBox(glm::dvec3(4.0 * i, -4.0, 4.0 * j), 3.999, 3.999, 3.999), NULL);
+            // 5 nines with no z-fighting
+            PhysicsObject greencube = PhysicsObject(dMesh::createBox(glm::dvec3(4.0 * i, -4.0, 4.0 * j), 3.99999, 3.99999, 3.99999), NULL);
             grid.push_back(RenderObject(&greencube));
             upload_boxen_mesh(&grid[grid.size()-1]);
             grid[grid.size()-1].shader = shaders["box"];
@@ -432,26 +437,35 @@ int main() {
         prevFrameTime = now();
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        if((frames_rendered / 1600) % 2){
-            spinningCube->body.rot = glm::angleAxis(-0.000001, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
-            ros[0].po->pos -= dvec3(0.001, 0.001, 0.001);
+        if((frames_rendered / 800) % 2){
+//            spinningCube->body.rot = glm::angleAxis(-0.000001, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
+            ros[0].po->pos += dvec3(0.01, 0.01, 0.01);
         } else {
-            spinningCube->body.rot = glm::angleAxis(0.000001, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
-            ros[0].po->pos += dvec3(0.001, 0.001, 0.001);
+            ros[0].po->pos -= dvec3(0.01, 0.01, 0.01);
         }
 
-        
+        spinningCube->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
+       
+        CollisionTree t = CollisionTree(dvec3(0.0));
+        ctleaf l = ctleaf(&spinningCube->body);
+        t.root = constructBVH(&l, 1);
+
+        // TODO: traverse tree, render objects in it
+        // physics objects really should have a pointer to their render object
 
         for(int j = 0; j < ros.size(); j++) {
             render(&ros[j]);
         }
-
+        
+        // TODO: traverse tree, render leaf nodes
 
         glDisable(GL_CULL_FACE);
         for(int j = 0; j < grid.size(); j++) {
             render(&grid[j]);
         }
         glEnable(GL_CULL_FACE);
+
+        t.destroy();
 
         // Bind back to the default framebuffer
         glBindFramebuffer(GL_FRAMEBUFFER, 0);

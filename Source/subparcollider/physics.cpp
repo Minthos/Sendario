@@ -196,72 +196,63 @@ struct dMesh {
     uint32_t num_verts;
     uint32_t num_tris;
 
-    void destroy();
+    dMesh() {}
 
-    dMesh();
-    dMesh(dvec3* pverts, uint32_t pnumVerts, dTri* ptris, uint32_t pnumTris);
-    
-    static dMesh createBox(dvec3 center, double width, double height, double depth);
+    dMesh(dvec3* pverts, uint32_t pnumVerts, dTri* ptris, uint32_t pnumTris) {
+        verts = pverts;
+        num_verts = pnumVerts;
+        tris = ptris;
+        num_tris = pnumTris;
+    }
+
+    void destroy() {
+        if(verts)
+            free(verts);
+        if(tris)
+            free(tris);
+        verts = 0;
+        tris = 0;
+        num_verts = 0;
+        num_tris = 0;
+    }
+
+    static dMesh createBox(dvec3 center, double width, double height, double depth) {
+        const int numVertices = 8;
+        const int numTriangles = 12;
+
+        dvec3 *vertices = (dvec3*)malloc(numVertices * sizeof(dvec3) + numTriangles * sizeof(dTri));
+        dTri *triangles = (dTri*)&vertices[numVertices];
+
+        double halfwidth = width / 2.0;
+        double halfheight = height / 2.0;
+        double halfdepth = depth / 2.0;
+
+        int vertexIndex = 0;
+        for (int i = 0; i < 8; ++i) {
+            double xCoord = i & 1 ? halfwidth : -halfwidth;
+            double yCoord = i & 4 ? halfheight : -halfheight;
+            double zCoord = i & 2 ? halfdepth : -halfdepth;
+            vertices[vertexIndex++] = center + dvec3(xCoord, yCoord, zCoord);
+        }
+
+        uint32_t faces[6 * 4] =
+            {0, 1, 2, 3, // top
+            0, 1, 4, 5, // front
+            0, 2, 4, 6, // left
+            7, 5, 3, 1, // right
+            7, 6, 3, 2, // back
+            7, 6, 5, 4}; // bottom
+
+        for(int i = 0; i < 6; i++) {
+            uint32_t tri1[3] = {faces[i * 4], faces[i * 4 + 1], faces[i * 4 + 2]};
+            uint32_t tri2[3] = {faces[i * 4 + 1], faces[i * 4 + 2], faces[i * 4 + 3]};
+            triangles[i * 2] = dTri(tri1, vertices, center);
+            triangles[i * 2 + 1] = dTri(tri2, vertices, center);
+        }
+
+        return dMesh(vertices, numVertices, triangles, numTriangles);
+    }
 };
-
-
-
-void dMesh::destroy() {
-    if(verts)
-        free(verts);
-    if(tris)
-        free(tris);
-    verts = 0;
-    tris = 0;
-    num_verts = 0;
-    num_tris = 0;
-}
-
-dMesh::dMesh(dvec3* pverts, uint32_t pnumVerts, dTri* ptris, uint32_t pnumTris) {
-    verts = pverts;
-    num_verts = pnumVerts;
-    tris = ptris;
-    num_tris = pnumTris;
-}
-
-dMesh::dMesh() {}
-
-dMesh dMesh::createBox(dvec3 center, double width, double height, double depth) {
-    const int numVertices = 8;
-    const int numTriangles = 12;
-
-    dvec3 *vertices = (dvec3*)malloc(numVertices * sizeof(dvec3) + numTriangles * sizeof(dTri));
-    dTri *triangles = (dTri*)&vertices[numVertices];
-
-    double halfwidth = width / 2.0;
-    double halfheight = height / 2.0;
-    double halfdepth = depth / 2.0;
-
-    int vertexIndex = 0;
-    for (int i = 0; i < 8; ++i) {
-        double xCoord = i & 1 ? halfwidth : -halfwidth;
-        double yCoord = i & 4 ? halfheight : -halfheight;
-        double zCoord = i & 2 ? halfdepth : -halfdepth;
-        vertices[vertexIndex++] = center + dvec3(xCoord, yCoord, zCoord);
-    }
-
-    uint32_t faces[6 * 4] =
-        {0, 1, 2, 3, // top
-        0, 1, 4, 5, // front
-        0, 2, 4, 6, // left
-        7, 5, 3, 1, // right
-        7, 6, 3, 2, // back
-        7, 6, 5, 4}; // bottom
-
-    for(int i = 0; i < 6; i++) {
-        uint32_t tri1[3] = {faces[i * 4], faces[i * 4 + 1], faces[i * 4 + 2]};
-        uint32_t tri2[3] = {faces[i * 4 + 1], faces[i * 4 + 2], faces[i * 4 + 3]};
-        triangles[i * 2] = dTri(tri1, vertices, center);
-        triangles[i * 2 + 1] = dTri(tri2, vertices, center);
-    }
-
-    return dMesh(vertices, numVertices, triangles, numTriangles);
-}
 
 
 struct Motor {
@@ -313,10 +304,13 @@ enum physics_state {
 // impacts that cause damage should create a new, recessed vertex at the impact point with depth proportional
 // to the damage. For damage that would cause a dent deeper than the component the component can be destroyed.
 
+struct RenderObject;
+
 mempool collision_pool;
 
 struct PhysicsObject {
     PhysicsObject *parent;
+    RenderObject *ro;
     Joint *joint; // joint can only represent the connection to parent. directed acyclic graph is the only valid topology.
     PhysicsObject *limbs; // limbs are subassemblies connected via joints
     int num_limbs;
@@ -413,7 +407,7 @@ struct Unit {
         components_dirty = true;
     }
 
-    void update() {
+    void bake() {
         if(limbs_dirty){
             body.limbs = &limbs[0];
             body.num_limbs = limbs.size();
@@ -457,14 +451,15 @@ struct Unit {
 // Thoughts on convex/concave hull
 //
 // We should separately collision test anything connected to a joint, and also anything protruding from the main hull.
-// The final authority on whether a component collides with something should be its hull mesh. Each component should have a very
-// simple hull mesh and the main body can have a hull mesh that combines the outer surface into one mesh except protruding 
-// and jointed features since they will be tested separately.
+// The final authority on whether a component collides with something should be its hull mesh. Each component should
+// have a very simple hull mesh and the main body can have a hull mesh that combines the outer surface into one mesh
+// except protruding and jointed features since they will be tested separately.
 
 // TODO: calculate the bounding box from the collision shape.
 // 1. physics objects move, rotate, appear and disappear
 // 2. we calculate a transformation matrix from the object's new rotation
-// 3. we transform each point in the collision shape's mesh to calculate a new bounding box (but leave the mesh untransformed)
+// 3. we transform each point in the collision shape's mesh to calculate a new bounding box (but leave the mesh
+// untransformed)
 // 3b. we may consider caching a transformed copy of the mesh for faster collision detection
 // 4. we add the physics object's position to the bounding box's
 // 5. we update the BVH
@@ -476,12 +471,29 @@ struct ctleaf {
     // axis-aligned bounding box
     hvec3 hi; // 6 bytes (total 14)
     hvec3 lo; // 6 bytes (total 20)
+
+    ctleaf(PhysicsObject *o){
+        object = o;
+        hi = hvec3(o->pos + o->radius);
+        lo = hvec3(o->pos - o->radius);
+    }
 };
 
 struct AABB {
 	hvec3 max;
 	hvec3 min;
 };
+
+AABB calculateBounds(ctleaf* p, uint32_t first, uint32_t last) {
+    AABB bounds;
+    bounds.min = hvec3(32767);
+    bounds.max = hvec3(-32768);
+    for (uint32_t i = first; i <= last; ++i) {
+        bounds.min = hvec3::min(bounds.min, p[i].lo);
+        bounds.max = hvec3::max(bounds.max, p[i].hi);
+    }
+    return bounds;
+}
 
 struct ctnode {
     hvec3 hi; // 6 bytes
@@ -492,9 +504,61 @@ struct ctnode {
         uint32_t first_leaf;
     };
 
-    void setBounds(AABB bounds);
-    void subdivide(ctnode *nodes, uint32_t *poolPtr, ctleaf *primitives, uint32_t first, uint32_t last);
+    void setBounds(AABB bounds) { hi = bounds.max; lo = bounds.min; }
+
+    void subdivide(ctnode* nodes, uint32_t* poolPtr, ctleaf* primitives, uint32_t first, uint32_t last) {
+        if (first == last) {
+            this->first_leaf = first;
+            this->count = 1;
+            return;
+        }
+        this->left_child = *poolPtr;
+        *poolPtr += 2;
+        ctnode *left = &nodes[left_child];
+        ctnode *right = &nodes[left_child + 1];
+
+        // sort the primitives
+        hvec3 size = hi - lo;
+        if(size.y > size.x && size.y > size.z) {
+            std::sort(primitives + first, primitives + last + 1, [](const ctleaf& a, const ctleaf& b) -> bool {
+                return a.lo.x + a.hi.x < b.hi.x + b.lo.x;
+            });
+        }
+        else if (size.y > size.x && size.y > size.z) {
+            std::sort(primitives + first, primitives + last + 1, [](const ctleaf& a, const ctleaf& b) -> bool {
+                return a.lo.y + a.hi.y < b.hi.y + b.lo.y;
+            });
+        }
+        else {
+            std::sort(primitives + first, primitives + last + 1, [](const ctleaf& a, const ctleaf& b) -> bool {
+                return a.lo.z + a.hi.z < b.hi.z + b.lo.z;
+            });
+        }
+        // split them in a dumb way that is not optimal but better than worst case
+        // here we could instead do a binary search to find the geometric middle or even search for the biggest gap
+        uint32_t split = (first + last) >> 1;
+
+        left->setBounds(calculateBounds(primitives, first, split));
+        right->setBounds(calculateBounds(primitives, split + 1, last));
+        left->subdivide(nodes, poolPtr, primitives, first, split);
+        right->subdivide(nodes, poolPtr, primitives, split + 1, last);
+        this->count = last - first + 1;
+    }
 };
+
+
+ctnode* constructBVH(ctleaf* leaves, int N) {
+	AABB globalBounds = calculateBounds(leaves, 0, N);
+	ctnode* nodes = (ctnode*) malloc(sizeof(ctnode) * (2 * N));
+	ctnode& root = nodes[0];
+	root.setBounds(globalBounds);
+	root.count = N;
+	uint32_t poolPtr = 1;
+	root.subdivide(nodes, &poolPtr, leaves, 0, N - 1);
+//	glBindBuffer(GL_SHADER_STORAGE_BUFFER, TLASBuffer);
+//	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(ctnode) * poolPtr, nodes, GL_STATIC_DRAW);
+	return(nodes);
+}
 
 
 #define MAX_MAX_DEPTH 16
@@ -502,7 +566,17 @@ struct CollisionTree {
     dvec3 pos;
     ctnode *root = 0;
 
-    CollisionTree(dvec3 origo);
+    void destroy() {
+        if(root){
+            free(root);
+            root = 0;
+        }
+    }
+
+    CollisionTree(dvec3 origo) {
+        pos = origo;
+        root = 0;
+    }
 };
 
 struct Celestial {
@@ -526,80 +600,6 @@ struct Zone {
     CollisionTree tree;
     Celestial *frame_of_reference;
 };
-
-
-AABB calculateBounds(ctleaf* p, uint32_t first, uint32_t last) {
-    AABB bounds;
-    bounds.min = hvec3(32767);
-    bounds.max = hvec3(-32768);
-    for (uint32_t i = first; i <= last; ++i) {
-        bounds.min = hvec3::min(bounds.min, p[i].lo);
-        bounds.max = hvec3::max(bounds.max, p[i].hi);
-    }
-    return bounds;
-}
-
-void ctnode::setBounds(AABB bounds) { hi = bounds.max; lo = bounds.min; }
-
-void ctnode::subdivide(ctnode* nodes, uint32_t* poolPtr, ctleaf* primitives, uint32_t first, uint32_t last) {
-    if (first == last) {
-        this->first_leaf = first;
-        this->count = 1;
-        return;
-    }
-    this->left_child = *poolPtr;
-    *poolPtr += 2;
-    ctnode *left = &nodes[left_child];
-    ctnode *right = &nodes[left_child + 1];
-
-    // sort the primitives
-    hvec3 size = hi - lo;
-    if(size.y > size.x && size.y > size.z) {
-        std::sort(primitives + first, primitives + last + 1, [](const ctleaf& a, const ctleaf& b) -> bool {
-            return a.lo.x + a.hi.x < b.hi.x + b.lo.x;
-        });
-    }
-    else if (size.y > size.x && size.y > size.z) {
-        std::sort(primitives + first, primitives + last + 1, [](const ctleaf& a, const ctleaf& b) -> bool {
-            return a.lo.y + a.hi.y < b.hi.y + b.lo.y;
-        });
-    }
-    else {
-        std::sort(primitives + first, primitives + last + 1, [](const ctleaf& a, const ctleaf& b) -> bool {
-            return a.lo.z + a.hi.z < b.hi.z + b.lo.z;
-        });
-    }
-    // split them in a dumb way that is not optimal but better than worst case
-    // here we could instead do a binary search to find the geometric middle or even search for the biggest gap
-    uint32_t split = (first + last) >> 1;
-
-    left->setBounds(calculateBounds(primitives, first, split));
-    right->setBounds(calculateBounds(primitives, split + 1, last));
-    left->subdivide(nodes, poolPtr, primitives, first, split);
-    right->subdivide(nodes, poolPtr, primitives, split + 1, last);
-    this->count = last - first + 1;
-}
-
-
-ctnode* constructBVH(ctleaf* leaves, int N) {
-	AABB globalBounds = calculateBounds(leaves, 0, N);
-	ctnode* nodes = (ctnode*) malloc(sizeof(ctnode) * (2 * N));
-	ctnode& root = nodes[0];
-	root.setBounds(globalBounds);
-	root.count = N;
-	uint32_t poolPtr = 1;
-	root.subdivide(nodes, &poolPtr, leaves, 0, N - 1);
-//	glBindBuffer(GL_SHADER_STORAGE_BUFFER, TLASBuffer);
-//	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(ctnode) * poolPtr, nodes, GL_STATIC_DRAW);
-	return(nodes);
-}
-
-
-#define MAX_MAX_DEPTH 16
-CollisionTree::CollisionTree(dvec3 origo) {
-    pos = origo;
-    root = 0;
-}
 
 
 // TODO:
