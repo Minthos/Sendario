@@ -2,7 +2,7 @@
 
 in vec2 texCoord;
 in vec2 velocity;
-in float linearDepth;
+in float z;
 
 uniform sampler2D tex;
 
@@ -13,6 +13,6 @@ void main() {
     //fragColor = vec4(1.0);
     fragColor = texture(tex, texCoord);
     velocityOut = velocity;
-    gl_FragDepth = log(linearDepth + 2.0) * 0.048259;
+    gl_FragDepth = log2(z + 2.0) * 0.05;
 }
 

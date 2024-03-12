@@ -342,7 +342,7 @@ void render(RenderObject *obj) {
     glm::mat4 translation = glm::translate(glm::mat4(1.0f), obj->po->zoneSpacePosition());
     glm::mat4 rotation = glm::mat4(glm::quat(obj->po->rot));
     glm::mat4 view = glm::lookAt(glm::vec3(2,1.5,1.5), glm::vec3(0,0,0), glm::vec3(0,1,0));
-    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenwidth / (float)screenheight, 0.1f, 100.0f);
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenwidth / (float)screenheight, 0.001f, 1000000.0f);
     glm::mat4 transform = projection * view * translation * rotation;
 
     glUseProgram(obj->shader);
@@ -401,7 +401,7 @@ int main() {
     ros.push_back(RenderObject(&spinningCube->body));
     for(int i = 0; i < spinningCube->components.size(); i++) {
         ros.push_back(RenderObject(&spinningCube->components[i]));
-        ros[ros.size() - 1].po->rot = glm::angleAxis(3.14, glm::dvec3(0.001, 0.0, 0.999)) * ros[ros.size() - 1].po->rot;
+        ros[ros.size() - 1].po->rot = glm::angleAxis(3.14, glm::dvec3(0.0001, 0.0, 0.9999)) * ros[ros.size() - 1].po->rot;
     }    
     for(int i = 0; i < ros.size(); i++) {
         upload_boxen_mesh(&ros[i]);
@@ -413,7 +413,7 @@ int main() {
 
     for(int i = -2; i < 1; i++){
         for(int j = -2; j < 1; j++){
-            PhysicsObject greencube = PhysicsObject(dMesh::createBox(glm::dvec3(4.0 * i, -4.0, 4.0 * j), 4.0, 4.0, 4.0), NULL);
+            PhysicsObject greencube = PhysicsObject(dMesh::createBox(glm::dvec3(4.0 * i, -4.0, 4.0 * j), 3.999, 3.999, 3.999), NULL);
             grid.push_back(RenderObject(&greencube));
             upload_boxen_mesh(&grid[grid.size()-1]);
             grid[grid.size()-1].shader = shaders["box"];
@@ -432,13 +432,14 @@ int main() {
         prevFrameTime = now();
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        if((frames_rendered / 800) % 2){
-            ros[0].po->pos += dvec3(0.001, 0.001, 0.001);
-        } else {
+        if((frames_rendered / 1600) % 2){
+            spinningCube->body.rot = glm::angleAxis(-0.000001, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
             ros[0].po->pos -= dvec3(0.001, 0.001, 0.001);
+        } else {
+            spinningCube->body.rot = glm::angleAxis(0.000001, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
+            ros[0].po->pos += dvec3(0.001, 0.001, 0.001);
         }
 
-//        spinningCube->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
         
 
         for(int j = 0; j < ros.size(); j++) {

@@ -120,20 +120,6 @@ hvec3 hvec3::min(hvec3 lhs, hvec3 rhs) {
             glm::min(lhs.z, rhs.z)};
 }
 
-/*
-constexpr hvec3 operator*(const hvec3 lhs, const int16_t rhs);
-constexpr hvec3 operator/(const hvec3 lhs, const int16_t rhs);
-constexpr hvec3 operator+(const hvec3 lhs, const int16_t rhs);
-constexpr hvec3 operator-(const hvec3 lhs, const int16_t rhs);
-constexpr hvec3 operator+(const hvec3 lhs, const hvec3 rhs);
-constexpr hvec3 operator-(const hvec3 lhs, const hvec3 rhs);
-constexpr dvec3 operator*(const dvec3 lhs, const double rhs);
-constexpr dvec3 operator/(const dvec3 lhs, const double rhs);
-constexpr dvec3 operator+(const dvec3 lhs, const double rhs);
-constexpr dvec3 operator-(const dvec3 lhs, const double rhs);
-constexpr dvec3 operator+(const dvec3 lhs, const vec3 rhs);
-constexpr dvec3 operator-(const dvec3 lhs, const vec3 rhs);
-*/
 constexpr hvec3 operator*(const hvec3 lhs, const int16_t rhs) {
     return hvec3(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs);
 }
@@ -190,8 +176,18 @@ struct dTri {
     uint32_t verts[3];
     glm::dvec3 normal;
 
-    dTri();
-    dTri(uint32_t pverts[3], dvec3* vertData, dvec3 center);
+    dTri() {}
+
+    dTri(uint32_t pverts[3], dvec3* vertData, dvec3 center) {
+        verts[0] = pverts[0];
+        verts[1] = pverts[1];
+        verts[2] = pverts[2];
+        normal = glm::normalize(glm::cross((vertData[verts[0]] - vertData[verts[1]]), (vertData[verts[0]] - vertData[verts[2]])));
+        double dotProduct = glm::dot(normal, vertData[verts[0]] - center);
+        if(dotProduct < 0.0){
+            normal = -normal;
+        }
+    }
 };
 
 struct dMesh {
@@ -208,17 +204,7 @@ struct dMesh {
     static dMesh createBox(dvec3 center, double width, double height, double depth);
 };
 
-dTri::dTri() {}
-dTri::dTri(uint32_t pverts[3], dvec3* vertData, dvec3 center) {
-    verts[0] = pverts[0];
-    verts[1] = pverts[1];
-    verts[2] = pverts[2];
-    normal = glm::normalize(glm::cross((vertData[verts[0]] - vertData[verts[1]]), (vertData[verts[0]] - vertData[verts[2]])));
-    double dotProduct = glm::dot(normal, vertData[verts[0]] - center);
-    if(dotProduct < 0.0){
-        normal = -normal;
-    }
-}
+
 
 void dMesh::destroy() {
     if(verts)
