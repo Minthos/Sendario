@@ -342,7 +342,7 @@ void render(RenderObject *obj) {
     glm::mat4 translation = glm::translate(glm::mat4(1.0f), obj->po->zoneSpacePosition());
     glm::mat4 rotation = glm::mat4(glm::quat(obj->po->rot));
     glm::mat4 view = glm::lookAt(glm::vec3(2,1.5,1.5), glm::vec3(0,0,0), glm::vec3(0,1,0));
-    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenwidth / (float)screenheight, 0.001f, 1000000.0f);
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenwidth / (float)screenheight, 0.001f, 1e38f);
     glm::mat4 transform = projection * view * translation * rotation;
 
     glUseProgram(obj->shader);
