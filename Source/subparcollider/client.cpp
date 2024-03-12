@@ -322,7 +322,7 @@ void resizeFramebuffer(int w, int h) {
     GLuint depthRBO;
     glGenRenderbuffers(1, &depthRBO);
     glBindRenderbuffer(GL_RENDERBUFFER, depthRBO);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32F, width, height);
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthRBO);
     setupTextures(width, height);
@@ -399,9 +399,10 @@ int main() {
 
     spinningCube->update();
     ros.push_back(RenderObject(&spinningCube->body));
-//    for(int i = 0; i < spinningCube->components.size(); i++) {
-//        ros.push_back(RenderObject(&spinningCube->components[i]));
-//    }    
+    for(int i = 0; i < spinningCube->components.size(); i++) {
+        ros.push_back(RenderObject(&spinningCube->components[i]));
+        ros[ros.size() - 1].po->rot = glm::angleAxis(3.14, glm::dvec3(0.001, 0.0, 0.999)) * ros[ros.size() - 1].po->rot;
+    }    
     for(int i = 0; i < ros.size(); i++) {
         upload_boxen_mesh(&ros[i]);
         ros[i].shader = shaders["box"];
@@ -419,12 +420,12 @@ int main() {
             grid[grid.size()-1].texture = textures["green_transparent_wireframe_box_64x64.png"];
         }
     }
-/*
+
     std::sort(grid.begin(), grid.end(), [](const RenderObject& a, const RenderObject& b) -> bool {
         glm::vec3 camera_pos = glm::vec3(2,1.5,1.5);
         return glm::length2(a.po->pos - camera_pos) > glm::length2(b.po->pos - camera_pos);
     });
-*/
+
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
@@ -432,12 +433,12 @@ int main() {
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         if((frames_rendered / 800) % 2){
-            ros[0].po->pos += dvec3(0.01, 0.01, 0.01);
+            ros[0].po->pos += dvec3(0.001, 0.001, 0.001);
         } else {
-            ros[0].po->pos -= dvec3(0.01, 0.01, 0.01);
+            ros[0].po->pos -= dvec3(0.001, 0.001, 0.001);
         }
 
-        spinningCube->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
+//        spinningCube->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
         
 
         for(int j = 0; j < ros.size(); j++) {
