@@ -418,11 +418,11 @@ int main() {
         prevFrameTime = now();
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        if((frames_rendered / 800) % 2){
+        if((frames_rendered / 4000) % 2){
 //            spinningCube->body.rot = glm::angleAxis(-0.000001, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
-            ros[0].po->pos += dvec3(0.01, 0.01, 0.01);
+            ros[0].po->pos += dvec3(0.001, 0.001, 0.001);
         } else {
-            ros[0].po->pos -= dvec3(0.01, 0.01, 0.01);
+            ros[0].po->pos -= dvec3(0.001, 0.001, 0.001);
         }
 
         spinningCube->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
@@ -445,10 +445,8 @@ int main() {
                 dvec3 hi = node->hi.todvec3();
                 dvec3 lo = node->lo.todvec3();
                 dvec3 center = (hi + lo) * 0.5;
-                dvec3 halfsize = (hi - lo) * 0.5;
-//                std::cout << "node at " << center.x << ", " << center.y << ", " << center.z << "\n";
-                // 5 nines with no z-fighting
-                PhysicsObject greencube = PhysicsObject(dMesh::createBox(center, halfsize.x, halfsize.y, halfsize.z), NULL);
+                dvec3 size = (hi - lo);
+                PhysicsObject greencube = PhysicsObject(dMesh::createBox(center, size.x, size.y, size.z), NULL);
                 RenderObject ro = RenderObject(&greencube);
                 upload_boxen_mesh(&ro);
                 ro.shader = shaders["box"];
