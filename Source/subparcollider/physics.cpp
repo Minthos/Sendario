@@ -90,6 +90,7 @@ struct hvec3 {
     hvec3(dvec3 in);
     static hvec3 max(hvec3 lhs, hvec3 rhs);
     static hvec3 min(hvec3 lhs, hvec3 rhs);
+    dvec3 todvec3() { return dvec3(x, y, z); }
 };
 
 int16_t d2hi(double in) {
@@ -119,6 +120,7 @@ hvec3 hvec3::min(hvec3 lhs, hvec3 rhs) {
             glm::min(lhs.y, rhs.y),
             glm::min(lhs.z, rhs.z)};
 }
+
 
 constexpr hvec3 operator*(const hvec3 lhs, const int16_t rhs) {
     return hvec3(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs);
@@ -474,8 +476,8 @@ struct ctleaf {
 
     ctleaf(PhysicsObject *o){
         object = o;
-        hi = hvec3(o->pos + o->radius);
-        lo = hvec3(o->pos - o->radius);
+        hi = hvec3(o->pos + o->radius + 0.5);
+        lo = hvec3(o->pos - o->radius - 0.5);
     }
 };
 
@@ -488,7 +490,7 @@ AABB calculateBounds(ctleaf* p, uint32_t first, uint32_t last) {
     AABB bounds;
     bounds.min = hvec3(32767);
     bounds.max = hvec3(-32768);
-    for (uint32_t i = first; i <= last; ++i) {
+    for (uint32_t i = first; i < last; ++i) {
         bounds.min = hvec3::min(bounds.min, p[i].lo);
         bounds.max = hvec3::max(bounds.max, p[i].hi);
     }

@@ -413,20 +413,6 @@ int main() {
         ros[i].texture = textures["isqswjwki55a1.png"];
     }
 
-    std::vector<RenderObject> grid;
-
-    for(int i = -2; i < 1; i++){
-        for(int j = -2; j < 1; j++){
-
-        }
-    }
-
-    std::sort(grid.begin(), grid.end(), [](const RenderObject& a, const RenderObject& b) -> bool {
-        glm::vec3 camera_pos = glm::vec3(2,1.5,1.5);
-        return glm::length2(a.po->pos - camera_pos) > glm::length2(b.po->pos - camera_pos);
-    });
-
-
     // Main loop
     while (!glfwWindowShouldClose(window)) {
         prevFrameTime = now();
@@ -455,34 +441,23 @@ int main() {
             } else {
                 ctleaf *leaf = &t.leaves[node->first_leaf];
                 render(leaf->object->ro);
-
+               
+                dvec3 hi = node->hi.todvec3();
+                dvec3 lo = node->lo.todvec3();
+                dvec3 center = (hi + lo) * 0.5;
+                dvec3 halfsize = (hi - lo) * 0.5;
+//                std::cout << "node at " << center.x << ", " << center.y << ", " << center.z << "\n";
                 // 5 nines with no z-fighting
-/*                PhysicsObject greencube = PhysicsObject(dMesh::createBox(glm::dvec3(4.0 * i, -4.0, 4.0 * j), 3.99999, 3.99999, 3.99999), NULL);
-                grid.push_back(RenderObject(&greencube));
-                upload_boxen_mesh(&grid[grid.size()-1]);
-                grid[grid.size()-1].shader = shaders["box"];
-                grid[grid.size()-1].texture = textures["green_transparent_wireframe_box_64x64.png"];
-*/
+                PhysicsObject greencube = PhysicsObject(dMesh::createBox(center, halfsize.x, halfsize.y, halfsize.z), NULL);
+                RenderObject ro = RenderObject(&greencube);
+                upload_boxen_mesh(&ro);
+                ro.shader = shaders["box"];
+                ro.texture = textures["green_transparent_wireframe_box_64x64.png"];
+                glDisable(GL_CULL_FACE);
+                render(&ro);
+                glEnable(GL_CULL_FACE);
             }
         }
-
-        // TODO: traverse tree, render objects in it
-        // physics objects really should have a pointer to their render object
-
-        
-
-        for(int j = 0; j < ros.size(); j++) {
-//            render(&ros[j]);
-        }
-        
-
-        // TODO: traverse tree, render leaf nodes
-
-        glDisable(GL_CULL_FACE);
-        for(int j = 0; j < grid.size(); j++) {
-//            render(&grid[j]);
-        }
-        glEnable(GL_CULL_FACE);
 
         t.destroy();
 
