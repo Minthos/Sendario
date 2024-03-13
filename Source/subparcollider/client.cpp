@@ -441,7 +441,8 @@ int main() {
             } else {
                 ctleaf *leaf = &t.leaves[node->first_leaf];
                 render(leaf->object->ro);
-               
+              
+#ifdef DEBUG
                 dvec3 hi = node->hi.todvec3();
                 dvec3 lo = node->lo.todvec3();
                 dvec3 center = (hi + lo) * 0.5;
@@ -454,6 +455,7 @@ int main() {
                 glDisable(GL_CULL_FACE);
                 render(&ro);
                 glEnable(GL_CULL_FACE);
+#endif
             }
         }
 
