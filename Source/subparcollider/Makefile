@@ -11,7 +11,7 @@ rt: gl4.cpp
 rtdebug: gl4.cpp
 	g++ -g3 -DDEBUG gl4.cpp -o rtdebug -lGL -lGLEW -lglut -lGLU -lm -L/usr/local/lib -I/usr/local/include
 
-NEW_SRC := physics.cpp client.cpp
+NEW_SRC := physics.cpp client.cpp terragen.cpp
 CPP_SRC := lintedrender5.cpp sdlwrapper.cpp
 SWIFT_SRC := main.swift gptphysics.swift spatialtypes.swift boxoid.swift gamelogic.swift
 OBJC_HEADERS := subparcollider-Bridging-Header.h
@@ -21,9 +21,11 @@ LIBDIR := -L/usr/local/lib
 INCDIR := -I/usr/local/include -IFastNoise2/include
 CXXFLAGS := -O2 -march=native
 
+terragen.o: terragen.cpp
+	g++ -O2 -march=native -c terragen.cpp -o terragen.o $(LIBDIR) $(INCDIR)
 
-takeoff: $(NEW_SRC)
-	g++ -O2 -march=native client.cpp -o takeoff $(LIBDIR) $(INCDIR) $(NEW_LIBS)
+takeoff: $(NEW_SRC) terragen.o
+	g++ -O2 -march=native terragen.o client.cpp -o takeoff $(LIBDIR) $(INCDIR) $(NEW_LIBS)
 
 takeoff_debug: $(NEW_SRC)
 	g++ -g3 -D DEBUG -march=native client.cpp -o takeoff_debug $(LIBDIR) $(INCDIR) $(NEW_LIBS)

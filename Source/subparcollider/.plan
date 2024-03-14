@@ -1,21 +1,26 @@
 TODO:
 
+1. Generate some terrain
+ - voronoi cellular noise tectonic plates and random noise heightmaps to begin with?
 
-Render some terrain
-define surface level as 0 in lieu of terrain procgen
+2. Render some terrain
+ - generate a mesh centered on the player with max lod within a reasonable distance and reduced lod further out
+ - don't worry about tiling and shit for now, just make one big mesh with progressive LOD
+ - regenerate the mesh when the player moves some distance from the origin of the current mesh
 
-Implement gravity and basic collision testing
+3. Implement gravity and basic collision with terrain
 
 
+?. add more cool shit
+
+
+----
 
 
 
 physics engine: record and replay
 every second: snapshot of the physics state
 every tick: only the variables that changed
-
-
-
 
 
 

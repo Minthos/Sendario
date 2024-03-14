@@ -1,6 +1,30 @@
 #include <vector>
 #include <cmath>
+#include <iostream>
 
+#include "FastNoise2/include/FastNoise/FastNoise.h"
+
+
+/*
+
+
+Initial solution: Generate random noise in multiple octaves and call it a day, focus on the sphere/cube mapping and
+data structure, stuff like that
+
+
+Improvements to quality:
+
+1. Each planet has a personality. Initially we can just set it to default.
+
+2. Generate a geological history for each planet. Atmosphere reduces meteor impact frequency. Plate tectonics and volcanism deform the surface and can erase impact craters. Erosion ages the surface.
+
+3. Create wet/dry and hot/cold areas, rivers and riverbeds, rockslides, glaciers, forests.
+
+4. Placing individual rocks: Create them randomly and apply some earthquakes.
+
+
+
+*/
 
 /* ranking of planets/moons
 
@@ -32,63 +56,29 @@ struct polar_vert {
     double elevation;
 };
 
-double lowFrequencyNoise(double lat, double lon) {
-    // Placeholder: replace with actual noise function
-    return sin(lat * 0.0174533) * cos(lon * 0.0174533); // Simple sine-cosine function for illustration
-}
+void noisetest() {
+    auto fnSimplex = FastNoise::New<FastNoise::Simplex>();
+    auto fnFractal = FastNoise::New<FastNoise::FractalFBm>();
 
-double highFrequencyNoise(double lat, double lon) {
-    // Placeholder: replace with actual noise function
-    return cos(lat * 0.0174533 * 5) * sin(lon * 0.0174533 * 5); // Higher frequency sine-cosine
-}
+    fnFractal->SetSource( fnSimplex );
+    fnFractal->SetOctaveCount( 5 );
+    
+    std::vector<float> noiseOutput(16 * 16 * 16);
 
-std::vector<polar_vert> distributePointsOnSphere(int num_points) {
-    std::vector<polar_vert> points;
-    double phi = M_PI * (3. - sqrt(5.)); // Golden angle in radians
+    // Generate a 16 x 16 x 16 area of noise
+    fnFractal->GenUniformGrid3D(noiseOutput.data(), 0, 0, 0, 16, 16, 16, 0.2f, 1337);  
+    int index = 0;
 
-    for (int i = 0; i < num_points; ++i) {
-        double y = 1 - (i / (double)(num_points - 1)) * 2; // y goes from 1 to -1
-        double radius = sqrt(1 - y * y); // radius at y
-
-        double theta = phi * i; // golden angle increment
-
-        double x = cos(theta) * radius;
-        double z = sin(theta) * radius;
-
-        // Convert from Cartesian to spherical coordinates
-        double lat = asin(y);
-        double lon = atan2(z, x);
-
-        points.push_back({lat * (180/M_PI), lon * (180/M_PI), 0.0}); // Convert to degrees
+    for (int z = 0; z < 16; z++)
+    {
+        for (int y = 0; y < 16; y++)
+        {
+            for (int x = 0; x < 16; x++)
+            {
+                // do something with data (x, y, z, noiseOutput[index++]);          
+            }       
+        }
+        std::cout << noiseOutput[z] << "\n";
     }
-
-    return points;
 }
-
-std::vector<polar_vert> generateTerrain(int num_points) {
-    std::vector<polar_vert> vertices;
-
-    // Distribute points using your chosen method
-    auto points = distributePointsOnSphere(num_points);
-
-    // Step 2: Assign base elevations with low-frequency noise
-    for (auto& point : points) {
-        point.elevation = lowFrequencyNoise(point.lat, point.lon);
-    }
-
-    // Step 4: Refine with high-frequency noise
-    for (auto& point : points) {
-        point.elevation += highFrequencyNoise(point.lat, point.lon);
-    }
-
-    // Convert to polar_vert and classify features
-    for (auto& point : points) {
-        polar_vert pv = {point.lat, point.lon, point.elevation};
-        // Optionally classify point as peak, ridge, or valley here
-        vertices.push_back(pv);
-    }
-
-    return vertices;
-}
-
 
