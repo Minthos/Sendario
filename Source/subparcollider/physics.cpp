@@ -218,6 +218,9 @@ struct dMesh {
         num_tris = 0;
     }
 
+    // TODO: create a cylinder mesh and remember to make a function that produces the correct texture coordinates for
+    // the mesh upload function
+
     static dMesh createBox(dvec3 center, double width, double height, double depth) {
         const int numVertices = 8;
         const int numTriangles = 12;
@@ -620,6 +623,9 @@ struct Zone {
 
 "collision shape" should probably just be simplified to an AABB for each object from the tree's
 perspective. Then when testing object collisions we can test the polygon mesh if the AABBs intersect.
+
+constructing the AABB from a sphere makes it bigger than it has to be but it saves us from having to recompute it with
+transformed vertices every frame due to rotation, we can just take the position and add the radius in each dimension.
 
 Collision shapes should be the building blocks of buildings and vehicles.
 Exterior-facing shapes should be flagged as exterior-facing, interiors can be ignored

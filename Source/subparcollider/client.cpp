@@ -418,11 +418,11 @@ int main() {
         prevFrameTime = now();
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        if((frames_rendered / 4000) % 2){
+        if((frames_rendered / 800) % 2){
 //            spinningCube->body.rot = glm::angleAxis(-0.000001, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
-            ros[0].po->pos += dvec3(0.001, 0.001, 0.001);
+            ros[0].po->pos += dvec3(0.01, 0.01, 0.01);
         } else {
-            ros[0].po->pos -= dvec3(0.001, 0.001, 0.001);
+            ros[0].po->pos -= dvec3(0.01, 0.01, 0.01);
         }
 
         spinningCube->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
