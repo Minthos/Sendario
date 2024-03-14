@@ -16,9 +16,9 @@ CPP_SRC := lintedrender5.cpp sdlwrapper.cpp
 SWIFT_SRC := main.swift gptphysics.swift spatialtypes.swift boxoid.swift gamelogic.swift
 OBJC_HEADERS := subparcollider-Bridging-Header.h
 LIBS := -lglfw -lGL -lGLEW -lm -lSDL2
-NEW_LIBS := -lGL -lGLEW -lglut -lGLU -lm -lglfw
+NEW_LIBS := -lGL -lGLEW -lglut -lGLU -lm -lglfw libFastNoise.a
 LIBDIR := -L/usr/local/lib
-INCDIR := -I/usr/local/include
+INCDIR := -I/usr/local/include -IFastNoise2/include
 CXXFLAGS := -O2 -march=native
 
 

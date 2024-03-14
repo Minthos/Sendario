@@ -1,3 +1,5 @@
+#include "FastNoise2/include/FastNoise/FastNoise.h"
+
 #include <algorithm>
 #include <boost/align/aligned_allocator.hpp>
 #include <deque>
@@ -260,6 +262,33 @@ struct dMesh {
 };
 
 
+void noisetest() {
+    auto fnSimplex = FastNoise::New<FastNoise::Simplex>();
+    auto fnFractal = FastNoise::New<FastNoise::FractalFBm>();
+
+    fnFractal->SetSource( fnSimplex );
+    fnFractal->SetOctaveCount( 5 );
+
+    std::vector<float> noiseOutput(16 * 16 * 16);
+
+    // Generate a 16 x 16 x 16 area of noise
+    fnFractal->GenUniformGrid3D(noiseOutput.data(), 0, 0, 0, 16, 16, 16, 0.2f, 1337);
+    int index = 0;
+
+    for (int z = 0; z < 16; z++)
+    {
+        for (int y = 0; y < 16; y++)
+        {
+            for (int x = 0; x < 16; x++)
+            {
+                // do something with data (x, y, z, noiseOutput[index++]);			
+            }			
+        }
+        std::cout << noiseOutput[z] << "\n";
+    }
+}
+
+
 struct Motor {
     double max_force;
     double min_force; // negative values for motors that can produce power in both directions
@@ -413,6 +442,8 @@ struct Unit {
     }
 
     void bake() {
+        noisetest();
+
         if(limbs_dirty){
             body.limbs = &limbs[0];
             body.num_limbs = limbs.size();
