@@ -1,3 +1,4 @@
+#include "terragen.h"
 #include "physics.cpp"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -388,21 +389,29 @@ int main() {
     glUniform1i(glGetUniformLocation(shaders["box"], "tex"), 0);
 
 
+
     std::vector<Unit> units;
-    units.push_back(Unit());
-    Unit *spinningCube = &units[0];
-
-    spinningCube->addComponent(dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0));
-    spinningCube->addComponent(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 0.01));
-    spinningCube->addComponent(dMesh::createBox(glm::dvec3(-1.2, 0.0, 0.0), 1.0, 0.05, 1.0));
-
     std::vector<RenderObject> ros;
 
-    spinningCube->bake();
+    units.push_back(Unit()); // 1
+    units.push_back(Unit()); // 1
+    Unit *spinningCube = &units[0]; // 2
+    Unit *ground = &units[1]; // 2
+    spinningCube->addComponent(dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0)); // 3
+    spinningCube->addComponent(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 0.01));
+    spinningCube->addComponent(dMesh::createBox(glm::dvec3(-1.2, 0.0, 0.0), 1.0, 0.05, 1.0));
+    spinningCube->bake(); // 4
 
-    ros.push_back(RenderObject(&spinningCube->body));
-    spinningCube->body.ro = &ros[ros.size() - 1];
+    
+    //ground->addComponent(dMesh::createBox(glm::dvec3(0.0, -1.0, 0.0), 1.0, 1.0, 1.0)); // 3
+    ground->addComponent(dMesh::createTerrain(glm::dvec3(0.0, 0.0, 0.0), 42)); // 3
+    ground->bake(); // 4
 
+
+    ros.push_back(RenderObject(&spinningCube->body)); // 5
+    ros.push_back(RenderObject(&ground->body)); // 5
+    spinningCube->body.ro = &ros[0]; // 6
+    ground->body.ro = &ros[1]; // 6
 
     for(int i = 0; i < spinningCube->components.size(); i++) {
 //        ros.push_back(RenderObject(&spinningCube->components[i]));
@@ -414,11 +423,19 @@ int main() {
         ros[i].texture = textures["isqswjwki55a1.png"];
     }
 
+    noisetest();
+    ground->body.rot = glm::angleAxis(0.5, glm::dvec3(0.0, 0.0, 1.0)) * ground->body.rot;
+    ground->body.pos += dvec3(0.0, -10000.0, 0.0);
+
     // Main loop
     while (!glfwWindowShouldClose(window)) {
         prevFrameTime = now();
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+//        ground->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * ground->body.rot;
+        render(ground->body.ro);
+
         if((frames_rendered / 800) % 2){
 //            spinningCube->body.rot = glm::angleAxis(-0.000001, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
             ros[0].po->pos += dvec3(0.01, 0.01, 0.01);
@@ -426,7 +443,7 @@ int main() {
             ros[0].po->pos -= dvec3(0.01, 0.01, 0.01);
         }
 
-        spinningCube->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
+        spinningCube->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 0.0, 1.0)) * spinningCube->body.rot;
        
         ctleaf l = ctleaf(&spinningCube->body);
         CollisionTree t = CollisionTree(dvec3(0.0), &l, 1);
@@ -455,7 +472,7 @@ int main() {
                 ro.texture = textures["green_transparent_wireframe_box_64x64.png"];
                 glDisable(GL_CULL_FACE);
                 render(&ro);
-                glEnable(GL_CULL_FACE);
+//                glEnable(GL_CULL_FACE);
 #endif
             }
         }

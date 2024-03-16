@@ -1,15 +1,19 @@
+#include "terragen.h"
+
 #include <vector>
 #include <cmath>
 #include <iostream>
-
-#include "FastNoise2/include/FastNoise/FastNoise.h"
-
-
 /*
 
 
-Initial solution: Generate random noise in multiple octaves and call it a day, focus on the sphere/cube mapping and
-data structure, stuff like that
+Initial solution:
+
+Sample random noise in multiple octaves in a spiderweb pattern centered on the player with vertices snapped to some
+sort of grid
+
+
+Voronoi cellular noise = continental plates
+
 
 
 Improvements to quality:
@@ -22,6 +26,12 @@ Improvements to quality:
 
 4. Placing individual rocks: Create them randomly and apply some earthquakes.
 
+
+
+
+
+https://en.wikipedia.org/wiki/Peatland
+Peatlands are found around the globe, although are at their greatest extent at high latitudes in the Northern Hemisphere. Peatlands are estimated to cover around 3% of the globe's surface
 
 
 */
@@ -42,11 +52,6 @@ ice giant - crushing atmosphere, no surface (neptune, uranus)
 gas giant - crushing atmosphere, no surface (jupiter, saturn)
 
 */
-
-// include libFastNoise.a
-// it would be cool to use terragen from planetside.co.uk but I want something fast and lightweight that can
-// run on each player's computer more than I want really beautiful and detailed planets
-
 
 
 
@@ -78,7 +83,28 @@ void noisetest() {
                 // do something with data (x, y, z, noiseOutput[index++]);          
             }       
         }
-        std::cout << noiseOutput[z] << "\n";
+        double value = fnFractal->GenSingle3D(1337, 0.0f, 0.0f, (float)z);
+        std::cout << value << "\n";
+        //std::cout << noiseOutput[z] << "\n";
     }
 }
+
+TerrainGenerator::TerrainGenerator(int pseed, double pradius) {
+    seed = pseed;
+    radius = pradius;
+    fnFractal->SetSource( fnSimplex );
+    fnFractal->SetOctaveCount( 5 );
+}
+
+double TerrainGenerator::getElevation(dvec3 pos) {
+    double length = pos.length();
+    if(length <= 0.0){
+        return 0.0;
+    }
+    dvec3 onSphere = pos * (radius / length);
+    return fnFractal->GenSingle3D(seed, onSphere.x, onSphere.y, onSphere.z);
+}
+
+
+
 

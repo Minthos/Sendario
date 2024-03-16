@@ -28,7 +28,7 @@ takeoff: $(NEW_SRC) terragen.o
 	g++ -O2 -march=native terragen.o client.cpp -o takeoff $(LIBDIR) $(INCDIR) $(NEW_LIBS)
 
 takeoff_debug: $(NEW_SRC)
-	g++ -g3 -D DEBUG -march=native client.cpp -o takeoff_debug $(LIBDIR) $(INCDIR) $(NEW_LIBS)
+	g++ -g3 -D DEBUG -march=native terragen.o client.cpp -o takeoff_debug $(LIBDIR) $(INCDIR) $(NEW_LIBS)
 
 #takeoff_debug: $(NEW_SRC)
 #	g++ -g3 -D DEBUG -march=native -c $(NEW_SRC) $(NEW_LIBS)
