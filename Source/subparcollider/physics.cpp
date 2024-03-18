@@ -37,6 +37,7 @@ struct mempool {
 };
 
 cacheline* mempool::alloc() {
+    assert(0); // using std::vectors this way causes segfaults, use malloc instead
     if(recycler.size() > 0) {
         cacheline* rax = recycler.back();
         recycler.pop_back();
@@ -658,6 +659,127 @@ struct CollisionTree {
 
 };
 
+
+struct ttnode {
+    uint32_t first_child;
+    double elevation[3]; // elevation of the node's 3 corners
+    dvec3 verts[3]; // vertices on the unit sphere
+
+    // add more stuff like temperature, moisture, vegetation
+};
+
+struct TerrainTree {
+    uint64_t seed;
+    TerrainGenerator *generator;
+
+    std::vector<ttnode> nodes;
+
+    TerrainTree(uint64_t pseed) {
+        seed = pseed;
+        generator = new TerrainGenerator(seed, 1.0);
+
+        // 6 corners
+        dvec3 initial_corners[6] = {
+            dvec3(0.0, 1.0, 0.0),
+            dvec3(0.0, -1.0, 0.0),
+            dvec3(0.0, 0.0, 1.0),
+            dvec3(1.0, 0.0, 0.0),
+            dvec3(0.0, 0.0, -1.0),
+            dvec3(-1.0, 0.0, 0.0)
+        };
+
+        int indices[8][3] = {
+            {0, 2, 3},
+            {0, 3, 4},
+            {0, 4, 5},
+            {0, 5, 2},
+            {1, 2, 5},
+            {1, 5, 4},
+            {1, 4, 3},
+            {1, 3, 2},
+        };
+
+        for(int i = 0; i < 8; i++){
+            nodes.push_back({ 0,
+                    generator->getElevation(initial_corners[indices[i][0]]),
+                    generator->getElevation(initial_corners[indices[i][1]]),
+                    generator->getElevation(initial_corners[indices[i][2]]),
+                    initial_corners[indices[i][0]],
+                    initial_corners[indices[i][1]],
+                    initial_corners[indices[i][2]]} );
+        }
+    }
+
+
+    // to keep things simple I will define a zone as a triangle at some reasonable subdivision level
+    // (~1 km on earth's surface?)
+    // and a zone's id will be encoded in a 64 bit unsigned integer
+    // the least significant bit separates north/south
+    // the next two bits encode which of the 4 subdivisions to traverse
+    // 0 - 3: lat lon (0 - 90, 0 - 90), (0 - 90, 90 - 180), (0 - 90, 180 - 270), (0 - 90, 270 - 0)
+    // 4 - 7: lat lon (-90 - 0, -90 - 0), (-90 - 0, 90 - 180), (-90 - 0, 180 - 270), (-90 - 0, 270 - 0)
+    // for every 2 additional bits we encode one more level of subdivision in clockwise order
+    //
+    // initially we can just ignore location and set max_subdivisions to something low like 2 or 3
+
+    void traverse(ttnode *node, std::vector<glm::dvec3> *verts, std::vector<dTri> *tris, int level, int max_level) {
+        if(level > max_level) {
+            dTri t;
+            dvec3 center = {0, 0, 0};
+            for(int i = 0; i < 3; i++) {
+                t.verts[i] = verts->size();
+                // scaling each point to lie on the unit sphere and adding the elevation value
+                verts->push_back(node->verts[i] * (node->elevation[i] / node->verts[i].length()) );
+                center += node->verts[i];
+            }
+            t.normal = center / center.length();
+            tris->push_back(t);
+            return;
+        } else {
+            if( ! node->first_child) {
+                node->first_child = (uint32_t)nodes.size();
+                dvec3 new_verts[3] = {
+                    (node->verts[0] + node->verts[1]) * 0.5,
+                    (node->verts[1] + node->verts[2]) * 0.5,
+                    (node->verts[2] + node->verts[0]) * 0.5};
+                nodes.push_back({ 0,
+                    generator->getElevation(new_verts[0]),
+                    generator->getElevation(new_verts[1]),
+                    generator->getElevation(new_verts[2]),
+                    new_verts[0],
+                    new_verts[1],
+                    new_verts[2] });
+
+                for(int i = 0; i < 3; i++) {
+                    nodes.push_back({ 0,
+                        generator->getElevation(new_verts[i]),
+                        generator->getElevation(node->verts[i]),
+                        generator->getElevation(node->verts[i + 2 % 3]),
+                        new_verts[i],
+                        new_verts[i],
+                        new_verts[i + 2 % 3] });
+                }
+            }
+            for(int i = 0; i < 4; i++) {
+                traverse(&nodes[node->first_child + i], verts, tris, level + 1, max_level);
+            }   
+        }
+    }
+
+    // ignoring location for now so max_subdivisions should be a very small number
+    dMesh buildMesh(dvec3 location, int max_subdivisions) {
+        std::vector<uint32_t> node_indices;
+        std::vector<glm::dvec3> verts;
+        std::vector<dTri> tris;
+        for(int i = 0; i < 8; i++) {
+            traverse(&nodes[i], &verts, &tris, 1, max_subdivisions);
+        }
+        dvec3 *vertices = (dvec3*)malloc(verts.size() * sizeof(dvec3) + tris.size() * sizeof(dTri));
+        dTri *triangles = (dTri*)&vertices[verts.size()];
+        return dMesh(vertices, verts.size(), triangles, tris.size());
+    }
+};
+
 struct Celestial {
     dvec3 pos;
     dvec3 vel;
@@ -671,6 +793,17 @@ struct Celestial {
 
     Celestial *nearest_star;
     std::vector<Celestial> orbiting_bodies;
+
+    
+
+    // opengl triangle winding order is by default counterclockwise so to preserve my sanity I will also order the
+    // faces of the octahedron and the subdivision of each face in counterclockwise order.
+    void octahedric() {
+        // top level: 2 hemispheres
+        // each level of subdivision: 4 triangles
+
+        
+    }
 };
 
 struct Zone {
@@ -687,6 +820,25 @@ struct Zone {
 
 
 /*
+
+Physics solving
+
+To intersect two meshes we can do point-triangle intersection and edge-edge intersection.
+
+
+Interesting article about solvers
+https://box2d.org/posts/2024/02/solver2d/
+
+https://matthias-research.github.io/pages/tenMinutePhysics/index.html
+https://www.youtube.com/watch?v=zzy6u1z_l9A recommends to solve locally instead of globally to simplify and to do
+multiple iterations
+
+----
+
+moment of intertia: the main body has a precomputed intertia tensor without the limbs and the masses of the limbs
+must be added each tick in order to produce the true intertia tensor taking each limb's center of mass into account
+
+----
 
 "collision shape" should probably just be simplified to an AABB for each object from the tree's
 perspective. Then when testing object collisions we can test the polygon mesh if the AABBs intersect.
