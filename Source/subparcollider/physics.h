@@ -664,10 +664,14 @@ struct TerrainTree {
         float noise_yscaling = 2000.0;
         float noise_xzscaling = 0.0001;
         if(level > max_level) {
-            double distance2 = glm::length2(location - nodes[node_idx].verts[0]);
-            double nodeWidth2 = glm::length2(nodes[node_idx].verts[0] - nodes[node_idx].verts[1]);
-            double ratio = distance2 / nodeWidth2;
-            if(ratio > 400.0 || level > 18) {
+            //double distance2 = glm::length2(location - nodes[node_idx].verts[0]);
+            //double nodeWidth2 = glm::length2(nodes[node_idx].verts[0] - nodes[node_idx].verts[1]);
+            //double ratio = distance2 / nodeWidth2;
+            //if(ratio > 400.0 || level > 18) {
+            double distance = glm::length(location - nodes[node_idx].verts[0]);
+            double nodeWidth = glm::length(nodes[node_idx].verts[0] - nodes[node_idx].verts[1]);
+            double ratio = distance / nodeWidth;
+            if(ratio > 80.0 || level > 17) {
                 dTri t;
                 dvec3 center = {0, 0, 0};
                 for(int i = 0; i < 3; i++) {
