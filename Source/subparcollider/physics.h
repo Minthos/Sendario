@@ -258,14 +258,6 @@ struct dMesh {
     
     // not in use
     void createTerrain(glm::dvec3 center, uint64_t seed) {
-        const double planet_radius = 6.371e6;
-        TerrainGenerator terrainGen(seed);
-        double altitude = center.y + planet_radius;
-        double horizon_distance = sqrt(2 * planet_radius * altitude + pow(altitude, 2));
-        const int segments = 16; // segments per ring
-        const double max_rings = 16; // number of rings from the player to the horizon
-        const double ring_spacing = horizon_distance / max_rings;
-
     }
 
 };
@@ -668,7 +660,7 @@ struct TerrainTree {
     //
     // initially we can just ignore location and set max_subdivisions to something low like 2 or 3
 
-    void traverse(uint32_t node_idx, std::vector<glm::dvec3> *verts, std::vector<dTri> *tris, int level, int max_level) {
+    void traverse(dvec3 location, uint32_t node_idx, std::vector<glm::dvec3> *verts, std::vector<dTri> *tris, int level, int max_level) {
         if(level > max_level) {
             dTri t;
             dvec3 center = {0, 0, 0};
@@ -705,19 +697,28 @@ struct TerrainTree {
                         new_verts[(i + 2) % 3] });
                 }
             }
+            double distance2 = glm::length2(location - nodes[node_idx].verts[0]);
+            double nodeWidth2 = glm::length2(nodes[node_idx].verts[0] - nodes[node_idx].verts[1]);
+            double ratio = distance2 / nodeWidth2;
+            int adjusted_level = level + 1;
+            if(ratio > 1.0){
+                adjusted_level = max_level + 1;
+            }
             for(int i = 0; i < 4; i++) {
-                traverse(nodes[node_idx].first_child + i, verts, tris, level + 1, max_level);
+                traverse(location, nodes[node_idx].first_child + i, verts, tris, adjusted_level, max_level);
             }   
         }
     }
 
-    // ignoring location for now so max_subdivisions should be a very small number
+    // TODO high priority
+    // use distance from node to location to determine max subdivision level for that node
+    // for this calculation double precision is precise enough even at planetary scale
     dMesh buildMesh(dvec3 location, int max_subdivisions) {
         std::vector<uint32_t> node_indices;
         std::vector<glm::dvec3> verts;
         std::vector<dTri> tris;
         for(int i = 0; i < 8; i++) {
-            traverse(i, &verts, &tris, 1, max_subdivisions);
+            traverse(location / radius, i, &verts, &tris, 1, max_subdivisions);
         }
         dvec3 *vertices = (dvec3*)malloc(verts.size() * sizeof(dvec3) + tris.size() * sizeof(dTri));
         dTri *triangles = (dTri*)&vertices[verts.size()];
@@ -748,7 +749,7 @@ struct Celestial {
         terrain = TerrainTree(pseed, pradius);
         auto time_begin = now();
         std::cout << "Generating mesh..\n";
-        body = PhysicsObject(terrain.buildMesh(dvec3(0,0,0), 5), NULL);
+        body = PhysicsObject(terrain.buildMesh(dvec3(0, 6.4e6, 0), 7), NULL);
         auto time_used = std::chrono::duration_cast<std::chrono::microseconds>(now() - time_begin).count();
         std::cout << "Celestial " << name << ": " << body.mesh.num_tris << " triangles procedurally generated in " << time_used/1000.0 << "ms\n";
         surface_temp_min = 183.0;
