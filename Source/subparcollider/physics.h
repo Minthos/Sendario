@@ -255,73 +255,16 @@ struct dMesh {
         return dMesh(vertices, numVertices, triangles, numTriangles);
     }
     
-
-    // I blame GPT-4 for this shit, but hey at least I have some geometry now
-    static dMesh createTerrain(glm::dvec3 center, uint64_t seed) {
+    // not in use
+    void createTerrain(glm::dvec3 center, uint64_t seed) {
         const double planet_radius = 6.371e6;
-        TerrainGenerator terrainGen(seed, planet_radius);
+        TerrainGenerator terrainGen(seed);
         double altitude = center.y + planet_radius;
         double horizon_distance = sqrt(2 * planet_radius * altitude + pow(altitude, 2));
         const int segments = 16; // segments per ring
         const double max_rings = 16; // number of rings from the player to the horizon
         const double ring_spacing = horizon_distance / max_rings;
 
-        std::vector<glm::dvec3> vertices;
-        std::vector<dTri> triangles;
-
-        // Generate rings
-        for (int ring = 0; ring <= max_rings; ++ring) {
-            double radius = ring * ring_spacing;
-
-            // Generate segments within a ring
-            for (int seg = 0; seg < segments; ++seg) {
-                double theta = (seg * 2 * M_PI) / segments;
-                double next_theta = ((seg + 1) % segments * 2 * M_PI) / segments;
-
-                // Calculate vertices for the current segment
-                glm::dvec3 current_vertex = center + glm::dvec3(radius * cos(theta), planet_radius, radius * sin(theta));
-                current_vertex.y = terrainGen.getElevation(current_vertex) - center.y;
-
-                glm::dvec3 next_vertex = center + glm::dvec3(radius * cos(next_theta), planet_radius, radius * sin(next_theta));
-                next_vertex.y = terrainGen.getElevation(next_vertex) - center.y;
-
-                // Connect vertices to form triangles, skipping the first ring to avoid degenerate triangles
-                if (ring > 0) {
-                    double inner_radius = (ring - 1) * ring_spacing;
-                    glm::dvec3 prev_vertex = center + glm::dvec3(inner_radius * cos(theta), planet_radius, inner_radius * sin(theta));
-                    prev_vertex.y = terrainGen.getElevation(prev_vertex) - center.y;
-
-                    glm::dvec3 prev_next_vertex = center + glm::dvec3(inner_radius * cos(next_theta), planet_radius, inner_radius * sin(next_theta));
-                    prev_next_vertex.y = terrainGen.getElevation(prev_next_vertex) - center.y;
-
-                    // Store vertices
-                    uint32_t current_index = vertices.size();
-                    vertices.push_back(current_vertex);
-                    vertices.push_back(next_vertex);
-                    vertices.push_back(prev_vertex);
-                    vertices.push_back(prev_next_vertex);
-
-                    // Form two triangles for each segment
-                    uint32_t tri1[3] = {current_index, current_index + 1, current_index + 2};
-                    uint32_t tri2[3] = {current_index + 1, current_index + 3, current_index + 2};
-
-                    triangles.push_back(dTri(tri1, vertices.data(), center));
-                    triangles.push_back(dTri(tri2, vertices.data(), center));
-                }
-            }
-        }
-
-        // Convert vectors to arrays for dMesh
-        glm::dvec3* vertices_array = (glm::dvec3*)malloc(vertices.size() * sizeof(glm::dvec3));
-        dTri* triangles_array = (dTri*)malloc(triangles.size() * sizeof(dTri));
-        for (size_t i = 0; i < vertices.size(); ++i) {
-            vertices_array[i] = vertices[i];
-        }
-        for (size_t i = 0; i < triangles.size(); ++i) {
-            triangles_array[i] = triangles[i];
-        }
-
-        return dMesh(vertices_array, vertices.size(), triangles_array, triangles.size());
     }
 
 };
@@ -681,7 +624,7 @@ struct TerrainTree {
     TerrainTree(uint64_t pseed, double pradius) {
         seed = pseed;
         radius = pradius;
-        generator = new TerrainGenerator(seed, radius);
+        generator = new TerrainGenerator(seed);
         // 6 corners
         dvec3 initial_corners[6] = {
             dvec3(0.0, 1.0, 0.0),

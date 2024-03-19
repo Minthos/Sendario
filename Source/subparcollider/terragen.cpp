@@ -53,58 +53,14 @@ gas giant - crushing atmosphere, no surface (jupiter, saturn)
 
 */
 
-
-
-struct polar_vert {
-    double lat;
-    double lon;
-    double elevation;
-};
-
-void noisetest() {
-    auto fnSimplex = FastNoise::New<FastNoise::Simplex>();
-    auto fnFractal = FastNoise::New<FastNoise::FractalFBm>();
-
-    fnFractal->SetSource( fnSimplex );
-    fnFractal->SetOctaveCount( 5 );
-    
-    std::vector<float> noiseOutput(16 * 16 * 16);
-
-    // Generate a 16 x 16 x 16 area of noise
-    fnFractal->GenUniformGrid3D(noiseOutput.data(), 0, 0, 0, 16, 16, 16, 0.2f, 1337);  
-    int index = 0;
-
-    for (int z = 0; z < 16; z++)
-    {
-        for (int y = 0; y < 16; y++)
-        {
-            for (int x = 0; x < 16; x++)
-            {
-                // do something with data (x, y, z, noiseOutput[index++]);          
-            }       
-        }
-        double value = fnFractal->GenSingle3D(1337, 0.0f, 0.0f, (float)z);
-        std::cout << value << "\n";
-        //std::cout << noiseOutput[z] << "\n";
-    }
-}
-
-TerrainGenerator::TerrainGenerator(int pseed, double pradius) {
+TerrainGenerator::TerrainGenerator(int pseed) {
     seed = pseed;
-    radius = pradius;
     fnFractal->SetSource( fnSimplex );
     fnFractal->SetOctaveCount( 5 );
 }
 
 double TerrainGenerator::getElevation(dvec3 pos) {
-    double length = glm::length(pos);
-    if(length <= 0.0){
-        return 0.0;
-    }
-    dvec3 onSphere = pos * (radius / length);
-    return fnFractal->GenSingle3D(seed, onSphere.x, onSphere.y, onSphere.z);
+    return fnFractal->GenSingle3D(seed, pos.x, pos.y, pos.z);
 }
-
-
 
 

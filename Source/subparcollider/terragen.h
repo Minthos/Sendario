@@ -12,7 +12,7 @@ class TerrainGenerator {
     FastNoise::SmartNode<FastNoise::FractalFBm> fnFractal = FastNoise::New<FastNoise::FractalFBm>();
 
 public:
-    TerrainGenerator(int pseed, double pradius);
+    TerrainGenerator(int pseed);
     double getElevation(dvec3 pos);
 };
 

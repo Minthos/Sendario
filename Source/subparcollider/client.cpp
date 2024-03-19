@@ -153,7 +153,6 @@ struct RenderObject {
 
 
 // uploads a mesh composed of one or more box meshes to the gpu
-// other mesh shapes are not currently supported.
 // TODO: find a better way to set texture coordinates.
 void upload_boxen_mesh(RenderObject *obj) {
     glGenVertexArrays(1, &obj->vao);
@@ -197,6 +196,41 @@ void upload_boxen_mesh(RenderObject *obj) {
         } else {
             indices.insert(indices.end(), {i * 4 + 1, i * 4 + 2, i * 4 + 3});
             indices.insert(indices.end(), {i * 4 + 2, i * 4 + 1, i * 4});
+        }
+    }
+
+    glGenBuffers(1, &obj->vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, obj->vbo);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(texvert), vertices.data(), GL_STATIC_DRAW);
+
+    glGenBuffers(1, &obj->ebo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj->ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
+
+    // Position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // Texture coordinate attribute
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+    glEnableVertexAttribArray(1);
+
+    glBindVertexArray(0);
+}
+
+void upload_terrain_mesh(RenderObject *obj) {
+    glGenVertexArrays(1, &obj->vao);
+    glBindVertexArray(obj->vao);
+
+    std::vector<texvert> vertices;
+    std::vector<GLuint> indices;
+
+    for (uint32_t i = 0; i < obj->po->mesh.num_tris; ++i) {
+        dTri* t = &obj->po->mesh.tris[i];
+        indices.insert(indices.end(), {t->verts[0], t->verts[1], t->verts[2]});
+
+        for(int j = 0; j < 3; j++){
+            vertices.insert(vertices.end(), {glm::vec3(obj->po->mesh.verts[ t->verts[j] ]), glm::vec2(t->normal.x, t->normal.z)});
         }
     }
 
@@ -376,12 +410,13 @@ int main() {
     glUseProgram(ppshader);
     glUniform1i(glGetUniformLocation(ppshader, "screenTexture"), 0);
     
-//    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_BLEND);
 
     shaders["box"] = mkShader("box");
+    shaders["terrain"] = mkShader("terrain");
     textures["isqswjwki55a1.png"] = loadTexture("textures/isqswjwki55a1.png", true);
     textures["green_transparent_wireframe_box_64x64.png"] = loadTexture("textures/green_transparent_wireframe_box_64x64.png", false);
     glActiveTexture(GL_TEXTURE0);
@@ -420,11 +455,16 @@ int main() {
 //        ros.push_back(RenderObject(&spinningCube->components[i]));
 //        ros[ros.size() - 1].po->rot = glm::angleAxis(3.14, glm::dvec3(0.0001, 0.0, 0.9999)) * ros[ros.size() - 1].po->rot;
     }    
-    for(int i = 0; i < ros.size(); i++) {
-        upload_boxen_mesh(&ros[i]);
-        ros[i].shader = shaders["box"];
-        ros[i].texture = textures["isqswjwki55a1.png"];
-    }
+//    for(int i = 0; i < ros.size(); i++) {
+        upload_boxen_mesh(spinningCube->body.ro);
+        spinningCube->body.ro->shader = shaders["box"];
+        spinningCube->body.ro->texture = textures["isqswjwki55a1.png"];
+
+        upload_terrain_mesh(earth.body.ro);
+        earth.body.ro->shader = shaders["terrain"];
+        earth.body.ro->texture = textures["isqswjwki55a1.png"];
+
+//    }
 
 //    noisetest();
 //    ground->body.rot = glm::angleAxis(0.5, glm::dvec3(0.0, 0.0, 1.0)) * ground->body.rot;
@@ -449,7 +489,7 @@ int main() {
         }
 
         spinningCube->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 0.0, 1.0)) * spinningCube->body.rot;
-        earth.body.rot = glm::angleAxis(0.004, glm::dvec3(0.0, 0.0, 1.0)) * earth.body.rot;
+        earth.body.rot = glm::angleAxis(0.004, glm::dvec3(0.0, 1.0, 0.0)) * earth.body.rot;
        
         ctleaf l = ctleaf(&spinningCube->body);
         CollisionTree t = CollisionTree(dvec3(0.0), &l, 1);
