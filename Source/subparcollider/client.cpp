@@ -344,7 +344,7 @@ void render(RenderObject *obj) {
     glm::mat4 translation = glm::translate(glm::mat4(1.0f), obj->po->zoneSpacePosition());
     glm::mat4 rotation = glm::mat4(glm::quat(obj->po->rot));
     glm::mat4 view = glm::lookAt(glm::vec3(2,1.5,1.5), glm::vec3(0,0,0), glm::vec3(0,1,0));
-    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)screenwidth / (float)screenheight, 0.001f, 1e38f);
+    glm::mat4 projection = glm::perspective(glm::radians(90.0f), (float)screenwidth / (float)screenheight, 0.001f, 1e38f);
     glm::mat4 transform = projection * view * translation * rotation;
 
     glUseProgram(obj->shader);
@@ -376,7 +376,7 @@ int main() {
     glUseProgram(ppshader);
     glUniform1i(glGetUniformLocation(ppshader, "screenTexture"), 0);
     
-    glEnable(GL_DEPTH_TEST);
+//    glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_BLEND);
@@ -429,7 +429,8 @@ int main() {
 //    noisetest();
 //    ground->body.rot = glm::angleAxis(0.5, glm::dvec3(0.0, 0.0, 1.0)) * ground->body.rot;
 //    ground->body.pos += dvec3(0.0, -10000.0, 0.0);
-    earth.body.pos += dvec3(-2e6, -(6.371e6 + 10.0), 0.0);
+//    earth.body.pos += dvec3(-2e7, -2e7, -2e7);
+    earth.body.pos += dvec3(-1e7, -6e6, -6e6);
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
@@ -448,12 +449,13 @@ int main() {
         }
 
         spinningCube->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 0.0, 1.0)) * spinningCube->body.rot;
+        earth.body.rot = glm::angleAxis(0.004, glm::dvec3(0.0, 0.0, 1.0)) * earth.body.rot;
        
         ctleaf l = ctleaf(&spinningCube->body);
         CollisionTree t = CollisionTree(dvec3(0.0), &l, 1);
 
         std::vector<ctnode*> stack;
-        stack.push_back(t.root);
+//        stack.push_back(t.root);
         while(stack.size()){
             ctnode* node = stack[stack.size() - 1];
             stack.pop_back();

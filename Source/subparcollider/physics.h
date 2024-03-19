@@ -802,7 +802,7 @@ struct Celestial {
         seed = pseed;
         name = pname;
         terrain = TerrainTree(pseed, pradius);
-        body = PhysicsObject(terrain.buildMesh(dvec3(0,0,0), 3), NULL);
+        body = PhysicsObject(terrain.buildMesh(dvec3(0,0,0), 1), NULL);
         surface_temp_min = 183.0;
         surface_temp_max = 331.0;
         nearest_star = pnearest_star;
