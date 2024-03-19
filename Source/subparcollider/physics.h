@@ -37,7 +37,7 @@ struct mempool {
 };
 
 cacheline* mempool::alloc() {
-    assert(0); // using std::vectors this way causes segfaults, use malloc instead
+//    assert(0); // using std::vectors this way causes segfaults, use malloc instead
     if(recycler.size() > 0) {
         cacheline* rax = recycler.back();
         recycler.pop_back();
@@ -425,7 +425,7 @@ struct PhysicsObject {
         double greatestRsquared = 0.0;
         for(int i = 0; i < mesh.num_verts; i++){
             dvec3 lvalue = mesh.verts[i] - pos;
-            double rSquared = glm::length2(*(glm::dvec3 *)&lvalue);
+            double rSquared = glm::length2(lvalue);
             greatestRsquared = glm::max(greatestRsquared, rSquared);
         }
         return sqrt(greatestRsquared);
@@ -659,7 +659,6 @@ struct CollisionTree {
 
 };
 
-
 struct ttnode {
     uint32_t first_child;
     double elevation[3]; // elevation of the node's 3 corners
@@ -670,14 +669,19 @@ struct ttnode {
 
 struct TerrainTree {
     uint64_t seed;
+    double radius;
     TerrainGenerator *generator;
 
     std::vector<ttnode> nodes;
 
-    TerrainTree(uint64_t pseed) {
-        seed = pseed;
-        generator = new TerrainGenerator(seed, 1.0);
+    TerrainTree() {
+        bzero(this, sizeof(TerrainTree));
+    }
 
+    TerrainTree(uint64_t pseed, double pradius) {
+        seed = pseed;
+        radius = pradius;
+        generator = new TerrainGenerator(seed, radius);
         // 6 corners
         dvec3 initial_corners[6] = {
             dvec3(0.0, 1.0, 0.0),
@@ -687,7 +691,6 @@ struct TerrainTree {
             dvec3(0.0, 0.0, -1.0),
             dvec3(-1.0, 0.0, 0.0)
         };
-
         int indices[8][3] = {
             {0, 2, 3},
             {0, 3, 4},
@@ -698,7 +701,6 @@ struct TerrainTree {
             {1, 4, 3},
             {1, 3, 2},
         };
-
         for(int i = 0; i < 8; i++){
             nodes.push_back({ 0,
                     generator->getElevation(initial_corners[indices[i][0]]),
@@ -710,7 +712,6 @@ struct TerrainTree {
         }
     }
 
-
     // to keep things simple I will define a zone as a triangle at some reasonable subdivision level
     // (~1 km on earth's surface?)
     // and a zone's id will be encoded in a 64 bit unsigned integer
@@ -718,30 +719,31 @@ struct TerrainTree {
     // the next two bits encode which of the 4 subdivisions to traverse
     // 0 - 3: lat lon (0 - 90, 0 - 90), (0 - 90, 90 - 180), (0 - 90, 180 - 270), (0 - 90, 270 - 0)
     // 4 - 7: lat lon (-90 - 0, -90 - 0), (-90 - 0, 90 - 180), (-90 - 0, 180 - 270), (-90 - 0, 270 - 0)
-    // for every 2 additional bits we encode one more level of subdivision in clockwise order
+    // for every 2 additional bits we encode one more level of subdivision in clockwise order seen from above the
+    // nearest pole (so the northern hemisphere will be traversed west-east and the southern east-west)
     //
     // initially we can just ignore location and set max_subdivisions to something low like 2 or 3
 
-    void traverse(ttnode *node, std::vector<glm::dvec3> *verts, std::vector<dTri> *tris, int level, int max_level) {
+    void traverse(uint32_t node_idx, std::vector<glm::dvec3> *verts, std::vector<dTri> *tris, int level, int max_level) {
         if(level > max_level) {
             dTri t;
             dvec3 center = {0, 0, 0};
             for(int i = 0; i < 3; i++) {
                 t.verts[i] = verts->size();
-                // scaling each point to lie on the unit sphere and adding the elevation value
-                verts->push_back(node->verts[i] * (node->elevation[i] / node->verts[i].length()) );
-                center += node->verts[i];
+                // scaling each point to the surface of the spheroid and adding the elevation value
+                verts->push_back(nodes[node_idx].verts[i] * ((radius + nodes[node_idx].elevation[i]) / glm::length(nodes[node_idx].verts[i])) );
+                center += nodes[node_idx].verts[i];
             }
-            t.normal = center / center.length();
+            t.normal = center / glm::length(center);
             tris->push_back(t);
             return;
         } else {
-            if( ! node->first_child) {
-                node->first_child = (uint32_t)nodes.size();
+            if( ! nodes[node_idx].first_child) {
+                nodes[node_idx].first_child = (uint32_t)nodes.size();
                 dvec3 new_verts[3] = {
-                    (node->verts[0] + node->verts[1]) * 0.5,
-                    (node->verts[1] + node->verts[2]) * 0.5,
-                    (node->verts[2] + node->verts[0]) * 0.5};
+                    (nodes[node_idx].verts[0] + nodes[node_idx].verts[1]) * 0.5,
+                    (nodes[node_idx].verts[1] + nodes[node_idx].verts[2]) * 0.5,
+                    (nodes[node_idx].verts[2] + nodes[node_idx].verts[0]) * 0.5};
                 nodes.push_back({ 0,
                     generator->getElevation(new_verts[0]),
                     generator->getElevation(new_verts[1]),
@@ -749,19 +751,18 @@ struct TerrainTree {
                     new_verts[0],
                     new_verts[1],
                     new_verts[2] });
-
                 for(int i = 0; i < 3; i++) {
                     nodes.push_back({ 0,
+                        generator->getElevation(nodes[node_idx].verts[i]),
                         generator->getElevation(new_verts[i]),
-                        generator->getElevation(node->verts[i]),
-                        generator->getElevation(node->verts[i + 2 % 3]),
+                        generator->getElevation(new_verts[(i + 2) % 3]),
+                        nodes[node_idx].verts[i],
                         new_verts[i],
-                        new_verts[i],
-                        new_verts[i + 2 % 3] });
+                        new_verts[(i + 2) % 3] });
                 }
             }
             for(int i = 0; i < 4; i++) {
-                traverse(&nodes[node->first_child + i], verts, tris, level + 1, max_level);
+                traverse(nodes[node_idx].first_child + i, verts, tris, level + 1, max_level);
             }   
         }
     }
@@ -772,37 +773,39 @@ struct TerrainTree {
         std::vector<glm::dvec3> verts;
         std::vector<dTri> tris;
         for(int i = 0; i < 8; i++) {
-            traverse(&nodes[i], &verts, &tris, 1, max_subdivisions);
+            traverse(i, &verts, &tris, 1, max_subdivisions);
         }
         dvec3 *vertices = (dvec3*)malloc(verts.size() * sizeof(dvec3) + tris.size() * sizeof(dTri));
         dTri *triangles = (dTri*)&vertices[verts.size()];
+
+        memcpy(vertices, &verts[0], verts.size() * sizeof(dvec3));
+        memcpy(triangles, &tris[0], tris.size() * sizeof(dTri));
+
         return dMesh(vertices, verts.size(), triangles, tris.size());
     }
 };
 
 struct Celestial {
-    dvec3 pos;
-    dvec3 vel;
-    dvec3 rot;
-    dvec3 spin;
-    double mass;
-    double radius;
+    uint64_t seed;
+    std::string name;
+    PhysicsObject body;
+    TerrainTree terrain;
     double surface_temp_min;
     double surface_temp_max;
     vec9 radiance;
-
+    vec9 albedo;
     Celestial *nearest_star;
     std::vector<Celestial> orbiting_bodies;
 
-    
-
-    // opengl triangle winding order is by default counterclockwise so to preserve my sanity I will also order the
-    // faces of the octahedron and the subdivision of each face in counterclockwise order.
-    void octahedric() {
-        // top level: 2 hemispheres
-        // each level of subdivision: 4 triangles
-
-        
+    Celestial(uint64_t pseed, std::string pname, double pradius, Celestial *pnearest_star) {
+        bzero(this, sizeof(Celestial));
+        seed = pseed;
+        name = pname;
+        terrain = TerrainTree(pseed, pradius);
+        body = PhysicsObject(terrain.buildMesh(dvec3(0,0,0), 3), NULL);
+        surface_temp_min = 183.0;
+        surface_temp_max = 331.0;
+        nearest_star = pnearest_star;
     }
 };
 

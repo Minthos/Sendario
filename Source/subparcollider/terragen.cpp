@@ -97,7 +97,7 @@ TerrainGenerator::TerrainGenerator(int pseed, double pradius) {
 }
 
 double TerrainGenerator::getElevation(dvec3 pos) {
-    double length = pos.length();
+    double length = glm::length(pos);
     if(length <= 0.0){
         return 0.0;
     }

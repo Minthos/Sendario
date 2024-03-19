@@ -1,5 +1,5 @@
 #include "terragen.h"
-#include "physics.cpp"
+#include "physics.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -392,11 +392,11 @@ int main() {
 
     std::vector<Unit> units;
     std::vector<RenderObject> ros;
+    Celestial earth = Celestial(42, "Tellus", 6.371e6, NULL);
+
 
     units.push_back(Unit()); // 1
-    units.push_back(Unit()); // 1
     Unit *spinningCube = &units[0]; // 2
-    Unit *ground = &units[1]; // 2
     spinningCube->addComponent(dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0)); // 3
     spinningCube->addComponent(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 0.01));
     spinningCube->addComponent(dMesh::createBox(glm::dvec3(-1.2, 0.0, 0.0), 1.0, 0.05, 1.0));
@@ -404,14 +404,17 @@ int main() {
 
     
     //ground->addComponent(dMesh::createBox(glm::dvec3(0.0, -1.0, 0.0), 1.0, 1.0, 1.0)); // 3
-    ground->addComponent(dMesh::createTerrain(glm::dvec3(0.0, 0.0, 0.0), 42)); // 3
-    ground->bake(); // 4
+    //ground->addComponent(dMesh::createTerrain(glm::dvec3(0.0, 0.0, 0.0), 42)); // 3
+    
+    
+//    ground->addComponent(dMesh::createTerrain(glm::dvec3(0.0, 0.0, 0.0), 42)); // 3
+//    ground->bake(); // 4
 
 
     ros.push_back(RenderObject(&spinningCube->body)); // 5
-    ros.push_back(RenderObject(&ground->body)); // 5
+    ros.push_back(RenderObject(&earth.body)); // 5
     spinningCube->body.ro = &ros[0]; // 6
-    ground->body.ro = &ros[1]; // 6
+    earth.body.ro = &ros[1]; // 6
 
     for(int i = 0; i < spinningCube->components.size(); i++) {
 //        ros.push_back(RenderObject(&spinningCube->components[i]));
@@ -423,9 +426,10 @@ int main() {
         ros[i].texture = textures["isqswjwki55a1.png"];
     }
 
-    noisetest();
-    ground->body.rot = glm::angleAxis(0.5, glm::dvec3(0.0, 0.0, 1.0)) * ground->body.rot;
-    ground->body.pos += dvec3(0.0, -10000.0, 0.0);
+//    noisetest();
+//    ground->body.rot = glm::angleAxis(0.5, glm::dvec3(0.0, 0.0, 1.0)) * ground->body.rot;
+//    ground->body.pos += dvec3(0.0, -10000.0, 0.0);
+    earth.body.pos += dvec3(-2e6, -(6.371e6 + 10.0), 0.0);
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
@@ -434,7 +438,7 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 //        ground->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * ground->body.rot;
-        render(ground->body.ro);
+        render(earth.body.ro);
 
         if((frames_rendered / 800) % 2){
 //            spinningCube->body.rot = glm::angleAxis(-0.000001, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
