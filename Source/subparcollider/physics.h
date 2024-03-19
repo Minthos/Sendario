@@ -661,13 +661,13 @@ struct TerrainTree {
     // initially we can just ignore location and set max_subdivisions to something low like 2 or 3
 
     void traverse(dvec3 location, uint32_t node_idx, std::vector<glm::dvec3> *verts, std::vector<dTri> *tris, int level, int max_level) {
-        double noise_yscaling = 1000.0;
+        double noise_yscaling = 2000.0;
         double noise_xzscaling = 0.0001;
         if(level > max_level) {
             double distance2 = glm::length2(location - nodes[node_idx].verts[0]);
             double nodeWidth2 = glm::length2(nodes[node_idx].verts[0] - nodes[node_idx].verts[1]);
             double ratio = distance2 / nodeWidth2;
-            if(ratio > 100.0 || level > 16) {
+            if(ratio > 100.0 || level > 18) {
                 dTri t;
                 dvec3 center = {0, 0, 0};
                 for(int i = 0; i < 3; i++) {

@@ -60,7 +60,9 @@ TerrainGenerator::TerrainGenerator(int pseed) {
 }
 
 double TerrainGenerator::getElevation(dvec3 pos) {
-    return fnFractal->GenSingle3D(seed, pos.x, pos.y, pos.z);
+    double elevation = fnFractal->GenSingle3D(seed, pos.x, pos.y, pos.z);
+    double roughness = fnFractal->GenSingle3D(~seed, pos.z, pos.x, pos.y);
+    return elevation * (glm::max(roughness, -0.2) + 0.2);
 }
 
 
