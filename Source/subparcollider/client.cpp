@@ -384,8 +384,8 @@ void render(RenderObject *obj) {
     glm::mat4 translation = glm::translate(glm::mat4(1.0f), obj->po->zoneSpacePosition());
     glm::mat4 rotation = glm::mat4(glm::quat(obj->po->rot));
 //    glm::mat4 view = glm::lookAt(glm::vec3(20.00,15,15), glm::vec3(0,0,0), glm::vec3(0,1,0));
-//    glm::mat4 view = glm::lookAt(glm::vec3(200.00,150,150), glm::vec3(0,0,0), glm::vec3(0,1,0));
-    glm::mat4 view = glm::lookAt(glm::vec3(1000.00,750,750), glm::vec3(0,0,0), glm::vec3(0,1,0));
+    glm::mat4 view = glm::lookAt(glm::vec3(400.00,350,250), glm::vec3(0,0,0), glm::vec3(0,1,0));
+//    glm::mat4 view = glm::lookAt(glm::vec3(1000.00,750,750), glm::vec3(0,0,0), glm::vec3(0,1,0));
 //    glm::mat4 view = glm::lookAt(glm::vec3(200000.00,150000,150000), glm::vec3(0,0,0), glm::vec3(0,1,0));
     glm::mat4 projection = glm::perspective(glm::radians(90.0f), (float)screenwidth / (float)screenheight, 0.001f, 1e38f);
     glm::mat4 transform = projection * view * translation * rotation;
