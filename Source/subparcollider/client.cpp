@@ -433,7 +433,7 @@ int main() {
 
     std::vector<Unit> units;
     std::vector<RenderObject> ros;
-    Celestial earth = Celestial(42, "Tellus", 6.372e6, NULL);
+    Celestial earth = Celestial(42, "Tellus", 6.371e6, NULL);
 
 
     units.push_back(Unit()); // 1
@@ -476,7 +476,7 @@ int main() {
 //    ground->body.rot = glm::angleAxis(0.5, glm::dvec3(0.0, 0.0, 1.0)) * ground->body.rot;
 //    ground->body.pos += dvec3(0.0, -10000.0, 0.0);
 //    earth.body.pos += dvec3(-2e7, -2e7, -2e7);
-    earth.body.pos += dvec3(0, -6.370e6, 0);
+    earth.body.pos += dvec3(0, -6.371e6, 0);
 //    earth.body.rot = glm::angleAxis(-1.0, glm::dvec3(0.0, 0.0, 1.0)) * earth.body.rot;
 //    earth.body.rot = glm::angleAxis(-0.8, glm::dvec3(0.0, 1.0, 0.0)) * earth.body.rot;
 
