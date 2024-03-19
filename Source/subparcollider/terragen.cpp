@@ -53,8 +53,9 @@ gas giant - crushing atmosphere, no surface (jupiter, saturn)
 
 */
 
-TerrainGenerator::TerrainGenerator(int pseed) {
+TerrainGenerator::TerrainGenerator(int pseed, float proughness) {
     seed = pseed;
+    roughness = proughness;
     fnFractal->SetSource( fnSimplex );
     fnFractal->SetOctaveCount( 5 );
 }
@@ -81,7 +82,7 @@ void TerrainGenerator::getMultiple(float *elevations, vec3 *scaled_verts, int nu
     fnFractal->GenPositionArray3D(elevations, num, xs, ys, zs, 0, 0, 0, seed);
     fnFractal->GenPositionArray3D(roughnesses, num, zs, xs, ys, 0, 0, 0, ~seed ^ 0xF0F0F0F0F0F0);
     for(int i = 0; i < 6; i++) {
-        elevations[i] = elevations[i] * (glm::max(roughnesses[i], -0.2f) + 0.2f);
+        elevations[i] = elevations[i] * (glm::max(roughnesses[i], -roughness) + roughness);
     }
 }
 

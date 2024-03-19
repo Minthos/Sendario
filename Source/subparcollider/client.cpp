@@ -436,7 +436,8 @@ int main() {
 
     std::vector<Unit> units;
     std::vector<RenderObject> ros;
-    Celestial earth = Celestial(42, "Tellus", 6.371e6, NULL);
+    // seed, name, radius, roughness, parent body
+    Celestial glitch = Celestial(42, "Glitch", 6.371e6, -0.0, NULL);
 
 
     units.push_back(Unit()); // 1
@@ -456,9 +457,9 @@ int main() {
 
 
     ros.push_back(RenderObject(&spinningCube->body)); // 5
-    ros.push_back(RenderObject(&earth.body)); // 5
+    ros.push_back(RenderObject(&glitch.body)); // 5
     spinningCube->body.ro = &ros[0]; // 6
-    earth.body.ro = &ros[1]; // 6
+    glitch.body.ro = &ros[1]; // 6
 
     for(int i = 0; i < spinningCube->components.size(); i++) {
 //        ros.push_back(RenderObject(&spinningCube->components[i]));
@@ -469,19 +470,19 @@ int main() {
         spinningCube->body.ro->shader = shaders["box"];
         spinningCube->body.ro->texture = textures["isqswjwki55a1.png"];
 
-        upload_terrain_mesh(earth.body.ro);
-        earth.body.ro->shader = shaders["terrain"];
-        earth.body.ro->texture = textures["isqswjwki55a1.png"];
+        upload_terrain_mesh(glitch.body.ro);
+        glitch.body.ro->shader = shaders["terrain"];
+        glitch.body.ro->texture = textures["isqswjwki55a1.png"];
 
 //    }
 
 //    noisetest();
 //    ground->body.rot = glm::angleAxis(0.5, glm::dvec3(0.0, 0.0, 1.0)) * ground->body.rot;
 //    ground->body.pos += dvec3(0.0, -10000.0, 0.0);
-//    earth.body.pos += dvec3(-2e7, -2e7, -2e7);
-//    earth.body.pos += dvec3(0, -6.371e6, 0);
-//    earth.body.rot = glm::angleAxis(-1.0, glm::dvec3(0.0, 0.0, 1.0)) * earth.body.rot;
-//    earth.body.rot = glm::angleAxis(-0.8, glm::dvec3(0.0, 1.0, 0.0)) * earth.body.rot;
+//    glitch.body.pos += dvec3(-2e7, -2e7, -2e7);
+//    glitch.body.pos += dvec3(0, -6.371e6, 0);
+//    glitch.body.rot = glm::angleAxis(-1.0, glm::dvec3(0.0, 0.0, 1.0)) * glitch.body.rot;
+//    glitch.body.rot = glm::angleAxis(-0.8, glm::dvec3(0.0, 1.0, 0.0)) * glitch.body.rot;
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
@@ -490,7 +491,7 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 //        ground->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * ground->body.rot;
-        render(earth.body.ro);
+        render(glitch.body.ro);
 
         if((frames_rendered / 800) % 2){
 //            spinningCube->body.rot = glm::angleAxis(-0.000001, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
@@ -500,8 +501,8 @@ int main() {
         }
 
         spinningCube->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 0.0, 1.0)) * spinningCube->body.rot;
-        //earth.body.rot = glm::normalize(glm::angleAxis(0.004, glm::dvec3(0.4, 0.4, 0.4)) * earth.body.rot);
-        earth.body.rot = glm::normalize(glm::angleAxis(0.0004, glm::dvec3(0.0, 1.0, 0.0)) * earth.body.rot);
+        //glitch.body.rot = glm::normalize(glm::angleAxis(0.004, glm::dvec3(0.4, 0.4, 0.4)) * glitch.body.rot);
+        glitch.body.rot = glm::normalize(glm::angleAxis(0.0004, glm::dvec3(0.0, 1.0, 0.0)) * glitch.body.rot);
        
         ctleaf l = ctleaf(&spinningCube->body);
         CollisionTree t = CollisionTree(dvec3(0.0), &l, 1);

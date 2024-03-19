@@ -614,10 +614,10 @@ struct TerrainTree {
         bzero(this, sizeof(TerrainTree));
     }
 
-    TerrainTree(uint64_t pseed, double pradius) {
+    TerrainTree(uint64_t pseed, double pradius, float roughness) {
         seed = pseed;
         radius = pradius;
-        generator = new TerrainGenerator(seed);
+        generator = new TerrainGenerator(seed, roughness);
         // 6 corners
         dvec3 initial_corners[6] = {
             dvec3(0.0, radius, 0.0),
@@ -751,11 +751,11 @@ struct Celestial {
     Celestial *nearest_star;
     std::vector<Celestial> orbiting_bodies;
 
-    Celestial(uint64_t pseed, std::string pname, double pradius, Celestial *pnearest_star) {
+    Celestial(uint64_t pseed, std::string pname, double pradius, float proughness, Celestial *pnearest_star) {
         bzero(this, sizeof(Celestial));
         seed = pseed;
         name = pname;
-        terrain = TerrainTree(pseed, pradius);
+        terrain = TerrainTree(pseed, pradius, proughness);
         auto time_begin = now();
         std::cout << "Generating mesh..\n";
         body = PhysicsObject(terrain.buildMesh(dvec3(0, 6.37101e6, 0), 5), NULL);
