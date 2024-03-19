@@ -65,4 +65,20 @@ double TerrainGenerator::getElevation(dvec3 pos) {
     return elevation * (glm::max(roughness, -0.2) + 0.2);
 }
 
+/*
+void TerrainGenerator::getMultiple() {
+    
+    GenPositionArray3D(
+            float* noiseOut,
+            int count,
+            const float* xPosArray,
+            const float* yPosArray,
+            const float* zPosArray,
+            float xOffset,
+            float yOffset,
+            float zOffset,
+            int seed );
+
+}
+*/
 

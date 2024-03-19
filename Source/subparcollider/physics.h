@@ -692,18 +692,25 @@ struct TerrainTree {
                 (nodes[node_idx].verts[0] + nodes[node_idx].verts[1]) * 0.5,
                 (nodes[node_idx].verts[1] + nodes[node_idx].verts[2]) * 0.5,
                 (nodes[node_idx].verts[2] + nodes[node_idx].verts[0]) * 0.5};
-            nodes.push_back({ 0,
+            double elevations[6] = {
                 generator->getElevation(new_verts[0] * noise_xzscaling),
                 generator->getElevation(new_verts[1] * noise_xzscaling),
                 generator->getElevation(new_verts[2] * noise_xzscaling),
+                generator->getElevation(nodes[node_idx].verts[0] * noise_xzscaling),
+                generator->getElevation(nodes[node_idx].verts[1] * noise_xzscaling),
+                generator->getElevation(nodes[node_idx].verts[2] * noise_xzscaling)};
+            nodes.push_back({ 0,
+                elevations[0],
+                elevations[1],
+                elevations[2],
                 new_verts[0],
                 new_verts[1],
                 new_verts[2] });
             for(int i = 0; i < 3; i++) {
                 nodes.push_back({ 0,
-                    generator->getElevation(nodes[node_idx].verts[i] * noise_xzscaling),
-                    generator->getElevation(new_verts[i] * noise_xzscaling),
-                    generator->getElevation(new_verts[(i + 2) % 3] * noise_xzscaling),
+                    elevations[i + 3],
+                    elevations[i],
+                    elevations[((i + 2) % 3)],
                     nodes[node_idx].verts[i],
                     new_verts[i],
                     new_verts[(i + 2) % 3] });
