@@ -665,14 +665,14 @@ struct TerrainTree {
             double distance2 = glm::length2(location - nodes[node_idx].verts[0]);
             double nodeWidth2 = glm::length2(nodes[node_idx].verts[0] - nodes[node_idx].verts[1]);
             double ratio = distance2 / nodeWidth2;
-            if(ratio > 100.0 || level > 40) {
+            if(ratio > 400.0 || level > 50) {
                 dTri t;
                 dvec3 center = {0, 0, 0};
                 for(int i = 0; i < 3; i++) {
                     t.verts[i] = verts->size();
                     // scaling each point to the surface of the spheroid and adding the elevation value
                     verts->push_back(nodes[node_idx].verts[i] *
-                            ((radius * 0.99999 + 0.00001 * radius * nodes[node_idx].elevation[i]) / glm::length(nodes[node_idx].verts[i])) );
+                            ((radius * 0.9999999 + 0.0000001 * radius * nodes[node_idx].elevation[i]) / glm::length(nodes[node_idx].verts[i])) );
                     center += nodes[node_idx].verts[i];
                 }
                 t.normal = center / glm::length(center);
@@ -744,7 +744,7 @@ struct Celestial {
         terrain = TerrainTree(pseed, pradius);
         auto time_begin = now();
         std::cout << "Generating mesh..\n";
-        body = PhysicsObject(terrain.buildMesh(dvec3(0, 6.372e6, 0), 5), NULL);
+        body = PhysicsObject(terrain.buildMesh(dvec3(0, 6.37101e6, 0), 5), NULL);
         auto time_used = std::chrono::duration_cast<std::chrono::microseconds>(now() - time_begin).count();
         std::cout << "Celestial " << name << ": " << body.mesh.num_tris << " triangles procedurally generated in " << time_used/1000.0 << "ms\n";
         surface_temp_min = 183.0;
