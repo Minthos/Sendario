@@ -672,7 +672,7 @@ struct TerrainTree {
                     t.verts[i] = verts->size();
                     // scaling each point to the surface of the spheroid and adding the elevation value
                     verts->push_back(nodes[node_idx].verts[i] *
-                            ((radius * 0.99 + 0.01 * radius * nodes[node_idx].elevation[i]) / glm::length(nodes[node_idx].verts[i])) );
+                            ((radius * 0.99999 + 0.00001 * radius * nodes[node_idx].elevation[i]) / glm::length(nodes[node_idx].verts[i])) );
                     center += nodes[node_idx].verts[i];
                 }
                 t.normal = center / glm::length(center);
