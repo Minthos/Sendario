@@ -661,8 +661,8 @@ struct TerrainTree {
     // initially we can just ignore location and set max_subdivisions to something low like 2 or 3
 
     void traverse(dvec3 location, uint32_t node_idx, std::vector<glm::dvec3> *verts, std::vector<dTri> *tris, int level, int max_level) {
-        double noise_yscaling = 2000.0;
-        double noise_xzscaling = 0.0001;
+        float noise_yscaling = 2000.0;
+        float noise_xzscaling = 0.0001;
         if(level > max_level) {
             double distance2 = glm::length2(location - nodes[node_idx].verts[0]);
             double nodeWidth2 = glm::length2(nodes[node_idx].verts[0] - nodes[node_idx].verts[1]);
@@ -692,7 +692,7 @@ struct TerrainTree {
                 (nodes[node_idx].verts[0] + nodes[node_idx].verts[1]) * 0.5,
                 (nodes[node_idx].verts[1] + nodes[node_idx].verts[2]) * 0.5,
                 (nodes[node_idx].verts[2] + nodes[node_idx].verts[0]) * 0.5};
-            double elevations[6] = {
+            float elevations[6] = {
                 generator->getElevation(new_verts[0] * noise_xzscaling),
                 generator->getElevation(new_verts[1] * noise_xzscaling),
                 generator->getElevation(new_verts[2] * noise_xzscaling),

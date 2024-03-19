@@ -13,7 +13,7 @@ class TerrainGenerator {
 
 public:
     TerrainGenerator(int pseed);
-    double getElevation(dvec3 pos);
+    float getElevation(dvec3 pos);
 };
 
 
