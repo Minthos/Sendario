@@ -665,7 +665,7 @@ struct TerrainTree {
             double distance2 = glm::length2(location - nodes[node_idx].verts[0]);
             double nodeWidth2 = glm::length2(nodes[node_idx].verts[0] - nodes[node_idx].verts[1]);
             double ratio = distance2 / nodeWidth2;
-            if(ratio > 1000.0) {
+            if(ratio > 100.0) {
                 dTri t;
                 dvec3 center = {0, 0, 0};
                 for(int i = 0; i < 3; i++) {
@@ -708,15 +708,12 @@ struct TerrainTree {
         }
     }
 
-    // TODO high priority
-    // use distance from node to location to determine max subdivision level for that node
-    // for this calculation double precision is precise enough even at planetary scale
     dMesh buildMesh(dvec3 location, int max_subdivisions) {
         std::vector<uint32_t> node_indices;
         std::vector<glm::dvec3> verts;
         std::vector<dTri> tris;
         for(int i = 0; i < 8; i++) {
-            traverse(location / radius, i, &verts, &tris, 1, max_subdivisions);
+            traverse(location, i, &verts, &tris, 1, max_subdivisions);
         }
         dvec3 *vertices = (dvec3*)malloc(verts.size() * sizeof(dvec3) + tris.size() * sizeof(dTri));
         dTri *triangles = (dTri*)&vertices[verts.size()];
@@ -747,13 +744,17 @@ struct Celestial {
         terrain = TerrainTree(pseed, pradius);
         auto time_begin = now();
         std::cout << "Generating mesh..\n";
-        body = PhysicsObject(terrain.buildMesh(dvec3(0, 6.4e6, 0), 5), NULL);
+        body = PhysicsObject(terrain.buildMesh(dvec3(0, 6.372e6, 0), 5), NULL);
         auto time_used = std::chrono::duration_cast<std::chrono::microseconds>(now() - time_begin).count();
         std::cout << "Celestial " << name << ": " << body.mesh.num_tris << " triangles procedurally generated in " << time_used/1000.0 << "ms\n";
         surface_temp_min = 183.0;
         surface_temp_max = 331.0;
         nearest_star = pnearest_star;
     }
+
+//    void redrawMesh(dvec3 vantage_point) {
+//        body.mesh = terrain.buildMesh(vantage_point, 5);
+//    }
 };
 
 struct Zone {
