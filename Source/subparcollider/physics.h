@@ -673,7 +673,6 @@ struct TerrainTree {
                 for(int i = 0; i < 3; i++) {
                     t.verts[i] = verts->size();
                     // scaling each point to the surface of the spheroid and adding the elevation value
-                    //verts->push_back(nodes[node_idx].verts[i] * ((radius * 0.9999999 + 0.0000001 * radius * nodes[node_idx].elevation[i]) / glm::length(nodes[node_idx].verts[i])) );
                     glm::vec3 point = nodes[node_idx].verts[i];
                     double length = glm::length(point);
                     point = point * (radius / length);
@@ -692,13 +691,15 @@ struct TerrainTree {
                 (nodes[node_idx].verts[0] + nodes[node_idx].verts[1]) * 0.5,
                 (nodes[node_idx].verts[1] + nodes[node_idx].verts[2]) * 0.5,
                 (nodes[node_idx].verts[2] + nodes[node_idx].verts[0]) * 0.5};
-            float elevations[6] = {
-                generator->getElevation(new_verts[0] * noise_xzscaling),
-                generator->getElevation(new_verts[1] * noise_xzscaling),
-                generator->getElevation(new_verts[2] * noise_xzscaling),
-                generator->getElevation(nodes[node_idx].verts[0] * noise_xzscaling),
-                generator->getElevation(nodes[node_idx].verts[1] * noise_xzscaling),
-                generator->getElevation(nodes[node_idx].verts[2] * noise_xzscaling)};
+            vec3 scaled_verts[6] = {
+                new_verts[0] * noise_xzscaling,
+                new_verts[1] * noise_xzscaling,
+                new_verts[2] * noise_xzscaling,
+                nodes[node_idx].verts[0] * noise_xzscaling,
+                nodes[node_idx].verts[1] * noise_xzscaling,
+                nodes[node_idx].verts[2] * noise_xzscaling};
+            float elevations[6];
+            generator->getMultiple(elevations, scaled_verts, 6);
             nodes.push_back({ 0,
                 elevations[0],
                 elevations[1],
