@@ -228,8 +228,15 @@ void upload_terrain_mesh(RenderObject *obj) {
         dTri* t = &obj->po->mesh.tris[i];
         indices.insert(indices.end(), {t->verts[0], t->verts[1], t->verts[2]});
 
+        glm::vec3 floatverts[3] = {
+            glm::vec3(obj->po->mesh.verts[ t->verts[0] ]),
+            glm::vec3(obj->po->mesh.verts[ t->verts[1] ]),
+            glm::vec3(obj->po->mesh.verts[ t->verts[2] ])};
+
+        glm::vec3 normal = glm::normalize(glm::cross(floatverts[1] - floatverts[0], floatverts[2] - floatverts[0]));
+
         for(int j = 0; j < 3; j++){
-            vertices.insert(vertices.end(), {glm::vec3(obj->po->mesh.verts[ t->verts[j] ]), glm::vec2(t->normal.x, t->normal.z)});
+            vertices.insert(vertices.end(), {floatverts[j], glm::vec2(normal.x, normal.z)});
         }
     }
 

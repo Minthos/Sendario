@@ -620,12 +620,12 @@ struct TerrainTree {
         generator = new TerrainGenerator(seed);
         // 6 corners
         dvec3 initial_corners[6] = {
-            dvec3(0.0, 1.0, 0.0),
-            dvec3(0.0, -1.0, 0.0),
-            dvec3(0.0, 0.0, 1.0),
-            dvec3(1.0, 0.0, 0.0),
-            dvec3(0.0, 0.0, -1.0),
-            dvec3(-1.0, 0.0, 0.0)
+            dvec3(0.0, radius, 0.0),
+            dvec3(0.0, -radius, 0.0),
+            dvec3(0.0, 0.0, radius),
+            dvec3(radius, 0.0, 0.0),
+            dvec3(0.0, 0.0, -radius),
+            dvec3(-radius, 0.0, 0.0)
         };
         int indices[8][3] = {
             {0, 2, 3},
@@ -662,51 +662,49 @@ struct TerrainTree {
 
     void traverse(dvec3 location, uint32_t node_idx, std::vector<glm::dvec3> *verts, std::vector<dTri> *tris, int level, int max_level) {
         if(level > max_level) {
-            dTri t;
-            dvec3 center = {0, 0, 0};
-            for(int i = 0; i < 3; i++) {
-                t.verts[i] = verts->size();
-                // scaling each point to the surface of the spheroid and adding the elevation value
-                verts->push_back(nodes[node_idx].verts[i] * ((radius + nodes[node_idx].elevation[i]) / glm::length(nodes[node_idx].verts[i])) );
-                center += nodes[node_idx].verts[i];
-            }
-            t.normal = center / glm::length(center);
-            tris->push_back(t);
-            return;
-        } else {
-            if( ! nodes[node_idx].first_child) {
-                nodes[node_idx].first_child = (uint32_t)nodes.size();
-                dvec3 new_verts[3] = {
-                    (nodes[node_idx].verts[0] + nodes[node_idx].verts[1]) * 0.5,
-                    (nodes[node_idx].verts[1] + nodes[node_idx].verts[2]) * 0.5,
-                    (nodes[node_idx].verts[2] + nodes[node_idx].verts[0]) * 0.5};
-                nodes.push_back({ 0,
-                    generator->getElevation(new_verts[0]),
-                    generator->getElevation(new_verts[1]),
-                    generator->getElevation(new_verts[2]),
-                    new_verts[0],
-                    new_verts[1],
-                    new_verts[2] });
-                for(int i = 0; i < 3; i++) {
-                    nodes.push_back({ 0,
-                        generator->getElevation(nodes[node_idx].verts[i]),
-                        generator->getElevation(new_verts[i]),
-                        generator->getElevation(new_verts[(i + 2) % 3]),
-                        nodes[node_idx].verts[i],
-                        new_verts[i],
-                        new_verts[(i + 2) % 3] });
-                }
-            }
             double distance2 = glm::length2(location - nodes[node_idx].verts[0]);
             double nodeWidth2 = glm::length2(nodes[node_idx].verts[0] - nodes[node_idx].verts[1]);
             double ratio = distance2 / nodeWidth2;
-            int adjusted_level = level + 1;
-            if(ratio > 1.0){
-                adjusted_level = max_level + 1;
+            if(ratio > 1000.0) {
+                dTri t;
+                dvec3 center = {0, 0, 0};
+                for(int i = 0; i < 3; i++) {
+                    t.verts[i] = verts->size();
+                    // scaling each point to the surface of the spheroid and adding the elevation value
+                    verts->push_back(nodes[node_idx].verts[i] *
+                            ((radius * 0.99 + 0.01 * radius * nodes[node_idx].elevation[i]) / glm::length(nodes[node_idx].verts[i])) );
+                    center += nodes[node_idx].verts[i];
+                }
+                t.normal = center / glm::length(center);
+                tris->push_back(t);
+                return;
             }
-            for(int i = 0; i < 4; i++) {
-                traverse(location, nodes[node_idx].first_child + i, verts, tris, adjusted_level, max_level);
-            }   
+        }
+        if( ! nodes[node_idx].first_child) {
+            nodes[node_idx].first_child = (uint32_t)nodes.size();
+            dvec3 new_verts[3] = {
+                (nodes[node_idx].verts[0] + nodes[node_idx].verts[1]) * 0.5,
+                (nodes[node_idx].verts[1] + nodes[node_idx].verts[2]) * 0.5,
+                (nodes[node_idx].verts[2] + nodes[node_idx].verts[0]) * 0.5};
+            nodes.push_back({ 0,
+                generator->getElevation(new_verts[0]),
+                generator->getElevation(new_verts[1]),
+                generator->getElevation(new_verts[2]),
+                new_verts[0],
+                new_verts[1],
+                new_verts[2] });
+            for(int i = 0; i < 3; i++) {
+                nodes.push_back({ 0,
+                    generator->getElevation(nodes[node_idx].verts[i]),
+                    generator->getElevation(new_verts[i]),
+                    generator->getElevation(new_verts[(i + 2) % 3]),
+                    nodes[node_idx].verts[i],
+                    new_verts[i],
+                    new_verts[(i + 2) % 3] });
+            }
+        }
+        for(int i = 0; i < 4; i++) {
+            traverse(location, nodes[node_idx].first_child + i, verts, tris, level + 1, max_level);
         }
     }
 
@@ -749,7 +747,7 @@ struct Celestial {
         terrain = TerrainTree(pseed, pradius);
         auto time_begin = now();
         std::cout << "Generating mesh..\n";
-        body = PhysicsObject(terrain.buildMesh(dvec3(0, 6.4e6, 0), 7), NULL);
+        body = PhysicsObject(terrain.buildMesh(dvec3(0, 6.4e6, 0), 5), NULL);
         auto time_used = std::chrono::duration_cast<std::chrono::microseconds>(now() - time_begin).count();
         std::cout << "Celestial " << name << ": " << body.mesh.num_tris << " triangles procedurally generated in " << time_used/1000.0 << "ms\n";
         surface_temp_min = 183.0;
