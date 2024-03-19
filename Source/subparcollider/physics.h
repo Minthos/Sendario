@@ -661,21 +661,27 @@ struct TerrainTree {
     // initially we can just ignore location and set max_subdivisions to something low like 2 or 3
 
     void traverse(dvec3 location, uint32_t node_idx, std::vector<glm::dvec3> *verts, std::vector<dTri> *tris, int level, int max_level) {
+        double noise_yscaling = 1000.0;
+        double noise_xzscaling = 0.0001;
         if(level > max_level) {
             double distance2 = glm::length2(location - nodes[node_idx].verts[0]);
             double nodeWidth2 = glm::length2(nodes[node_idx].verts[0] - nodes[node_idx].verts[1]);
             double ratio = distance2 / nodeWidth2;
-            if(ratio > 400.0 || level > 50) {
+            if(ratio > 100.0 || level > 16) {
                 dTri t;
                 dvec3 center = {0, 0, 0};
                 for(int i = 0; i < 3; i++) {
                     t.verts[i] = verts->size();
                     // scaling each point to the surface of the spheroid and adding the elevation value
-                    verts->push_back(nodes[node_idx].verts[i] *
-                            ((radius * 0.9999999 + 0.0000001 * radius * nodes[node_idx].elevation[i]) / glm::length(nodes[node_idx].verts[i])) );
-                    center += nodes[node_idx].verts[i];
+                    //verts->push_back(nodes[node_idx].verts[i] * ((radius * 0.9999999 + 0.0000001 * radius * nodes[node_idx].elevation[i]) / glm::length(nodes[node_idx].verts[i])) );
+                    glm::vec3 point = nodes[node_idx].verts[i];
+                    double length = glm::length(point);
+                    point = point * (radius / length);
+                    point = point - location + ((nodes[node_idx].elevation[i] * noise_yscaling) * (point / length));
+                    verts->push_back(point);
+                    center += point;
                 }
-                t.normal = center / glm::length(center);
+                t.normal = glm::normalize(center);
                 tris->push_back(t);
                 return;
             }
@@ -687,17 +693,17 @@ struct TerrainTree {
                 (nodes[node_idx].verts[1] + nodes[node_idx].verts[2]) * 0.5,
                 (nodes[node_idx].verts[2] + nodes[node_idx].verts[0]) * 0.5};
             nodes.push_back({ 0,
-                generator->getElevation(new_verts[0]),
-                generator->getElevation(new_verts[1]),
-                generator->getElevation(new_verts[2]),
+                generator->getElevation(new_verts[0] * noise_xzscaling),
+                generator->getElevation(new_verts[1] * noise_xzscaling),
+                generator->getElevation(new_verts[2] * noise_xzscaling),
                 new_verts[0],
                 new_verts[1],
                 new_verts[2] });
             for(int i = 0; i < 3; i++) {
                 nodes.push_back({ 0,
-                    generator->getElevation(nodes[node_idx].verts[i]),
-                    generator->getElevation(new_verts[i]),
-                    generator->getElevation(new_verts[(i + 2) % 3]),
+                    generator->getElevation(nodes[node_idx].verts[i] * noise_xzscaling),
+                    generator->getElevation(new_verts[i] * noise_xzscaling),
+                    generator->getElevation(new_verts[(i + 2) % 3] * noise_xzscaling),
                     nodes[node_idx].verts[i],
                     new_verts[i],
                     new_verts[(i + 2) % 3] });
