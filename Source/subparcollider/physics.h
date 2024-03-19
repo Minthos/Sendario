@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <boost/align/aligned_allocator.hpp>
+#include <chrono>
 #include <deque>
 #include <iostream>
 #include <vector>
@@ -15,7 +16,7 @@
 #include <glm/gtx/norm.hpp>
 
 using std::string;
-
+auto now = std::chrono::high_resolution_clock::now;
 using glm::dvec3;
 using glm::vec3;
 using glm::dmat4;
@@ -745,7 +746,11 @@ struct Celestial {
         seed = pseed;
         name = pname;
         terrain = TerrainTree(pseed, pradius);
-        body = PhysicsObject(terrain.buildMesh(dvec3(0,0,0), 1), NULL);
+        auto time_begin = now();
+        std::cout << "Generating mesh..\n";
+        body = PhysicsObject(terrain.buildMesh(dvec3(0,0,0), 5), NULL);
+        auto time_used = std::chrono::duration_cast<std::chrono::microseconds>(now() - time_begin).count();
+        std::cout << "Celestial " << name << ": " << body.mesh.num_tris << " triangles procedurally generated in " << time_used/1000.0 << "ms\n";
         surface_temp_min = 183.0;
         surface_temp_max = 331.0;
         nearest_star = pnearest_star;

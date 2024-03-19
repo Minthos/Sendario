@@ -27,7 +27,6 @@ int motion_blur_mode = 0; // 0 = off, 1 = nonlinear (sharp), 2 = linear (blurry)
 float motion_blur_invstr = 5.0f; // motion blur amount. 1.0 = very high. 5.0 = low.
 
 
-auto now = std::chrono::high_resolution_clock::now;
 using std::string;
 
 std::unordered_map<string, GLuint> shaders;
