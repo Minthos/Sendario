@@ -240,6 +240,8 @@ void upload_terrain_mesh(RenderObject *obj, Celestial *celestial) {
 
         for(int j = 0; j < 3; j++){
             //vertices.insert(vertices.end(), {floatverts[j], glm::vec2(normal.x, normal.z)});
+            
+
             vertices.insert(vertices.end(), {floatverts[j], glm::vec2(inclination, insolation)});
         }
     }

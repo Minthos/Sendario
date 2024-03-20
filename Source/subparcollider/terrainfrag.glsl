@@ -24,8 +24,8 @@ void main() {
     float inclination = texCoord.x / pi;
     float insolation = texCoord.y * 0.5 + 0.5;
 
-//    vec3 color = mix(vec3(0.2, 0.8, 0.2), vec3(0.3, 0.3, 0.3), inclination);
-    vec3 color = vec3(1.0);
+    vec3 color = mix(vec3(0.15, 0.4, 0.15), vec3(0.7, 0.5, 0.3), max(0.0, min(1.0, -0.5 + 5 * inclination)));
+//    vec3 color = vec3(1.0);
     fragColor = vec4(color * insolation, 1.0);
   
 
