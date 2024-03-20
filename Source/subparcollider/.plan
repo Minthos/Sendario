@@ -1,5 +1,10 @@
 TODO:
 
+1. Identify which nodes of the terrain will be rendered at a higher LOD than their neighboring nodes
+2. Ignore the real elevation for those nodes, instead use the average of the corner nodes that created the edge node
+3. This seems like a two-pass algorithm
+
+
 1. Generate some terrain
  - voronoi cellular noise tectonic plates and random noise heightmaps to begin with?
 

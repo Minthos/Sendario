@@ -597,6 +597,7 @@ struct CollisionTree {
 
 struct ttnode {
     uint32_t first_child;
+    uint32_t rendered_at_level; // number of subdivisions to reach this node, if it was rendered. otherwise 0.
     double elevation[3]; // elevation of the node's 3 corners
     dvec3 verts[3]; // vertices on the unit sphere
 
@@ -638,7 +639,7 @@ struct TerrainTree {
             {1, 3, 2},
         };
         for(int i = 0; i < 8; i++){
-            nodes.push_back({ 0,
+            nodes.push_back({ 0, 0,
                     generator->getElevation(initial_corners[indices[i][0]]),
                     generator->getElevation(initial_corners[indices[i][1]]),
                     generator->getElevation(initial_corners[indices[i][2]]),
@@ -663,15 +664,16 @@ struct TerrainTree {
     void traverse(dvec3 location, uint32_t node_idx, std::vector<glm::dvec3> *verts, std::vector<dTri> *tris, int level, int max_level) {
         float noise_yscaling = 2000.0;
         double noise_xzscaling = 0.0001;
+        // a LOD going on here
         if(level > max_level) {
-            //double distance2 = glm::length2(location - nodes[node_idx].verts[0]);
-            //double nodeWidth2 = glm::length2(nodes[node_idx].verts[0] - nodes[node_idx].verts[1]);
-            //double ratio = distance2 / nodeWidth2;
-            //if(ratio > 400.0 || level > 18) {
             double distance = glm::length(location - nodes[node_idx].verts[0]);
             double nodeWidth = glm::length(nodes[node_idx].verts[0] - nodes[node_idx].verts[1]);
             double ratio = distance / nodeWidth;
-            if(ratio > 40.0 || level > 17) {
+
+            // increase ratio cutoff to increase distant LOD
+            // increase level cutoff to increase near LOD
+            // 10.0 / 18 renders in 460 ms with 8 octaves of noise
+            if(ratio > 20.0 || level > 18) {
                 dTri t;
                 dvec3 center = {0, 0, 0};
                 for(int i = 0; i < 3; i++) {
@@ -684,11 +686,14 @@ struct TerrainTree {
                     verts->push_back(point);
                     center += point;
                 }
-                t.normal = glm::normalize(center);
+                t.normal = glm::normalize(nodes[node_idx].verts[0]);
+                
                 tris->push_back(t);
+                nodes[node_idx].rendered_at_level = level;
                 return;
             }
         }
+        // procedurally generate terrain height values on demand
         if( ! nodes[node_idx].first_child) {
             nodes[node_idx].first_child = (uint32_t)nodes.size();
             vec3 new_verts[3] = {
@@ -704,7 +709,7 @@ struct TerrainTree {
                 glm::normalize(nodes[node_idx].verts[2]) * radius * noise_xzscaling};
             float elevations[6];
             generator->getMultiple(elevations, scaled_verts, 6);
-            nodes.push_back({ 0,
+            nodes.push_back({ 0, 0,
                 elevations[0],
                 elevations[1],
                 elevations[2],
@@ -712,7 +717,7 @@ struct TerrainTree {
                 new_verts[1],
                 new_verts[2] });
             for(int i = 0; i < 3; i++) {
-                nodes.push_back({ 0,
+                nodes.push_back({ 0, 0,
                     elevations[i + 3],
                     elevations[i],
                     elevations[((i + 2) % 3)],
@@ -721,6 +726,7 @@ struct TerrainTree {
                     new_verts[(i + 2) % 3] });
             }
         }
+        // we need to go deeper
         for(int i = 0; i < 4; i++) {
             traverse(location, nodes[node_idx].first_child + i, verts, tris, level + 1, max_level);
         }

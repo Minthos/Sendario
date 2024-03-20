@@ -6,6 +6,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/vector_angle.hpp>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -217,7 +218,7 @@ void upload_boxen_mesh(RenderObject *obj) {
     glBindVertexArray(0);
 }
 
-void upload_terrain_mesh(RenderObject *obj) {
+void upload_terrain_mesh(RenderObject *obj, Celestial *celestial) {
     glGenVertexArrays(1, &obj->vao);
     glBindVertexArray(obj->vao);
 
@@ -234,9 +235,12 @@ void upload_terrain_mesh(RenderObject *obj) {
             glm::vec3(obj->po->mesh.verts[ t->verts[2] ])};
 
         glm::vec3 normal = glm::normalize(glm::cross(floatverts[1] - floatverts[0], floatverts[2] - floatverts[0]));
+        float inclination = glm::angle(normal, glm::vec3(t->normal));
+        float insolation = glm::dot(normal, glm::vec3(0.4, 0.4, 0.4));
 
         for(int j = 0; j < 3; j++){
-            vertices.insert(vertices.end(), {floatverts[j], glm::vec2(normal.x, normal.z)});
+            //vertices.insert(vertices.end(), {floatverts[j], glm::vec2(normal.x, normal.z)});
+            vertices.insert(vertices.end(), {floatverts[j], glm::vec2(inclination, insolation)});
         }
     }
 
@@ -471,7 +475,7 @@ int main() {
         spinningCube->body.ro->shader = shaders["box"];
         spinningCube->body.ro->texture = textures["isqswjwki55a1.png"];
 
-        upload_terrain_mesh(glitch.body.ro);
+        upload_terrain_mesh(glitch.body.ro, &glitch);
         glitch.body.ro->shader = shaders["terrain"];
         glitch.body.ro->texture = textures["isqswjwki55a1.png"];
 
