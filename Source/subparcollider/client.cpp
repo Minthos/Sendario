@@ -24,7 +24,7 @@
 // Rendering quality settings
 float anisotropy = 16.0f; // should be 4 with no upscaling, 16 with upscaling
 int upscaling_factor = 2; // 1 (no upscaling) and 2 (4 samples per pixel) are good values
-int motion_blur_mode = 0; // 0 = off, 1 = nonlinear (sharp), 2 = linear (blurry)
+int motion_blur_mode = 1; // 0 = off, 1 = nonlinear (sharp), 2 = linear (blurry)
 float motion_blur_invstr = 5.0f; // motion blur amount. 1.0 = very high. 5.0 = low.
 
 
@@ -427,7 +427,7 @@ int main() {
     glUniform1i(glGetUniformLocation(ppshader, "screenTexture"), 0);
     
     glEnable(GL_DEPTH_TEST);
-//    glEnable(GL_CULL_FACE);
+    glEnable(GL_CULL_FACE);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_BLEND);
 

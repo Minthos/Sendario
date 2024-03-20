@@ -597,6 +597,7 @@ struct CollisionTree {
 
 struct ttnode {
     uint32_t first_child;
+    uint32_t neighbors[3];
     uint32_t rendered_at_level; // number of subdivisions to reach this node, if it was rendered. otherwise 0.
     double elevation[3]; // elevation of the node's 3 corners
     dvec3 verts[3]; // vertices on the unit sphere
@@ -608,7 +609,6 @@ struct TerrainTree {
     uint64_t seed;
     double radius;
     TerrainGenerator *generator;
-
     std::vector<ttnode> nodes;
 
     TerrainTree() {
@@ -628,7 +628,7 @@ struct TerrainTree {
             dvec3(0.0, 0.0, -radius),
             dvec3(-radius, 0.0, 0.0)
         };
-        int indices[8][3] = {
+        uint32_t indices[8][3] = {
             {0, 2, 3},
             {0, 3, 4},
             {0, 4, 5},
@@ -638,8 +638,21 @@ struct TerrainTree {
             {1, 4, 3},
             {1, 3, 2},
         };
+        // neighboring triangles share an edge and 2 vertices
+        // make sure neighbors are in ccw order so it's consistent with the vertex ordering
+        uint32_t neighbors[8][3] = {
+            {3, 7, 1},
+            {0, 6, 2},
+            {1, 5, 3},
+            {2, 4, 0},
+            {7, 3, 5},
+            {4, 2, 6},
+            {5, 1, 7},
+            {6, 0, 4},
+        };
         for(int i = 0; i < 8; i++){
             nodes.push_back({ 0, 0,
+                    neighbors[i][0], neighbors[i][1], neighbors[i][2],
                     generator->getElevation(initial_corners[indices[i][0]]),
                     generator->getElevation(initial_corners[indices[i][1]]),
                     generator->getElevation(initial_corners[indices[i][2]]),
@@ -672,8 +685,11 @@ struct TerrainTree {
 
             // increase ratio cutoff to increase distant LOD
             // increase level cutoff to increase near LOD
-            // 10.0 / 18 renders in 460 ms with 8 octaves of noise
-            if(ratio > 20.0 || level > 18) {
+            // 20, 18 renders in 1.5 seconds with 8 octaves of noise
+            // it seems level can not be higher than 19 if we want to hide the precision artifacts of our noise
+            // 40, 18 seems like a good balance between procgen speed and visual quality. the gpu can handle
+            // much more geometry than but procedurally generating it takes time
+            if(ratio > 40.0 || level > 18) {
                 dTri t;
                 dvec3 center = {0, 0, 0};
                 for(int i = 0; i < 3; i++) {
@@ -709,7 +725,9 @@ struct TerrainTree {
                 glm::normalize(nodes[node_idx].verts[2]) * radius * noise_xzscaling};
             float elevations[6];
             generator->getMultiple(elevations, scaled_verts, 6);
+
             nodes.push_back({ 0, 0,
+                0, 0, 0,
                 elevations[0],
                 elevations[1],
                 elevations[2],
@@ -718,6 +736,7 @@ struct TerrainTree {
                 new_verts[2] });
             for(int i = 0; i < 3; i++) {
                 nodes.push_back({ 0, 0,
+                    0, 0, 0,
                     elevations[i + 3],
                     elevations[i],
                     elevations[((i + 2) % 3)],

@@ -1,22 +1,35 @@
+
+
 TODO:
 
-1. Identify which nodes of the terrain will be rendered at a higher LOD than their neighboring nodes
-2. Ignore the real elevation for those nodes, instead use the average of the corner nodes that created the edge node
-3. This seems like a two-pass algorithm
+I have to do a second traversal of the terrain tree after the procedural elevation pass
+In the second traversal I should do a breadth-first traversal and set the neighbor values for each node
+
+when all the neighbor values have been set I can check the rendered_at_level for a node's neighbors to find out if
+I have to adjust a vertex position to avoid gaps in the terrain and also calculate corner normals by accessing neighbor's neighbors and averaging something together
 
 
-1. Generate some terrain
- - voronoi cellular noise tectonic plates and random noise heightmaps to begin with?
-
-2. Render some terrain
- - generate a mesh centered on the player with max lod within a reasonable distance and reduced lod further out
- - don't worry about tiling and shit for now, just make one big mesh with progressive LOD
+improve terrain generation and rendering
+ - cache generated terrain to disk/database because the gpu can render a lot faster than we can procedurally generate
+   a few million triangles
+ - pass more per-vertex variables to the shader such as elevation, wetness, temperature, scorchedness, recently excavatedness
+ - give low LOD versions of triangles a billboard facing the player with vegetation, rocks and buildings
+ - billboard can be an upside down triangle sticking through the ground
+ - texture map for the billboard can have different versions of vegetation corresponding to wind strength and
+   direction, choose which version in the vertex shader based on wind information attached to the vertex
  - regenerate the mesh when the player moves some distance from the origin of the current mesh
+ - voronoi cells for continental plates, 
+ - render an atmosphere and some clouds
+ - fluid simulation of atmosphere (wind, temperature, moisture, pollution, nuclear fallout) at the same
+   resolution as terrain tree, that way we can reuse the terrain tree's neighbor pointers and dynamic LOD
+   (probably a lot more data than I want to store on the server for multiplayer, may have to axe it)
+ - terrain can store moisture based on a fluid simulation of rivers and lakes and evaporation/melting rate based
+   on atmospheric temperature and humidity
 
-3. Implement gravity and basic collision with terrain
+implement gravity and basic collision with terrain
 
 
-?. add more cool shit
+add more cool shit
 
 
 ----
