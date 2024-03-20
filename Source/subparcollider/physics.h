@@ -662,7 +662,7 @@ struct TerrainTree {
 
     void traverse(dvec3 location, uint32_t node_idx, std::vector<glm::dvec3> *verts, std::vector<dTri> *tris, int level, int max_level) {
         float noise_yscaling = 2000.0;
-        float noise_xzscaling = 0.0001;
+        double noise_xzscaling = 0.0001;
         if(level > max_level) {
             //double distance2 = glm::length2(location - nodes[node_idx].verts[0]);
             //double nodeWidth2 = glm::length2(nodes[node_idx].verts[0] - nodes[node_idx].verts[1]);
@@ -691,17 +691,17 @@ struct TerrainTree {
         }
         if( ! nodes[node_idx].first_child) {
             nodes[node_idx].first_child = (uint32_t)nodes.size();
-            dvec3 new_verts[3] = {
-                (nodes[node_idx].verts[0] + nodes[node_idx].verts[1]) * 0.5,
-                (nodes[node_idx].verts[1] + nodes[node_idx].verts[2]) * 0.5,
-                (nodes[node_idx].verts[2] + nodes[node_idx].verts[0]) * 0.5};
+            vec3 new_verts[3] = {
+                (nodes[node_idx].verts[0] + nodes[node_idx].verts[1]) * 0.5f,
+                (nodes[node_idx].verts[1] + nodes[node_idx].verts[2]) * 0.5f,
+                (nodes[node_idx].verts[2] + nodes[node_idx].verts[0]) * 0.5f};
             vec3 scaled_verts[6] = {
-                new_verts[0] * noise_xzscaling,
-                new_verts[1] * noise_xzscaling,
-                new_verts[2] * noise_xzscaling,
-                nodes[node_idx].verts[0] * noise_xzscaling,
-                nodes[node_idx].verts[1] * noise_xzscaling,
-                nodes[node_idx].verts[2] * noise_xzscaling};
+                glm::normalize(new_verts[0]) * radius * noise_xzscaling,
+                glm::normalize(new_verts[1]) * radius * noise_xzscaling,
+                glm::normalize(new_verts[2]) * radius * noise_xzscaling,
+                glm::normalize(nodes[node_idx].verts[0]) * radius * noise_xzscaling,
+                glm::normalize(nodes[node_idx].verts[1]) * radius * noise_xzscaling,
+                glm::normalize(nodes[node_idx].verts[2]) * radius * noise_xzscaling};
             float elevations[6];
             generator->getMultiple(elevations, scaled_verts, 6);
             nodes.push_back({ 0,
