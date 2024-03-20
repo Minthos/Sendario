@@ -384,8 +384,9 @@ void render(RenderObject *obj) {
     glm::mat4 translation = glm::translate(glm::mat4(1.0f), obj->po->zoneSpacePosition());
     glm::mat4 rotation = glm::mat4(glm::quat(obj->po->rot));
 //    glm::mat4 view = glm::lookAt(glm::vec3(20.00,15,15), glm::vec3(0,0,0), glm::vec3(0,1,0));
-    glm::mat4 view = glm::lookAt(glm::vec3(400.00,350,250), glm::vec3(0,0,0), glm::vec3(0,1,0));
-//    glm::mat4 view = glm::lookAt(glm::vec3(1000.00,750,750), glm::vec3(0,0,0), glm::vec3(0,1,0));
+//    glm::mat4 view = glm::lookAt(glm::vec3(400.00,350,250), glm::vec3(0,0,0), glm::vec3(0,1,0));
+    glm::mat4 view = glm::lookAt(glm::vec3(800.00,500,500), glm::vec3(0,0,0), glm::vec3(0,1,0));
+//    glm::mat4 view = glm::lookAt(glm::vec3(10000.00,7500,7500), glm::vec3(0,0,0), glm::vec3(0,1,0));
 //    glm::mat4 view = glm::lookAt(glm::vec3(200000.00,150000,150000), glm::vec3(0,0,0), glm::vec3(0,1,0));
     glm::mat4 projection = glm::perspective(glm::radians(90.0f), (float)screenwidth / (float)screenheight, 0.001f, 1e38f);
     glm::mat4 transform = projection * view * translation * rotation;
@@ -420,7 +421,7 @@ int main() {
     glUniform1i(glGetUniformLocation(ppshader, "screenTexture"), 0);
     
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
+//    glEnable(GL_CULL_FACE);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_BLEND);
 
@@ -437,7 +438,7 @@ int main() {
     std::vector<Unit> units;
     std::vector<RenderObject> ros;
     // seed, name, radius, roughness, parent body
-    Celestial glitch = Celestial(42, "Glitch", 6.371e6, -0.0, NULL);
+    Celestial glitch = Celestial(42, "Glitch", 6.371e6, 0.2, NULL);
 
 
     units.push_back(Unit()); // 1

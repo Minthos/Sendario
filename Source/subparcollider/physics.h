@@ -671,7 +671,7 @@ struct TerrainTree {
             double distance = glm::length(location - nodes[node_idx].verts[0]);
             double nodeWidth = glm::length(nodes[node_idx].verts[0] - nodes[node_idx].verts[1]);
             double ratio = distance / nodeWidth;
-            if(ratio > 80.0 || level > 17) {
+            if(ratio > 40.0 || level > 17) {
                 dTri t;
                 dvec3 center = {0, 0, 0};
                 for(int i = 0; i < 3; i++) {
