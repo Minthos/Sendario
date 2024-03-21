@@ -8,8 +8,7 @@
 
 Initial solution:
 
-Sample random noise in multiple octaves in a spiderweb pattern centered on the player with vertices snapped to some
-sort of grid
+Sample random noise in multiple octaves in a octahedron->triangles subdivision grid with LOD centered on the player
 
 
 Voronoi cellular noise = continental plates
@@ -62,8 +61,8 @@ TerrainGenerator::TerrainGenerator(int pseed, float proughness) {
 
 float TerrainGenerator::getElevation(dvec3 pos) {
     float elevation = fnFractal->GenSingle3D(seed, pos.x, pos.y, pos.z);
-    float roughness = fnFractal->GenSingle3D(~seed, pos.z, pos.x, pos.y);
-    return elevation * (glm::max(roughness, -0.2f) + 0.2f);
+    float local_roughness = fnFractal->GenSingle3D(~seed, pos.z, pos.x, pos.y);
+    return elevation * (glm::max(local_roughness, -roughness) + roughness);
 }
 
 void TerrainGenerator::getMultiple(float *elevations, vec3 *scaled_verts, int num) {
@@ -80,7 +79,7 @@ void TerrainGenerator::getMultiple(float *elevations, vec3 *scaled_verts, int nu
     
     float roughnesses[6];
     fnFractal->GenPositionArray3D(elevations, num, xs, ys, zs, 0, 0, 0, seed);
-    fnFractal->GenPositionArray3D(roughnesses, num, zs, xs, ys, 0, 0, 0, ~seed ^ 0xF0F0F0F0F0F0);
+    fnFractal->GenPositionArray3D(roughnesses, num, zs, xs, ys, 0, 0, 0, seed ^ 0xF0F0F0F0F0F0);
     for(int i = 0; i < 6; i++) {
         elevations[i] = elevations[i] * (glm::max(roughnesses[i], -roughness) + roughness);
     }

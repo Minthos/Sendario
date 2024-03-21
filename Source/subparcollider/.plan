@@ -10,11 +10,15 @@ I have to adjust a vertex position to avoid gaps in the terrain and also calcula
 
 
 improve terrain generation and rendering
+ - caves, tunnels, underground structures
+   a cave opening deletes one or more triangles from the terrain mesh and links to a cave mesh
+   the cave mesh can have multiple openings
  - cache generated terrain to disk/database because the gpu can render a lot faster than we can procedurally generate
    a few million triangles
  - pass more per-vertex variables to the shader such as elevation, wetness, temperature, scorchedness, recently excavatedness
  - give low LOD versions of triangles a billboard facing the player with vegetation, rocks and buildings
- - billboard can be an upside down triangle sticking through the ground
+ - billboard can be an upside down triangle sticking through the ground but a quad may be better, one more triangle
+   but less area to rasterize
  - texture map for the billboard can have different versions of vegetation corresponding to wind strength and
    direction, choose which version in the vertex shader based on wind information attached to the vertex
  - regenerate the mesh when the player moves some distance from the origin of the current mesh
@@ -25,6 +29,15 @@ improve terrain generation and rendering
    (probably a lot more data than I want to store on the server for multiplayer, may have to axe it)
  - terrain can store moisture based on a fluid simulation of rivers and lakes and evaporation/melting rate based
    on atmospheric temperature and humidity
+ - cities, towns, farms
+   apartment/office blocks are tall textured boxes
+   buildings can be procedurally generated from templates - different styles and materials for walls, roofs and shape
+ - roads, railroads, docks and airfields
+ - industry
+   smelter refines ore (and pretty much any item that has metal in it)
+   factory can build anything
+   power plants: solar and nuclear
+
 
 implement gravity and basic collision with terrain
 

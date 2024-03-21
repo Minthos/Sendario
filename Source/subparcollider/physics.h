@@ -674,11 +674,11 @@ struct TerrainTree {
     //
     // initially we can just ignore location and set max_subdivisions to something low like 2 or 3
 
-    void traverse(dvec3 location, uint32_t node_idx, std::vector<glm::dvec3> *verts, std::vector<dTri> *tris, int level, int max_level) {
+    void generate(dvec3 location, uint32_t node_idx, std::vector<glm::dvec3> *verts, std::vector<dTri> *tris, int level, int min_level) {
         float noise_yscaling = 2000.0;
         double noise_xzscaling = 0.0001;
         // a LOD going on here
-        if(level > max_level) {
+        if(level > min_level) {
             double distance = glm::length(location - nodes[node_idx].verts[0]);
             double nodeWidth = glm::length(nodes[node_idx].verts[0] - nodes[node_idx].verts[1]);
             double ratio = distance / nodeWidth;
@@ -726,17 +726,20 @@ struct TerrainTree {
             float elevations[6];
             generator->getMultiple(elevations, scaled_verts, 6);
 
+            // the center triangle neighbors the other 3 triangles, that's easy
             nodes.push_back({ 0, 0,
-                0, 0, 0,
+                (uint32_t)nodes.size() + 1, (uint32_t)nodes.size() + 2, (uint32_t)nodes.size() + 3,
                 elevations[0],
                 elevations[1],
                 elevations[2],
                 new_verts[0],
                 new_verts[1],
                 new_verts[2] });
+            // the other 3 triangles neighbor the center triangle and child trangles of the parent's neighbors
+            // we can't know the parent's neighbors' children because they may not exist yet
             for(int i = 0; i < 3; i++) {
                 nodes.push_back({ 0, 0,
-                    0, 0, 0,
+                    0, 0, (uint32_t)nodes.size(),
                     elevations[i + 3],
                     elevations[i],
                     elevations[((i + 2) % 3)],
@@ -747,7 +750,51 @@ struct TerrainTree {
         }
         // we need to go deeper
         for(int i = 0; i < 4; i++) {
-            traverse(location, nodes[node_idx].first_child + i, verts, tris, level + 1, max_level);
+            generate(location, nodes[node_idx].first_child + i, verts, tris, level + 1, min_level);
+        }
+    }
+
+    // breadth-first traversal of all the nodes in the terrain tree
+    // TODO: somehow set the correct neighbor pointers for each node
+    // initially the top layer has all its neighbor pointers set correctly
+    // for each layer we must set each missing neighbor pointer to the correct child of the parent's neighbor
+    // if it exists, or the parent's neighbor otherwise.
+    //
+    // some nodes on the top level will legitimately have 0 as their neighbor but as long as min_level is at least
+    // 2 the second level nodes should all have neighbors on their own level.
+    //
+    void get_to_know_the_neighbors(std::vector<glm::dvec3> *verts, std::vector<dTri> *tris) {
+        std::vector<uint32_t> stack;
+        std::vector<uint32_t> parents;
+        stack.reserve(nodes.size());
+        for(uint32_t i = 0; i < 8; i++) {
+            stack.push_back(i);
+            parents.push_back(i); // set the root nodes to be their own parents, doesn't matter, could be anything
+        }
+        for(uint32_t i = 0; i < stack.size(); i++) {
+            ttnode &n = nodes[stack[i]];
+
+            if(i > 7) {
+                ttnode &parent = nodes[parents[i]];
+                for(int j = 0; j < 2; j++){
+                    if(n.neighbors[j] == 0){
+                        ttnode &parents_neighbor = nodes[parent.neighbors[j]];
+                        if( ! parents_neighbor.first_child) { // BINGO! we have a node whose vertex must be adjusted
+                            n.neighbors[j] = parent.neighbors[j];
+                        } else { // have to figure out which of the parent's children is node's neighbor
+                            // sigh
+                        }
+                    }
+                }
+            }
+
+            if( ! n.first_child) {
+                continue;
+            }
+            for(int j = 0; j > 4; j++){
+                stack.push_back(n.first_child + j);
+                parents.push_back(i);
+            }
         }
     }
 
@@ -756,7 +803,7 @@ struct TerrainTree {
         std::vector<glm::dvec3> verts;
         std::vector<dTri> tris;
         for(int i = 0; i < 8; i++) {
-            traverse(location, i, &verts, &tris, 1, max_subdivisions);
+            generate(location, i, &verts, &tris, 1, max_subdivisions);
         }
         dvec3 *vertices = (dvec3*)malloc(verts.size() * sizeof(dvec3) + tris.size() * sizeof(dTri));
         dTri *triangles = (dTri*)&vertices[verts.size()];
