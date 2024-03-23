@@ -8,6 +8,7 @@ In the second traversal I should do a breadth-first traversal and set the neighb
 when all the neighbor values have been set I can check the rendered_at_level for a node's neighbors to find out if
 I have to adjust a vertex position to avoid gaps in the terrain and also calculate corner normals by accessing neighbor's neighbors and averaging something together
 
+I don't have to do this right now. I can do other things and return to this later.
 
 improve terrain generation and rendering
  - caves, tunnels, underground structures
@@ -29,6 +30,13 @@ improve terrain generation and rendering
    (probably a lot more data than I want to store on the server for multiplayer, may have to axe it)
  - terrain can store moisture based on a fluid simulation of rivers and lakes and evaporation/melting rate based
    on atmospheric temperature and humidity
+   the terrain can be a 2d fluid simulation and each tile has a sponge value that says how much moisture it can
+   soak up before the excess pools on the surface and gets carried by gravity and inertia to nearby tiles
+   snow and vegetation increase the sponge value. ice, concrete and asphalt decrease it. excessive load can cause an
+   avalanche
+   belowground can have several types: soil, porous rock, hard rock, resource deposit (metals, coal, oil?)
+   fluid simulation belowground at very low flow rate through soil and porous rock, no flow through hard rock
+   https://www.youtube.com/watch?v=iKAVRgIrUOU
  - cities, towns, farms
    apartment/office blocks are tall textured boxes
    buildings can be procedurally generated from templates - different styles and materials for walls, roofs and shape
@@ -38,6 +46,31 @@ improve terrain generation and rendering
    factory can build anything
    power plants: solar and nuclear
 
+ - cast shadows on the terrain from the sun's point of view
+   first check if any celestials are between the sun and the celestial being rendered and ray intersect them if so
+   traverse the terrain in sweeps away from the sun toward the terrain tiles that are visible on screen
+   the first tile will be lit unless blocked by another celestial
+   the next tile will be lit if it's above the shadow ray from the previous tile
+   the shadow ray creeps up for every lit tile and stays put for unlit tiles
+   for each unlit tile we can store the shadow ray and the tile that caused the shadow so that stuff on the tile can
+   easily determine whether it's in shadow or not
+ - moving objects can cast shadows separately from this at a higher update rate. sun shadows on static geometry don't
+   need to update every frame.
+   
+ - server spatial partitions
+   to scale to thousands of players we have to generate a visibility list for each player: which tiles can they see
+   and which units can they see? to accelerate that we can precompute visibility lists for each tile: which other
+   tiles can potentially be seen from anywhere on this tile? (ground level and several altitudes)
+   also assign a visibility tile to every room in every building and vehicle.
+
+   belowground
+   indoor
+   outdoor
+   canopy
+   belowclouds
+   abovecoulds
+   low orbit
+   high orbit
 
 implement gravity and basic collision with terrain
 
@@ -74,6 +107,20 @@ need a simple way to flag owners as friends or foes of each other for basic comb
 
 I want to implement some guns (fixed angle, turret, point defense) and a homing missile to have at least
 some basic combat functionality.
+
+
+
+
+
+----
+
+starting equipment:
+
+an AI companion to build buildings, gather resources and explain the game mechanics
+a weapon
+a vehicle
+
+
 
 
 

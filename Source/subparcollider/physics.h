@@ -38,7 +38,7 @@ struct mempool {
 };
 
 cacheline* mempool::alloc() {
-//    assert(0); // using std::vectors this way causes segfaults, use malloc instead
+    assert(0); // using std::vectors this way causes segfaults, use malloc instead
     if(recycler.size() > 0) {
         cacheline* rax = recycler.back();
         recycler.pop_back();
@@ -256,10 +256,6 @@ struct dMesh {
         return dMesh(vertices, numVertices, triangles, numTriangles);
     }
     
-    // not in use
-    void createTerrain(glm::dvec3 center, uint64_t seed) {
-    }
-
 };
 
 
@@ -314,7 +310,7 @@ enum physics_state {
 
 struct RenderObject;
 
-mempool collision_pool;
+//mempool collision_pool;
 
 struct PhysicsObject {
     PhysicsObject *parent;
@@ -324,7 +320,7 @@ struct PhysicsObject {
     int num_limbs;
     PhysicsObject *components; // components are rigidly attached to the object
     int num_components;
-    cacheline *active_collisions; // I will use this later to implement multi-body collisions
+//    cacheline *active_collisions; // I will use this later to implement multi-body collisions
 
     dMesh mesh;
     double radius; // radius of the bounding sphere for early elimination
@@ -339,7 +335,7 @@ struct PhysicsObject {
 
     PhysicsObject() {
         bzero(this, sizeof(PhysicsObject));
-        active_collisions = collision_pool.alloc();
+//        active_collisions = collision_pool.alloc();
         rot = glm::dquat(1.0, 0.0, 0.0, 0.0);
         spin = glm::dquat(1.0, 0.0, 0.0, 0.0);
         state = active;
@@ -348,7 +344,7 @@ struct PhysicsObject {
     PhysicsObject(dMesh pmesh, PhysicsObject *pparent) {
         bzero(this, sizeof(PhysicsObject));
         parent = pparent;
-        active_collisions = collision_pool.alloc();
+//        active_collisions = collision_pool.alloc();
         mesh = pmesh;
         radius = calculateRadius();
         state = active;
@@ -608,6 +604,9 @@ struct ttnode {
 struct TerrainTree {
     uint64_t seed;
     double radius;
+    double LOD_DISTANCE_SCALE;
+    int MAX_LOD;
+
     TerrainGenerator *generator;
     std::vector<ttnode> nodes;
 
@@ -615,9 +614,15 @@ struct TerrainTree {
         bzero(this, sizeof(TerrainTree));
     }
 
+    // MAX_LOD should be no more than 18 for an Earth-sized planet because of precision artifacts in the fractal
+    // noise generator.
+    // LOD_DISTANCE_SCALE should be roughly on the order of 10 to 100 for decent performance. The gpu can handle more
+    // polygons but generating the geometry on the cpu is slow
     TerrainTree(uint64_t pseed, double pradius, float roughness) {
         seed = pseed;
         radius = pradius;
+        LOD_DISTANCE_SCALE = 50.0;
+        MAX_LOD = 18;
         generator = new TerrainGenerator(seed, roughness);
         // 6 corners
         dvec3 initial_corners[6] = {
@@ -672,7 +677,7 @@ struct TerrainTree {
     // for every 2 additional bits we encode one more level of subdivision in clockwise order seen from above the
     // nearest pole (so the northern hemisphere will be traversed west-east and the southern east-west)
     //
-    // initially we can just ignore location and set max_subdivisions to something low like 2 or 3
+    // initially we can just ignore location and set min_subdivisions to something low like 2 or 3
 
     void generate(dvec3 location, uint32_t node_idx, std::vector<glm::dvec3> *verts, std::vector<dTri> *tris, int level, int min_level) {
         float noise_yscaling = 2000.0;
@@ -683,13 +688,7 @@ struct TerrainTree {
             double nodeWidth = glm::length(nodes[node_idx].verts[0] - nodes[node_idx].verts[1]);
             double ratio = distance / nodeWidth;
 
-            // increase ratio cutoff to increase distant LOD
-            // increase level cutoff to increase near LOD
-            // 20, 18 renders in 1.5 seconds with 8 octaves of noise
-            // it seems level can not be higher than 19 if we want to hide the precision artifacts of our noise
-            // 40, 18 seems like a good balance between procgen speed and visual quality. the gpu can handle
-            // much more geometry than but procedurally generating it takes time
-            if(ratio > 40.0 || level > 18) {
+           if(ratio > LOD_DISTANCE_SCALE || level > MAX_LOD) {
                 dTri t;
                 dvec3 center = {0, 0, 0};
                 for(int i = 0; i < 3; i++) {
@@ -706,6 +705,10 @@ struct TerrainTree {
                 
                 tris->push_back(t);
                 nodes[node_idx].rendered_at_level = level;
+                if(level <= MAX_LOD){
+                    // add a billboard for distant vegetation and buildings
+                    
+                }
                 return;
             }
         }
@@ -782,7 +785,8 @@ struct TerrainTree {
                         if( ! parents_neighbor.first_child) { // BINGO! we have a node whose vertex must be adjusted
                             n.neighbors[j] = parent.neighbors[j];
                         } else { // have to figure out which of the parent's children is node's neighbor
-                            // sigh
+                            // le sigh
+                            
                         }
                     }
                 }
@@ -798,12 +802,12 @@ struct TerrainTree {
         }
     }
 
-    dMesh buildMesh(dvec3 location, int max_subdivisions) {
+    dMesh buildMesh(dvec3 location, int min_subdivisions) {
         std::vector<uint32_t> node_indices;
         std::vector<glm::dvec3> verts;
         std::vector<dTri> tris;
         for(int i = 0; i < 8; i++) {
-            generate(location, i, &verts, &tris, 1, max_subdivisions);
+            generate(location, i, &verts, &tris, 1, min_subdivisions);
         }
         dvec3 *vertices = (dvec3*)malloc(verts.size() * sizeof(dvec3) + tris.size() * sizeof(dTri));
         dTri *triangles = (dTri*)&vertices[verts.size()];
@@ -876,8 +880,8 @@ multiple iterations
 
 ----
 
-moment of intertia: the main body has a precomputed intertia tensor without the limbs and the masses of the limbs
-must be added each tick in order to produce the true intertia tensor taking each limb's center of mass into account
+moment of intertia: the main body has a precomputed intertia tensor without the limbs. The masses of the limbs
+must be added each tick in order to produce the true intertia tensor taking each limb's center of mass into account.
 
 ----
 

@@ -389,9 +389,9 @@ void reshape(GLFWwindow* window, int width, int height) {
 void render(RenderObject *obj) {
     glm::mat4 translation = glm::translate(glm::mat4(1.0f), obj->po->zoneSpacePosition());
     glm::mat4 rotation = glm::mat4(glm::quat(obj->po->rot));
-    glm::mat4 view = glm::lookAt(glm::vec3(20.00,15,15), glm::vec3(0,0,0), glm::vec3(0,1,0));
+//    glm::mat4 view = glm::lookAt(glm::vec3(20.00,15,15), glm::vec3(0,0,0), glm::vec3(0,1,0));
 //    glm::mat4 view = glm::lookAt(glm::vec3(400.00,350,250), glm::vec3(0,0,0), glm::vec3(0,1,0));
-//    glm::mat4 view = glm::lookAt(glm::vec3(800.00,500,500), glm::vec3(0,0,0), glm::vec3(0,1,0));
+    glm::mat4 view = glm::lookAt(glm::vec3(800.00,500,500), glm::vec3(0,0,0), glm::vec3(0,1,0));
 //    glm::mat4 view = glm::lookAt(glm::vec3(10000.00,7500,7500), glm::vec3(0,0,0), glm::vec3(0,1,0));
 //    glm::mat4 view = glm::lookAt(glm::vec3(200000.00,150000,150000), glm::vec3(0,0,0), glm::vec3(0,1,0));
     glm::mat4 projection = glm::perspective(glm::radians(90.0f), (float)screenwidth / (float)screenheight, 0.001f, 1e38f);
@@ -435,6 +435,7 @@ int main() {
     shaders["terrain"] = mkShader("terrain");
     textures["isqswjwki55a1.png"] = loadTexture("textures/isqswjwki55a1.png", true);
     textures["green_transparent_wireframe_box_64x64.png"] = loadTexture("textures/green_transparent_wireframe_box_64x64.png", false);
+    textures["tree00.png"] = loadTexture("textures/tree00.png", true);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, textures["isqswjwki55a1.png"]);
     glUniform1i(glGetUniformLocation(shaders["box"], "tex"), 0);
@@ -493,7 +494,6 @@ int main() {
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
-        prevFrameTime = now();
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -568,24 +568,32 @@ int main() {
         glBindTexture(GL_TEXTURE_2D, 0); // Unbind velocity texture
         glBindFramebuffer(GL_FRAMEBUFFER, 0); // Bind back to the default framebuffer
 
-        auto frameDuration = std::chrono::duration_cast<std::chrono::microseconds>(now() - prevFrameTime).count();
 
 
-        // uncomment to see how fast the game can run when not limited by the monitor's refresh rate
-//        if(frames_rendered % 100 == 0) {
+        //int framerate_handicap = 1;
+        int framerate_handicap = 1;
+        ++frames_rendered;
+        if(frames_rendered % framerate_handicap == 0) {
             glfwSwapBuffers(window);
             glfwPollEvents();
-//        }
+
+            auto frameDuration = std::chrono::duration_cast<std::chrono::microseconds>(now() - prevFrameTime).count();
+            if(frames_rendered % (40 * framerate_handicap) == 0){
+                std::cout << frameDuration / 1000.0 << " ms (" << 1000000.0 / frameDuration <<" fps)";
+                if(framerate_handicap > 1){
+                    std::cout << " " << framerate_handicap * (1000000.0 / frameDuration) << " theoretically";
+                }
+                std::cout << "\n";
+            }
+            if(frameDuration < 1000.0){ // limit the game to 1000 fps if the system/libraries don't limit it for us
+    			usleep(1000.0 - frameDuration);
+            }
+            prevFrameTime = now();
+
+        }
 
 //        usleep(40000);
 
-
-        if(++frames_rendered % 40 == 0){
-            std::cout << frameDuration / 1000.0 << " ms (theoretically " << 1000000.0 / frameDuration <<" fps) \n";
-        }
-        if(frameDuration < 1000.0){ // limit the game to 1000 fps if the system/libraries don't limit it for us
-			usleep(1000.0 - frameDuration);
-        }
 
     }
 
