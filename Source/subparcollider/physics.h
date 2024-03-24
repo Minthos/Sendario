@@ -24,28 +24,41 @@ using glm::dmat3;
 using glm::dquat;
 
 // right now (2024) Intel and AMD cpus have 64 byte cache lines and Apple's M series have 128 bytes.
-// Apple can suck a dick because they hate free software (opengl is deprecated on mac).
+// Apple can suck a dick because opengl is deprecated on macos and their ios app store policies are anticompetitive.
 struct cacheline {
     void *ptr[8];
 };
 
 struct mempool {
-    std::vector<cacheline, boost::alignment::aligned_allocator<cacheline, 64>> data;
+    std::vector<cacheline*> data;
     std::vector<cacheline*> recycler;
+    uint64_t data_idx;
 
     cacheline* alloc();
     void free(cacheline *line);
 };
 
 cacheline* mempool::alloc() {
-    assert(0); // using std::vectors this way causes segfaults, use malloc instead
+    cacheline* rax;
     if(recycler.size() > 0) {
-        cacheline* rax = recycler.back();
+        rax = recycler.back();
         recycler.pop_back();
         return(rax);
     } else {
-        data.push_back({0});
-        return &data.back();
+        if( ! data_idx){
+            data.push_back((cacheline *)calloc(4096, sizeof(cacheline)));
+            uint64_t misalignment = (uint64_t)data.back() % sizeof(cacheline);
+            if(misalignment != 0){
+                std::cout << "pool allocator adjusted misaligned memory: off by " << misalignment <<" bytes\n";
+                data[data.size()-1] -= misalignment;
+                ++data_idx;
+            } else {
+                std::cout << "pool allocator got memory that was already aligned, nothing to adjust\n";
+            }
+        }
+        rax = &data.back()[data_idx];
+        data_idx = (data_idx + 1) % 4096;
+        return rax;
     }
 }
 
@@ -214,8 +227,6 @@ struct dMesh {
     void destroy() {
         if(verts)
             free(verts);
-        if(tris)
-            free(tris);
         verts = 0;
         tris = 0;
         num_verts = 0;
@@ -310,7 +321,7 @@ enum physics_state {
 
 struct RenderObject;
 
-//mempool collision_pool;
+mempool collision_pool;
 
 struct PhysicsObject {
     PhysicsObject *parent;
@@ -320,7 +331,7 @@ struct PhysicsObject {
     int num_limbs;
     PhysicsObject *components; // components are rigidly attached to the object
     int num_components;
-//    cacheline *active_collisions; // I will use this later to implement multi-body collisions
+    cacheline *active_collisions; // I will use this later to implement multi-body collisions
 
     dMesh mesh;
     double radius; // radius of the bounding sphere for early elimination
@@ -335,7 +346,7 @@ struct PhysicsObject {
 
     PhysicsObject() {
         bzero(this, sizeof(PhysicsObject));
-//        active_collisions = collision_pool.alloc();
+        active_collisions = collision_pool.alloc();
         rot = glm::dquat(1.0, 0.0, 0.0, 0.0);
         spin = glm::dquat(1.0, 0.0, 0.0, 0.0);
         state = active;
@@ -344,7 +355,7 @@ struct PhysicsObject {
     PhysicsObject(dMesh pmesh, PhysicsObject *pparent) {
         bzero(this, sizeof(PhysicsObject));
         parent = pparent;
-//        active_collisions = collision_pool.alloc();
+        active_collisions = collision_pool.alloc();
         mesh = pmesh;
         radius = calculateRadius();
         state = active;
@@ -621,7 +632,7 @@ struct TerrainTree {
     TerrainTree(uint64_t pseed, double pradius, float roughness) {
         seed = pseed;
         radius = pradius;
-        LOD_DISTANCE_SCALE = 50.0;
+        LOD_DISTANCE_SCALE = 20.0;
         MAX_LOD = 18;
         generator = new TerrainGenerator(seed, roughness);
         // 6 corners

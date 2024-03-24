@@ -298,6 +298,10 @@ void initializeGLEW() {
 
 int screenwidth = 3840;
 int screenheight = 2123;
+//int screenheight = 80;
+//int screenwidth = 120;
+int framerate_handicap = 1;
+//int framerate_handicap = 10000;
 int frames_rendered = 0;
 auto prevFrameTime = now();
 GLuint framebuffer, colorTex, velocityTex;
@@ -384,6 +388,7 @@ void reshape(GLFWwindow* window, int width, int height) {
     screenwidth = width;
     screenheight = height;
     resizeFramebuffer(screenwidth, screenheight);
+    std::cout << "Resized window to " << height << "x" << width << "\n";
 }
 
 void render(RenderObject *obj) {
@@ -484,14 +489,6 @@ int main() {
 
 //    }
 
-//    noisetest();
-//    ground->body.rot = glm::angleAxis(0.5, glm::dvec3(0.0, 0.0, 1.0)) * ground->body.rot;
-//    ground->body.pos += dvec3(0.0, -10000.0, 0.0);
-//    glitch.body.pos += dvec3(-2e7, -2e7, -2e7);
-//    glitch.body.pos += dvec3(0, -6.371e6, 0);
-//    glitch.body.rot = glm::angleAxis(-1.0, glm::dvec3(0.0, 0.0, 1.0)) * glitch.body.rot;
-//    glitch.body.rot = glm::angleAxis(-0.8, glm::dvec3(0.0, 1.0, 0.0)) * glitch.body.rot;
-
     // Main loop
     while (!glfwWindowShouldClose(window)) {
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
@@ -568,10 +565,6 @@ int main() {
         glBindTexture(GL_TEXTURE_2D, 0); // Unbind velocity texture
         glBindFramebuffer(GL_FRAMEBUFFER, 0); // Bind back to the default framebuffer
 
-
-
-        //int framerate_handicap = 1;
-        int framerate_handicap = 1;
         ++frames_rendered;
         if(frames_rendered % framerate_handicap == 0) {
             glfwSwapBuffers(window);
@@ -589,7 +582,6 @@ int main() {
     			usleep(1000.0 - frameDuration);
             }
             prevFrameTime = now();
-
         }
 
 //        usleep(40000);
