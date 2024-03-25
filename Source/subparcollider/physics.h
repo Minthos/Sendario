@@ -869,6 +869,29 @@ struct Zone {
     Celestial *frame_of_reference;
 };
 
+enum state_update_type {
+    resource_deposit,
+    fluidsim,
+    telemetry,
+    destruction,
+    creation,
+    commands
+};
+
+
+// here we can put all the dirty (updated) objects between two physics states
+// typically from one tick to the next but can also be used as savegame format and for client<->server updates
+// by not modifying the physics state while doing the physics calculations but instead accumulating updates in a
+// copy of every physics object and applying them all in a batch we can make the game engine multithreaded and thread
+// safe by default without jumping through hoops or inviting nasal demons
+struct state_update {
+    state_update_type update_type;
+    void *data;
+    uint64_t count;
+    uint64_t tick;
+};
+
+
 
 // TODO:
 // we should put all the zones into a zone BVH for each celestial so it's easy to find the correct zone for any location near a celestial
