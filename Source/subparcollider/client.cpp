@@ -394,9 +394,10 @@ void reshape(GLFWwindow* window, int width, int height) {
 void render(RenderObject *obj) {
     glm::mat4 translation = glm::translate(glm::mat4(1.0f), obj->po->zoneSpacePosition());
     glm::mat4 rotation = glm::mat4(glm::quat(obj->po->rot));
+    glm::mat4 view = glm::lookAt(glm::vec3(2.00,1.5,1.5), glm::vec3(0,0,0), glm::vec3(0,1,0));
 //    glm::mat4 view = glm::lookAt(glm::vec3(20.00,15,15), glm::vec3(0,0,0), glm::vec3(0,1,0));
 //    glm::mat4 view = glm::lookAt(glm::vec3(400.00,350,250), glm::vec3(0,0,0), glm::vec3(0,1,0));
-    glm::mat4 view = glm::lookAt(glm::vec3(800.00,500,500), glm::vec3(0,0,0), glm::vec3(0,1,0));
+//    glm::mat4 view = glm::lookAt(glm::vec3(800.00,500,500), glm::vec3(0,0,0), glm::vec3(0,1,0));
 //    glm::mat4 view = glm::lookAt(glm::vec3(10000.00,7500,7500), glm::vec3(0,0,0), glm::vec3(0,1,0));
 //    glm::mat4 view = glm::lookAt(glm::vec3(200000.00,150000,150000), glm::vec3(0,0,0), glm::vec3(0,1,0));
     glm::mat4 projection = glm::perspective(glm::radians(90.0f), (float)screenwidth / (float)screenheight, 0.001f, 1e38f);
@@ -512,7 +513,7 @@ int main() {
         CollisionTree t = CollisionTree(dvec3(0.0), &l, 1);
 
         std::vector<ctnode*> stack;
-//        stack.push_back(t.root);
+        stack.push_back(t.root);
         while(stack.size()){
             ctnode* node = stack[stack.size() - 1];
             stack.pop_back();
@@ -571,7 +572,7 @@ int main() {
             glfwPollEvents();
 
             auto frameDuration = std::chrono::duration_cast<std::chrono::microseconds>(now() - prevFrameTime).count();
-            if(frames_rendered % (40 * framerate_handicap) == 0){
+            if(frames_rendered % (240 * framerate_handicap) == 0){
                 std::cout << frameDuration / 1000.0 << " ms (" << 1000000.0 / frameDuration <<" fps)";
                 if(framerate_handicap > 1){
                     std::cout << " " << framerate_handicap * (1000000.0 / frameDuration) << " theoretically";

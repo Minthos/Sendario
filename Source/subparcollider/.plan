@@ -1,6 +1,14 @@
 
-
 TODO:
+
+
+Implement gravity, velocity and collision test against ground
+
+Implement mouselook, camera zooming with scroll wheel and panning with keyboard
+
+
+
+---
 
 I have to do a second traversal of the terrain tree after the procedural elevation pass
 In the second traversal I should do a breadth-first traversal and set the neighbor values for each node
