@@ -8,6 +8,7 @@
 #include <vector>
 
 #include <cassert>
+#include <cstdarg>
 #include <cstdint>
 #include <cstring>
 
@@ -22,6 +23,90 @@ using glm::vec3;
 using glm::dmat4;
 using glm::dmat3;
 using glm::dquat;
+
+std::string fstr(const char* format, ...) {
+    // Initializing a variable argument list
+    va_list args;
+    va_start(args, format);
+    
+    // Getting the size of the formatted string
+    std::vector<char> buf(1 + std::vsnprintf(nullptr, 0, format, args));
+    va_end(args);
+    
+    // Re-initializing args to reuse with vsnprintf
+    va_start(args, format);
+    std::vsnprintf(buf.data(), buf.size(), format, args);
+    va_end(args);
+    
+    // Creating a std::string from the buffer
+    return std::string(buf.data());
+}
+
+size_t min(size_t a, size_t b) {
+    return a > b ? b : a;
+}
+
+size_t max(size_t a, size_t b) {
+    return a < b ? b : a;
+}
+
+namespace nonstd {
+
+template <typename T> struct vector {
+    T* data;
+    size_t count;
+    size_t capacity;
+
+    vector() { bzero(this, sizeof(vector<T>)); }
+    ~vector() {
+        for(size_t i = 0; i < count; ++i){
+            data[i].~T();
+        }
+        free(data);
+        data = 0;
+        count = 0;
+        capacity = 0;
+    }
+
+    size_t size() { return count; }
+
+    void reserve(size_t new_capacity) {
+        assert(new_capacity >= count);
+        data = (T*)realloc(data, sizeof(T) * new_capacity);
+        capacity = new_capacity;
+    }
+
+    void push_back(T&& val) {
+        assert(0);
+        if(count == capacity) reserve(max(4, capacity) * 2);
+        memcpy(&data[count++], &val, sizeof(T));
+    }
+
+    template <typename... Args> constexpr T& emplace_back(Args&&... args) {
+        if(count == capacity) reserve(max(4, capacity) * 2);
+        return *new(&data[count++]) T(std::forward<Args>(args)...);
+    }
+
+    T pop_back() {
+        return data[--count];
+    }
+
+    T& operator[](size_t idx) {
+        return data[idx];
+    }
+
+    T* begin() {
+        return data;
+    }
+
+    T* end() {
+        return &data[count-1];
+    }
+    
+
+};
+
+};
 
 // right now (2024) Intel and AMD cpus have 64 byte cache lines and Apple's M series have 128 bytes.
 // Apple can suck a dick because opengl is deprecated on macos and their ios app store policies are anticompetitive.
@@ -410,16 +495,16 @@ struct Unit {
         bzero(this, sizeof(Unit));
         name = "prototype";
         id = unit_next_uid++;
-        body = PhysicsObject();
+        new(&body) PhysicsObject();
     }
 
     void addLimb(dMesh pmesh) {
-        limbs.push_back(PhysicsObject(pmesh, &body));
+        limbs.emplace_back(PhysicsObject(pmesh, &body));
         limbs_dirty = true;
     }
 
     void addComponent(dMesh pmesh) {
-        components.push_back(PhysicsObject(pmesh, &body));
+        components.emplace_back(PhysicsObject(pmesh, &body));
         components_dirty = true;
     }
 
@@ -628,6 +713,11 @@ struct TerrainTree {
         }
     }
 
+// let's hope this isn't needed.. damn C++ can be needlessly annoying
+    TerrainTree(TerrainTree &&rhs) noexcept {
+        memcpy(this, &rhs, sizeof(TerrainTree));
+    }
+
     TerrainTree() {
         bzero(this, sizeof(TerrainTree));
     }
@@ -639,7 +729,7 @@ struct TerrainTree {
     TerrainTree(uint64_t pseed, double pradius, float roughness) {
         seed = pseed;
         radius = pradius;
-        LOD_DISTANCE_SCALE = 20.0;
+        LOD_DISTANCE_SCALE = 4.0;
         MAX_LOD = 18;
         generator = new TerrainGenerator(seed, roughness);
         // 6 corners
@@ -847,7 +937,16 @@ struct Celestial {
     vec9 radiance;
     vec9 albedo;
     Celestial *nearest_star;
-    std::vector<Celestial> orbiting_bodies;
+    nonstd::vector<Celestial> orbiting_bodies;
+
+//    ~Celestial() {
+//        std::cout << "Celestial " << name << " no-op destructor\n";
+//    }
+
+    Celestial(Celestial &&rhs) noexcept {
+        memcpy(this, &rhs, sizeof(Celestial));
+        std::cout << "Celestial " << name << " memcpy copy constructor\n";
+    }
 
     Celestial(uint64_t pseed, std::string pname, double pradius, float proughness, Celestial *pnearest_star) {
         bzero(this, sizeof(Celestial));
@@ -856,7 +955,7 @@ struct Celestial {
         new(&terrain) TerrainTree(pseed, pradius, proughness);
         auto time_begin = now();
         std::cout << "Generating mesh..\n";
-        body = PhysicsObject(terrain.buildMesh(dvec3(0, 6.37101e6, 0), 5), NULL);
+        new(&body) PhysicsObject(terrain.buildMesh(dvec3(0, 6.37101e6, 0), 3), NULL);
         auto time_used = std::chrono::duration_cast<std::chrono::microseconds>(now() - time_begin).count();
         std::cout << "Celestial " << name << ": " << body.mesh.num_tris << " triangles procedurally generated in " << time_used/1000.0 << "ms\n";
         surface_temp_min = 183.0;

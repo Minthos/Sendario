@@ -22,16 +22,16 @@ INCDIR := -I/usr/local/include -IFastNoise2/include
 CXXFLAGS := -O2 -march=native
 
 terragen.o: terragen.cpp
-	g++ -O2 -march=native -c terragen.cpp -o terragen.o $(LIBDIR) $(INCDIR)
+	g++ -std=c++20 -O2 -march=native -c terragen.cpp -o terragen.o $(LIBDIR) $(INCDIR)
 
 terragen_debug.o: terragen.cpp
-	g++ -g3 -D DEBUG -march=native -c terragen.cpp -o terragen_debug.o $(LIBDIR) $(INCDIR)
+	g++ -std=c++20 -ggdb3 -O2 -D DEBUG -march=native -c terragen.cpp -o terragen_debug.o $(LIBDIR) $(INCDIR)
 
 takeoff: $(NEW_SRC) terragen.o
-	g++ -O2 -march=native terragen.o client.cpp -o takeoff $(LIBDIR) $(INCDIR) $(NEW_LIBS)
+	g++ -std=c++20 -O2 -march=native terragen.o client.cpp -o takeoff $(LIBDIR) $(INCDIR) $(NEW_LIBS)
 
 takeoff_debug: $(NEW_SRC) terragen_debug.o
-	g++ -g3 -D DEBUG -march=native terragen_debug.o client.cpp -o takeoff_debug $(LIBDIR) $(INCDIR) $(NEW_LIBS)
+	g++ -std=c++20 -ggdb3 -O2 -D DEBUG -march=native terragen_debug.o client.cpp -o takeoff_debug $(LIBDIR) $(INCDIR) $(NEW_LIBS)
 
 #takeoff_debug: $(NEW_SRC)
 #	g++ -g3 -D DEBUG -march=native -c $(NEW_SRC) $(NEW_LIBS)

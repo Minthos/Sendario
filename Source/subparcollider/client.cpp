@@ -459,9 +459,11 @@ int main() {
     std::vector<RenderObject> ros;
     // seed, name, radius, roughness, parent body
     Celestial glitch(42, "Glitch", 6.371e6, 0.2, NULL);
+    for(int i = 0; i < 5; i++) {
+        glitch.orbiting_bodies.emplace_back(42 + i, fstr("Glitch-%d", i), 1e6, 0.2, &glitch);
+    }
 
-
-    units.push_back(Unit()); // 1
+    units.emplace_back(Unit()); // 1
     Unit *spinningCube = &units[0]; // 2
     spinningCube->addComponent(dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0)); // 3
     spinningCube->addComponent(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 0.01));
@@ -477,8 +479,8 @@ int main() {
 //    ground->bake(); // 4
 
 
-    ros.push_back(RenderObject(&spinningCube->body)); // 5
-    ros.push_back(RenderObject(&glitch.body)); // 5
+    ros.emplace_back(RenderObject(&spinningCube->body)); // 5
+    ros.emplace_back(RenderObject(&glitch.body)); // 5
     spinningCube->body.ro = &ros[0]; // 6
     glitch.body.ro = &ros[1]; // 6
 
@@ -505,7 +507,7 @@ int main() {
 //        ground->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * ground->body.rot;
         render(glitch.body.ro);
 
-        if((frames_rendered / 800) % 2){
+        if((frames_rendered / 1100) % 2){
 //            spinningCube->body.rot = glm::angleAxis(-0.000001, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
             ros[0].po->pos += dvec3(0.01, 0.01, 0.01);
         } else {
