@@ -450,6 +450,11 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 }
 
 int main() {
+    // seed, name, radius, roughness, parent body
+    Celestial glitch(42, "Glitch", 6.371e6, 0.2, NULL);
+    for(int i = 0; i < 5; i++) {
+        glitch.orbiting_bodies.emplace_back(42 + i, fstr("Glitch-%d", i), 1e6, 0.2, &glitch);
+    }
     initializeGLFW();
     GLFWwindow* window = createWindow(screenwidth, screenheight, "Takeoff Sendario");
     glfwSetWindowSizeCallback(window, reshape);
@@ -485,11 +490,6 @@ int main() {
 
     nonstd::vector<Unit> units;
     nonstd::vector<RenderObject> ros;
-    // seed, name, radius, roughness, parent body
-    Celestial glitch(42, "Glitch", 6.371e6, 0.2, NULL);
-    for(int i = 0; i < 5; i++) {
-        glitch.orbiting_bodies.emplace_back(42 + i, fstr("Glitch-%d", i), 1e6, 0.2, &glitch);
-    }
 
     units.emplace_back(Unit()); // 1
     Unit *spinningCube = &units[0]; // 2

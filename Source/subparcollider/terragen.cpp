@@ -68,21 +68,27 @@ float TerrainGenerator::getElevation(dvec3 pos) {
 }
 
 void TerrainGenerator::getMultiple(float *elevations, vec3 *scaled_verts, int num) {
-    assert(num == 6);
-    float xs[6] = {
+    assert(num == 12);
+    float xs[12] = {  
         scaled_verts[0].x, scaled_verts[1].x, scaled_verts[2].x,
-        scaled_verts[3].x, scaled_verts[4].x, scaled_verts[5].x};
-    float ys[6] = {
+        scaled_verts[3].x, scaled_verts[4].x, scaled_verts[5].x,
+        scaled_verts[6].x, scaled_verts[7].x, scaled_verts[8].x,
+        scaled_verts[9].x, scaled_verts[10].x, scaled_verts[11].x};
+    float ys[12] = {
         scaled_verts[0].y, scaled_verts[1].y, scaled_verts[2].y,
-        scaled_verts[3].y, scaled_verts[4].y, scaled_verts[5].y};
-    float zs[6] = {
+        scaled_verts[3].y, scaled_verts[4].y, scaled_verts[5].y,
+        scaled_verts[6].y, scaled_verts[7].y, scaled_verts[8].y,
+        scaled_verts[9].y, scaled_verts[10].y, scaled_verts[11].y};
+    float zs[12] = {
         scaled_verts[0].z, scaled_verts[1].z, scaled_verts[2].z,
-        scaled_verts[3].z, scaled_verts[4].z, scaled_verts[5].z};
-    
-    float roughnesses[6];
+        scaled_verts[3].z, scaled_verts[4].z, scaled_verts[5].z,
+        scaled_verts[6].z, scaled_verts[7].z, scaled_verts[8].z,
+        scaled_verts[9].z, scaled_verts[10].z, scaled_verts[11].z};
+
+    float roughnesses[12];
     fnFractal->GenPositionArray3D(elevations, num, xs, ys, zs, 0, 0, 0, seed);
     fnFractal->GenPositionArray3D(roughnesses, num, zs, xs, ys, 0, 0, 0, seed ^ 0xF0F0F0F0F0F0);
-    for(int i = 0; i < 6; i++) {
+    for(int i = 0; i < 12; i++) {
         elevations[i] = elevations[i] * (glm::max(roughnesses[i], -roughness) + roughness);
     }
 }

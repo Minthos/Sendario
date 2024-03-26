@@ -683,6 +683,8 @@ struct TerrainTree {
     double radius;
     double LOD_DISTANCE_SCALE;
     int MAX_LOD;
+    float highest_point = 0.0f;
+    float lowest_point = 0.0f;
 
     TerrainGenerator *generator;
     nonstd::vector<ttnode> nodes;
@@ -705,8 +707,8 @@ struct TerrainTree {
     TerrainTree(uint64_t pseed, double pradius, float roughness) {
         seed = pseed;
         radius = pradius;
-        LOD_DISTANCE_SCALE = 40.0;
-        MAX_LOD = 18;
+        LOD_DISTANCE_SCALE = 60.0;
+        MAX_LOD = 17;
         generator = new TerrainGenerator(seed, roughness);
         // 6 corners
         dvec3 initial_corners[6] = {
@@ -766,6 +768,7 @@ struct TerrainTree {
     void generate(dvec3 location, uint32_t node_idx, nonstd::vector<glm::dvec3> *verts, nonstd::vector<dTri> *tris, int level, int min_level) {
         float noise_yscaling = 2000.0;
         double noise_xzscaling = 0.0001;
+        double noise_xzscaling2 = -0.00001;
         // a LOD going on here
         if(level > min_level) {
             double distance = glm::length(location - nodes[node_idx].verts[0]);
@@ -803,15 +806,27 @@ struct TerrainTree {
                 (nodes[node_idx].verts[0] + nodes[node_idx].verts[1]) * 0.5f,
                 (nodes[node_idx].verts[1] + nodes[node_idx].verts[2]) * 0.5f,
                 (nodes[node_idx].verts[2] + nodes[node_idx].verts[0]) * 0.5f};
-            vec3 scaled_verts[6] = {
+            vec3 scaled_verts[12] = {
                 glm::normalize(new_verts[0]) * radius * noise_xzscaling,
                 glm::normalize(new_verts[1]) * radius * noise_xzscaling,
                 glm::normalize(new_verts[2]) * radius * noise_xzscaling,
                 glm::normalize(nodes[node_idx].verts[0]) * radius * noise_xzscaling,
                 glm::normalize(nodes[node_idx].verts[1]) * radius * noise_xzscaling,
-                glm::normalize(nodes[node_idx].verts[2]) * radius * noise_xzscaling};
-            float elevations[6];
-            generator->getMultiple(elevations, scaled_verts, 6);
+                glm::normalize(nodes[node_idx].verts[2]) * radius * noise_xzscaling,
+                glm::normalize(new_verts[0]) * radius * noise_xzscaling2,
+                glm::normalize(new_verts[1]) * radius * noise_xzscaling2,
+                glm::normalize(new_verts[2]) * radius * noise_xzscaling2,
+                glm::normalize(nodes[node_idx].verts[0]) * radius * noise_xzscaling2,
+                glm::normalize(nodes[node_idx].verts[1]) * radius * noise_xzscaling2,
+                glm::normalize(nodes[node_idx].verts[2]) * radius * noise_xzscaling2};
+            float elevations[12];
+            generator->getMultiple(elevations, scaled_verts, 12);
+
+            for(int i = 0; i < 6; i++) {
+                elevations[i] += (elevations[i+6] * 5.0);
+                lowest_point = glm::min(elevations[i] * noise_yscaling, lowest_point);
+                highest_point = glm::max(elevations[i] * noise_yscaling, highest_point);
+            }
 
             // the center triangle neighbors the other 3 triangles, that's easy
             nodes.push_back({ 0, 0,
@@ -930,6 +945,7 @@ struct Celestial {
         new(&body) PhysicsObject(terrain.buildMesh(dvec3(0, 6.37101e6, 0), 3), NULL);
         auto time_used = std::chrono::duration_cast<std::chrono::microseconds>(now() - time_begin).count();
         std::cout << "Celestial " << name << ": " << body.mesh.num_tris << " triangles procedurally generated in " << time_used/1000.0 << "ms\n";
+        std::cout << "Lowest point: " << terrain.lowest_point << ", highest point: " << terrain.highest_point << "\n";
         surface_temp_min = 183.0;
         surface_temp_max = 331.0;
         nearest_star = pnearest_star;
