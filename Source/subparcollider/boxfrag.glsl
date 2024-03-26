@@ -13,6 +13,6 @@ void main() {
     //fragColor = vec4(1.0);
     fragColor = texture(tex, texCoord);
     velocityOut = velocity;
-    gl_FragDepth = log2(z + 2.0) * 0.04;
+    gl_FragDepth = log2(z + 2.0) * 0.03;
 }
 

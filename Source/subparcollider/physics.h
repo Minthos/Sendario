@@ -81,20 +81,13 @@ template <typename T> struct vector {
 };
 
 std::string fstr(const char* format, ...) {
-    // Initializing a variable argument list
     va_list args;
     va_start(args, format);
-    
-    // Getting the size of the formatted string
     std::vector<char> buf(1 + std::vsnprintf(nullptr, 0, format, args));
     va_end(args);
-    
-    // Re-initializing args to reuse with vsnprintf
     va_start(args, format);
     std::vsnprintf(buf.data(), buf.size(), format, args);
     va_end(args);
-    
-    // Creating a std::string from the buffer
     return std::string(buf.data());
 }
 
@@ -115,11 +108,8 @@ struct mempool {
 };
 
 cacheline* mempool::alloc() {
-    cacheline* rax;
     if(recycler.size() > 0) {
-        rax = recycler.back();
-        recycler.pop_back();
-        return(rax);
+        return recycler.pop_back();
     } else {
         if( ! data_idx){
             data.push_back((cacheline *)calloc(4096, sizeof(cacheline)));
@@ -132,7 +122,7 @@ cacheline* mempool::alloc() {
                 std::cout << "pool allocator got memory that was already aligned, nothing to adjust\n";
             }
         }
-        rax = &data.back()[data_idx];
+        cacheline* rax = &data.back()[data_idx];
         data_idx = (data_idx + 1) % 4096;
         return rax;
     }
@@ -715,7 +705,7 @@ struct TerrainTree {
     TerrainTree(uint64_t pseed, double pradius, float roughness) {
         seed = pseed;
         radius = pradius;
-        LOD_DISTANCE_SCALE = 10.0;
+        LOD_DISTANCE_SCALE = 40.0;
         MAX_LOD = 18;
         generator = new TerrainGenerator(seed, roughness);
         // 6 corners

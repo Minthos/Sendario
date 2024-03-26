@@ -304,6 +304,12 @@ int framerate_handicap = 1;
 //int framerate_handicap = 10000;
 int frames_rendered = 0;
 auto prevFrameTime = now();
+
+glm::quat camera_rot;
+double camera_initial_x;
+double camera_initial_y;
+double camera_zoom = 1.0;
+
 GLuint framebuffer, colorTex, velocityTex;
 GLuint ppshader;
 GLuint quadVAO, quadVBO;
@@ -394,13 +400,15 @@ void reshape(GLFWwindow* window, int width, int height) {
 void render(RenderObject *obj) {
     glm::mat4 translation = glm::translate(glm::mat4(1.0f), obj->po->zoneSpacePosition());
     glm::mat4 rotation = glm::mat4(glm::quat(obj->po->rot));
-    glm::mat4 view = glm::lookAt(glm::vec3(2.00,1.5,1.5), glm::vec3(0,0,0), glm::vec3(0,1,0));
+    glm::mat4 view = glm::lookAt(glm::vec3(2.00,1.5,1.5) * glm::max(1.0f, (float)camera_zoom), glm::vec3(0,0,0), glm::vec3(0,1,0));
+    view = glm::mat4(camera_rot) * view;
 //    glm::mat4 view = glm::lookAt(glm::vec3(20.00,15,15), glm::vec3(0,0,0), glm::vec3(0,1,0));
 //    glm::mat4 view = glm::lookAt(glm::vec3(400.00,350,250), glm::vec3(0,0,0), glm::vec3(0,1,0));
 //    glm::mat4 view = glm::lookAt(glm::vec3(800.00,500,500), glm::vec3(0,0,0), glm::vec3(0,1,0));
 //    glm::mat4 view = glm::lookAt(glm::vec3(10000.00,7500,7500), glm::vec3(0,0,0), glm::vec3(0,1,0));
 //    glm::mat4 view = glm::lookAt(glm::vec3(200000.00,150000,150000), glm::vec3(0,0,0), glm::vec3(0,1,0));
-    glm::mat4 projection = glm::perspective(glm::radians(90.0f), (float)screenwidth / (float)screenheight, 0.001f, 1e38f);
+    
+    glm::mat4 projection = glm::perspective(glm::radians(90.0f * glm::min(1.0f, (float)camera_zoom)), (float)screenwidth / (float)screenheight, 0.001f, 1e38f);
     glm::mat4 transform = projection * view * translation * rotation;
 
     glUseProgram(obj->shader);
@@ -426,11 +434,31 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         glfwSetWindowShouldClose(window, GL_TRUE);
 }
 
+static void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
+{
+    if(camera_initial_x == 0 && camera_initial_y == 0){
+        camera_initial_x = xpos;
+        camera_initial_y = ypos;
+    }
+    camera_rot = glm::normalize(glm::angleAxis((float)(xpos - camera_initial_x) / 1000.0f, glm::vec3(0.0, 1.0, 0.0)));
+    camera_rot = glm::normalize(glm::angleAxis((float)(ypos - camera_initial_y) / 1000.0f, glm::vec3(1.0, 0.0, 0.0)) * camera_rot);
+}
+
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+    camera_zoom *= 1.0 + (-0.3 * yoffset);
+}
+
 int main() {
     initializeGLFW();
     GLFWwindow* window = createWindow(screenwidth, screenheight, "Takeoff Sendario");
     glfwSetWindowSizeCallback(window, reshape);
     glfwSetKeyCallback(window, key_callback);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+    glfwSetCursorPosCallback(window, cursor_position_callback);
+    glfwSetScrollCallback(window, scroll_callback);
+    camera_rot = glm::quat(1, 0, 0, 0);
     initializeGLEW();
 
     initializeFramebuffer();
