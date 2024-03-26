@@ -455,8 +455,8 @@ int main() {
 
 
 
-    std::vector<Unit> units;
-    std::vector<RenderObject> ros;
+    nonstd::vector<Unit> units;
+    nonstd::vector<RenderObject> ros;
     // seed, name, radius, roughness, parent body
     Celestial glitch(42, "Glitch", 6.371e6, 0.2, NULL);
     for(int i = 0; i < 5; i++) {
@@ -521,7 +521,7 @@ int main() {
         ctleaf l = ctleaf(&spinningCube->body);
         CollisionTree t = CollisionTree(dvec3(0.0), &l, 1);
 
-        std::vector<ctnode*> stack;
+        nonstd::vector<ctnode*> stack;
         stack.push_back(t.root);
         while(stack.size()){
             ctnode* node = stack[stack.size() - 1];

@@ -24,24 +24,6 @@ using glm::dmat4;
 using glm::dmat3;
 using glm::dquat;
 
-std::string fstr(const char* format, ...) {
-    // Initializing a variable argument list
-    va_list args;
-    va_start(args, format);
-    
-    // Getting the size of the formatted string
-    std::vector<char> buf(1 + std::vsnprintf(nullptr, 0, format, args));
-    va_end(args);
-    
-    // Re-initializing args to reuse with vsnprintf
-    va_start(args, format);
-    std::vsnprintf(buf.data(), buf.size(), format, args);
-    va_end(args);
-    
-    // Creating a std::string from the buffer
-    return std::string(buf.data());
-}
-
 size_t min(size_t a, size_t b) {
     return a > b ? b : a;
 }
@@ -63,9 +45,7 @@ template <typename T> struct vector {
             data[i].~T();
         }
         free(data);
-        data = 0;
-        count = 0;
-        capacity = 0;
+        bzero(this, sizeof(vector<T>));
     }
 
     size_t size() { return count; }
@@ -76,8 +56,12 @@ template <typename T> struct vector {
         capacity = new_capacity;
     }
 
+    void push_back(const T& val) {
+        if(count == capacity) reserve(max(4, capacity) * 2);
+        memcpy(&data[count++], &val, sizeof(T));
+    }
+
     void push_back(T&& val) {
-        assert(0);
         if(count == capacity) reserve(max(4, capacity) * 2);
         memcpy(&data[count++], &val, sizeof(T));
     }
@@ -87,26 +71,33 @@ template <typename T> struct vector {
         return *new(&data[count++]) T(std::forward<Args>(args)...);
     }
 
-    T pop_back() {
-        return data[--count];
-    }
+    T pop_back() { return data[--count]; }
+    T& operator[](size_t idx) { return data[idx]; }
+    T* begin() { return data; }
+    T* end() { return &data[count]; }
+    T& back() { return data[count-1]; }
+};
 
-    T& operator[](size_t idx) {
-        return data[idx];
-    }
+};
 
-    T* begin() {
-        return data;
-    }
-
-    T* end() {
-        return &data[count-1];
-    }
+std::string fstr(const char* format, ...) {
+    // Initializing a variable argument list
+    va_list args;
+    va_start(args, format);
     
+    // Getting the size of the formatted string
+    std::vector<char> buf(1 + std::vsnprintf(nullptr, 0, format, args));
+    va_end(args);
+    
+    // Re-initializing args to reuse with vsnprintf
+    va_start(args, format);
+    std::vsnprintf(buf.data(), buf.size(), format, args);
+    va_end(args);
+    
+    // Creating a std::string from the buffer
+    return std::string(buf.data());
+}
 
-};
-
-};
 
 // right now (2024) Intel and AMD cpus have 64 byte cache lines and Apple's M series have 128 bytes.
 // Apple can suck a dick because opengl is deprecated on macos and their ios app store policies are anticompetitive.
@@ -115,8 +106,8 @@ struct cacheline {
 };
 
 struct mempool {
-    std::vector<cacheline*> data;
-    std::vector<cacheline*> recycler;
+    nonstd::vector<cacheline*> data;
+    nonstd::vector<cacheline*> recycler;
     uint64_t data_idx;
 
     cacheline* alloc();
@@ -484,8 +475,8 @@ struct Unit {
     uint64_t id;
     uint64_t owner_id;
     PhysicsObject body;
-    std::vector<PhysicsObject> limbs;
-    std::vector<PhysicsObject> components;
+    nonstd::vector<PhysicsObject> limbs;
+    nonstd::vector<PhysicsObject> components;
     bool limbs_dirty;
     bool components_dirty;
 
@@ -704,18 +695,13 @@ struct TerrainTree {
     int MAX_LOD;
 
     TerrainGenerator *generator;
-    std::vector<ttnode> nodes;
+    nonstd::vector<ttnode> nodes;
 
     ~TerrainTree() {
         if(generator){
             delete generator;
             generator = 0;
         }
-    }
-
-// let's hope this isn't needed.. damn C++ can be needlessly annoying
-    TerrainTree(TerrainTree &&rhs) noexcept {
-        memcpy(this, &rhs, sizeof(TerrainTree));
     }
 
     TerrainTree() {
@@ -729,7 +715,7 @@ struct TerrainTree {
     TerrainTree(uint64_t pseed, double pradius, float roughness) {
         seed = pseed;
         radius = pradius;
-        LOD_DISTANCE_SCALE = 4.0;
+        LOD_DISTANCE_SCALE = 10.0;
         MAX_LOD = 18;
         generator = new TerrainGenerator(seed, roughness);
         // 6 corners
@@ -787,7 +773,7 @@ struct TerrainTree {
     //
     // initially we can just ignore location and set min_subdivisions to something low like 2 or 3
 
-    void generate(dvec3 location, uint32_t node_idx, std::vector<glm::dvec3> *verts, std::vector<dTri> *tris, int level, int min_level) {
+    void generate(dvec3 location, uint32_t node_idx, nonstd::vector<glm::dvec3> *verts, nonstd::vector<dTri> *tris, int level, int min_level) {
         float noise_yscaling = 2000.0;
         double noise_xzscaling = 0.0001;
         // a LOD going on here
@@ -874,9 +860,9 @@ struct TerrainTree {
     // some nodes on the top level will legitimately have 0 as their neighbor but as long as min_level is at least
     // 2 the second level nodes should all have neighbors on their own level.
     //
-    void get_to_know_the_neighbors(std::vector<glm::dvec3> *verts, std::vector<dTri> *tris) {
-        std::vector<uint32_t> stack;
-        std::vector<uint32_t> parents;
+    void get_to_know_the_neighbors(nonstd::vector<glm::dvec3> *verts, nonstd::vector<dTri> *tris) {
+        nonstd::vector<uint32_t> stack;
+        nonstd::vector<uint32_t> parents;
         stack.reserve(nodes.size());
         for(uint32_t i = 0; i < 8; i++) {
             stack.push_back(i);
@@ -911,9 +897,9 @@ struct TerrainTree {
     }
 
     dMesh buildMesh(dvec3 location, int min_subdivisions) {
-        std::vector<uint32_t> node_indices;
-        std::vector<glm::dvec3> verts;
-        std::vector<dTri> tris;
+        nonstd::vector<uint32_t> node_indices;
+        nonstd::vector<glm::dvec3> verts;
+        nonstd::vector<dTri> tris;
         for(int i = 0; i < 8; i++) {
             generate(location, i, &verts, &tris, 1, min_subdivisions);
         }
@@ -938,10 +924,6 @@ struct Celestial {
     vec9 albedo;
     Celestial *nearest_star;
     nonstd::vector<Celestial> orbiting_bodies;
-
-//    ~Celestial() {
-//        std::cout << "Celestial " << name << " no-op destructor\n";
-//    }
 
     Celestial(Celestial &&rhs) noexcept {
         memcpy(this, &rhs, sizeof(Celestial));
