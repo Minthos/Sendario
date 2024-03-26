@@ -681,6 +681,7 @@ struct ttnode {
 struct TerrainTree {
     uint64_t seed;
     double radius;
+    float noise_yscaling;
     double LOD_DISTANCE_SCALE;
     int MAX_LOD;
     float highest_point = 0.0f;
@@ -707,6 +708,7 @@ struct TerrainTree {
     TerrainTree(uint64_t pseed, double pradius, float roughness) {
         seed = pseed;
         radius = pradius;
+        noise_yscaling = sqrt(radius);
         LOD_DISTANCE_SCALE = 60.0;
         MAX_LOD = 17;
         generator = new TerrainGenerator(seed, roughness);
@@ -766,7 +768,6 @@ struct TerrainTree {
     // initially we can just ignore location and set min_subdivisions to something low like 2 or 3
 
     void generate(dvec3 location, uint32_t node_idx, nonstd::vector<glm::dvec3> *verts, nonstd::vector<dTri> *tris, int level, int min_level) {
-        float noise_yscaling = 2000.0;
         double noise_xzscaling = 0.0001;
         double noise_xzscaling2 = -0.00001;
         // a LOD going on here

@@ -457,6 +457,7 @@ int main() {
     }
     initializeGLFW();
     GLFWwindow* window = createWindow(screenwidth, screenheight, "Takeoff Sendario");
+    glfwWindowHint(GLFW_AUTO_ICONIFY, GL_FALSE);
     glfwSetWindowSizeCallback(window, reshape);
     glfwSetKeyCallback(window, key_callback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
