@@ -5,12 +5,12 @@ in vec2 TexCoords;
 
 uniform sampler2D screenTexture;
 uniform sampler2D velocityTexture;
-uniform float upscaling_factor;
+uniform float antialiasing;
 uniform float inv_strength;
 uniform int mode;
 
 void main() {
-    vec2 coords = TexCoords * upscaling_factor;
+    vec2 coords = TexCoords * antialiasing;
     
     if(mode == 0){
         FragColor = texture(screenTexture, coords);

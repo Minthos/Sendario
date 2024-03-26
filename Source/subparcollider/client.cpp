@@ -23,7 +23,7 @@
 
 // Rendering quality settings
 float anisotropy = 16.0f; // should be 4 with no upscaling, 16 with upscaling
-int upscaling_factor = 2; // 1 (no upscaling) and 2 (4 samples per pixel) are good values
+int antialiasing = 2; // 1 (no upscaling) and 2 (4 samples per pixel) are good values
 int motion_blur_mode = 1; // 0 = off, 1 = nonlinear (sharp), 2 = linear (blurry)
 float motion_blur_invstr = 5.0f; // motion blur amount. 1.0 = very high. 5.0 = low.
 
@@ -39,18 +39,15 @@ char* readShaderSource(const char* filePath) {
         perror("Error opening file");
         exit(EXIT_FAILURE);
     }
-
     fseek(file, 0, SEEK_END);
     long length = ftell(file);
     fseek(file, 0, SEEK_SET);
-
     char* buffer = (char*)malloc(length + 1);
     if (buffer == NULL) {
         fprintf(stderr, "Memory allocation failed\n");
         fclose(file);
         exit(EXIT_FAILURE);
     }
-
     size_t bytesRead = fread(buffer, 1, length, file);
     if (bytesRead != (size_t)length) {
         fprintf(stderr, "Error reading file\n");
@@ -58,9 +55,7 @@ char* readShaderSource(const char* filePath) {
         fclose(file);
         exit(EXIT_FAILURE);
     }
-
     buffer[length] = '\0';
-
     fclose(file);
     return buffer;
 }
@@ -108,26 +103,20 @@ GLuint loadTexture(const char* filename, bool smooth) {
         std::cerr << "Failed to load texture " << filename << std::endl;
         exit(1);
     }
-
     GLuint texture;
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
-
     if (glewIsSupported("GL_EXT_texture_filter_anisotropic")) {
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, anisotropy);
     }
-
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, smooth ? GL_LINEAR : GL_NEAREST);
-
     std::cout << "loaded texture " << filename << " with " << channels << " channels\n";
-
     GLint format = channels == 4 ? GL_RGBA : GL_RGB;
     glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
     glGenerateMipmap(GL_TEXTURE_2D);
-
     stbi_image_free(data);
     return texture;
 }
@@ -144,13 +133,11 @@ struct RenderObject {
     GLuint shader;
     GLuint texture;
     GLuint vao, vbo, ebo;
-
     glm::mat4 prev;
     bool firstTime;
 
     RenderObject(PhysicsObject *ppo) { po = ppo; firstTime = true; }
 };
-
 
 // uploads a mesh composed of one or more box meshes to the gpu
 // TODO: find a better way to set texture coordinates.
@@ -169,25 +156,20 @@ void upload_boxen_mesh(RenderObject *obj) {
         3, 1, 7, 5, // right
         3, 2, 7, 6, // back
         5, 4, 7, 6}; // bottom
-
     glm::vec2 texture_corners[4] = {
         glm::vec2(1.0f, 1.0f),
         glm::vec2(0.0f, 1.0f),
         glm::vec2(1.0f, 0.0f),
         glm::vec2(0.0f, 0.0f)};
-
     for (uint32_t i = 0; i < obj->po->mesh.num_tris / 2; ++i) {
         dTri* t1 = &obj->po->mesh.tris[i * 2];
         dTri* t2 = &obj->po->mesh.tris[i * 2 + 1];
-
         texvert verts[4] = {
             texvert(vec3(obj->po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4    ]]), texture_corners[0]),
             texvert(vec3(obj->po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4 + 1]]), texture_corners[1]),
             texvert(vec3(obj->po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4 + 2]]), texture_corners[2]),
             texvert(vec3(obj->po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4 + 3]]), texture_corners[3])};
-       
         vertices.insert(vertices.end(), {verts[0], verts[1], verts[2], verts[3]});
-
         // correct the winding order so we can use backface culling
         bool ccw = ((i % 6 == 2) || (i % 6 == 3) || (i % 6 == 5) || (i % 6 == 0));
         if(ccw) {
@@ -198,80 +180,60 @@ void upload_boxen_mesh(RenderObject *obj) {
             indices.insert(indices.end(), {i * 4 + 2, i * 4 + 1, i * 4});
         }
     }
-
     glGenBuffers(1, &obj->vbo);
     glBindBuffer(GL_ARRAY_BUFFER, obj->vbo);
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(texvert), vertices.data(), GL_STATIC_DRAW);
-
     glGenBuffers(1, &obj->ebo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj->ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
-
     // Position attribute
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)0);
     glEnableVertexAttribArray(0);
-
     // Texture coordinate attribute
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
     glEnableVertexAttribArray(1);
-
     glBindVertexArray(0);
 }
 
 void upload_terrain_mesh(RenderObject *obj, Celestial *celestial) {
     glGenVertexArrays(1, &obj->vao);
     glBindVertexArray(obj->vao);
-
     std::vector<texvert> vertices;
     std::vector<GLuint> indices;
-
     for (uint32_t i = 0; i < obj->po->mesh.num_tris; ++i) {
         dTri* t = &obj->po->mesh.tris[i];
         indices.insert(indices.end(), {t->verts[0], t->verts[1], t->verts[2]});
-
         glm::vec3 floatverts[3] = {
             glm::vec3(obj->po->mesh.verts[ t->verts[0] ]),
             glm::vec3(obj->po->mesh.verts[ t->verts[1] ]),
             glm::vec3(obj->po->mesh.verts[ t->verts[2] ])};
-
         glm::vec3 normal = glm::normalize(glm::cross(floatverts[1] - floatverts[0], floatverts[2] - floatverts[0]));
         float inclination = glm::angle(normal, glm::vec3(t->normal));
         float insolation = glm::dot(normal, glm::vec3(0.4, 0.4, 0.4));
-
         for(int j = 0; j < 3; j++){
-            //vertices.insert(vertices.end(), {floatverts[j], glm::vec2(normal.x, normal.z)});
-            
-
             vertices.insert(vertices.end(), {floatverts[j], glm::vec2(inclination, insolation)});
         }
     }
-
     glGenBuffers(1, &obj->vbo);
     glBindBuffer(GL_ARRAY_BUFFER, obj->vbo);
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(texvert), vertices.data(), GL_STATIC_DRAW);
-
     glGenBuffers(1, &obj->ebo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj->ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
-
     // Position attribute
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)0);
     glEnableVertexAttribArray(0);
-
     // Texture coordinate attribute
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
     glEnableVertexAttribArray(1);
-
     glBindVertexArray(0);
 }
-
 
 void initializeGLFW() {
     if (!glfwInit()) {
         std::cerr << "Failed to initialize GLFW\n";
         exit(EXIT_FAILURE);
     }
-
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -298,9 +260,9 @@ void initializeGLEW() {
 
 int screenwidth = 3840;
 int screenheight = 2123;
+int framerate_handicap = 1;
 //int screenheight = 80;
 //int screenwidth = 120;
-int framerate_handicap = 1;
 //int framerate_handicap = 10000;
 int frames_rendered = 0;
 auto prevFrameTime = now();
@@ -370,8 +332,8 @@ void setupTextures(int width, int height) {
 }
 
 void resizeFramebuffer(int w, int h) {
-    int width = w * upscaling_factor;
-    int height = h * upscaling_factor;
+    int width = w * antialiasing;
+    int height = h * antialiasing;
     glViewport(0, 0, width, height);
     glBindTexture(GL_TEXTURE_2D, colorTex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
@@ -400,15 +362,11 @@ void reshape(GLFWwindow* window, int width, int height) {
 void render(RenderObject *obj) {
     glm::mat4 translation = glm::translate(glm::mat4(1.0f), obj->po->zoneSpacePosition());
     glm::mat4 rotation = glm::mat4(glm::quat(obj->po->rot));
-    glm::mat4 view = glm::lookAt(glm::vec3(2.00,1.5,1.5) * glm::max(1.0f, (float)camera_zoom), glm::vec3(0,0,0), glm::vec3(0,1,0));
+    glm::mat4 view = glm::lookAt(glm::vec3(2.00,1.5,1.5) * glm::max(1.0f, (float)camera_zoom),
+            glm::vec3(0,0,0), glm::vec3(0,1,0));
     view = glm::mat4(camera_rot) * view;
-//    glm::mat4 view = glm::lookAt(glm::vec3(20.00,15,15), glm::vec3(0,0,0), glm::vec3(0,1,0));
-//    glm::mat4 view = glm::lookAt(glm::vec3(400.00,350,250), glm::vec3(0,0,0), glm::vec3(0,1,0));
-//    glm::mat4 view = glm::lookAt(glm::vec3(800.00,500,500), glm::vec3(0,0,0), glm::vec3(0,1,0));
-//    glm::mat4 view = glm::lookAt(glm::vec3(10000.00,7500,7500), glm::vec3(0,0,0), glm::vec3(0,1,0));
-//    glm::mat4 view = glm::lookAt(glm::vec3(200000.00,150000,150000), glm::vec3(0,0,0), glm::vec3(0,1,0));
-    
-    glm::mat4 projection = glm::perspective(glm::radians(90.0f * glm::min(1.0f, (float)camera_zoom)), (float)screenwidth / (float)screenheight, 0.001f, 1e38f);
+    glm::mat4 projection = glm::perspective(glm::radians(90.0f * glm::min(1.0f, (float)camera_zoom)),
+            (float)screenwidth / (float)screenheight, 0.001f, 1e38f);
     glm::mat4 transform = projection * view * translation * rotation;
 
     glUseProgram(obj->shader);
@@ -487,8 +445,6 @@ int main() {
     glBindTexture(GL_TEXTURE_2D, textures["isqswjwki55a1.png"]);
     glUniform1i(glGetUniformLocation(shaders["box"], "tex"), 0);
 
-
-
     nonstd::vector<Unit> units;
     nonstd::vector<RenderObject> ros;
 
@@ -498,15 +454,6 @@ int main() {
     spinningCube->addComponent(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 0.01));
     spinningCube->addComponent(dMesh::createBox(glm::dvec3(-1.2, 0.0, 0.0), 1.0, 0.05, 1.0));
     spinningCube->bake(); // 4
-
-    
-    //ground->addComponent(dMesh::createBox(glm::dvec3(0.0, -1.0, 0.0), 1.0, 1.0, 1.0)); // 3
-    //ground->addComponent(dMesh::createTerrain(glm::dvec3(0.0, 0.0, 0.0), 42)); // 3
-    
-    
-//    ground->addComponent(dMesh::createTerrain(glm::dvec3(0.0, 0.0, 0.0), 42)); // 3
-//    ground->bake(); // 4
-
 
     ros.emplace_back(RenderObject(&spinningCube->body)); // 5
     ros.emplace_back(RenderObject(&glitch.body)); // 5
@@ -596,7 +543,7 @@ int main() {
 
         glUniform1i(glGetUniformLocation(ppshader, "mode"), motion_blur_mode);
         glUniform1f(glGetUniformLocation(ppshader, "inv_strength"), motion_blur_invstr);
-        glUniform1f(glGetUniformLocation(ppshader, "upscaling_factor"), upscaling_factor);
+        glUniform1f(glGetUniformLocation(ppshader, "antialiasing"), antialiasing);
 
         // render the color+velocity buffer to the screen buffer with a quad and apply post-processing
         glBindVertexArray(quadVAO);
