@@ -1,11 +1,9 @@
 
 TODO:
 
-
-Implement gravity, velocity and collision test against ground
-
-Implement mouselook, camera zooming with scroll wheel and panning with keyboard
-
+gravity, velocity and collision test against ground
+mouselook, camera zooming with scroll wheel and panning with keyboard
+fluid simulation
 
 
 ---

@@ -11,8 +11,8 @@ public:
     int seed;
     double radius;
     float roughness;
-    FastNoise::SmartNode<FastNoise::Simplex> fnSimplex = FastNoise::New<FastNoise::Simplex>();
-    FastNoise::SmartNode<FastNoise::FractalFBm> fnFractal = FastNoise::New<FastNoise::FractalFBm>();
+    FastNoise::SmartNode<FastNoise::Simplex> fnSimplex;
+    FastNoise::SmartNode<FastNoise::FractalFBm> fnFractal;
 
     TerrainGenerator(int pseed, float proughness);
     float getElevation(dvec3 pos);

@@ -273,6 +273,7 @@ struct dMesh {
 struct Motor {
     double max_force;
     double min_force; // negative values for motors that can produce power in both directions
+    double max_braking_force;
     double max_power; // both positive and negative if applicable
 };
 
@@ -471,7 +472,6 @@ struct Unit {
 // have a very simple hull mesh and the main body can have a hull mesh that combines the outer surface into one mesh
 // except protruding and jointed features since they will be tested separately.
 
-// TODO: calculate the bounding box from the collision shape.
 // 1. physics objects move, rotate, appear and disappear
 // 2. we calculate a transformation matrix from the object's new rotation
 // 3. we transform each point in the collision shape's mesh to calculate a new bounding box (but leave the mesh
@@ -620,6 +620,13 @@ struct TerrainTree {
 
     TerrainGenerator *generator;
     std::vector<ttnode> nodes;
+
+    ~TerrainTree() {
+        if(generator){
+            delete generator;
+            generator = 0;
+        }
+    }
 
     TerrainTree() {
         bzero(this, sizeof(TerrainTree));
@@ -846,7 +853,7 @@ struct Celestial {
         bzero(this, sizeof(Celestial));
         seed = pseed;
         name = pname;
-        terrain = TerrainTree(pseed, pradius, proughness);
+        new(&terrain) TerrainTree(pseed, pradius, proughness);
         auto time_begin = now();
         std::cout << "Generating mesh..\n";
         body = PhysicsObject(terrain.buildMesh(dvec3(0, 6.37101e6, 0), 5), NULL);

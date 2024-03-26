@@ -420,10 +420,17 @@ void render(RenderObject *obj) {
     glBindVertexArray(0);
 }
 
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, GL_TRUE);
+}
+
 int main() {
     initializeGLFW();
     GLFWwindow* window = createWindow(screenwidth, screenheight, "Takeoff Sendario");
     glfwSetWindowSizeCallback(window, reshape);
+    glfwSetKeyCallback(window, key_callback);
     initializeGLEW();
 
     initializeFramebuffer();
@@ -451,7 +458,7 @@ int main() {
     std::vector<Unit> units;
     std::vector<RenderObject> ros;
     // seed, name, radius, roughness, parent body
-    Celestial glitch = Celestial(42, "Glitch", 6.371e6, 0.2, NULL);
+    Celestial glitch(42, "Glitch", 6.371e6, 0.2, NULL);
 
 
     units.push_back(Unit()); // 1

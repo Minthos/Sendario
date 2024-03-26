@@ -53,6 +53,8 @@ gas giant - crushing atmosphere, no surface (jupiter, saturn)
 */
 
 TerrainGenerator::TerrainGenerator(int pseed, float proughness) {
+    fnSimplex = FastNoise::New<FastNoise::Simplex>();
+    fnFractal = FastNoise::New<FastNoise::FractalFBm>();
     seed = pseed;
     roughness = proughness;
     fnFractal->SetSource( fnSimplex );
