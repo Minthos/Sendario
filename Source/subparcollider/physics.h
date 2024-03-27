@@ -436,6 +436,7 @@ struct PhysicsObject {
             collision_pool.free(active_collisions);
             active_collisions = 0;
         }
+        mesh.destroy();
     }
 
     // this just assumes that pos is at the center, of course in practice it will often not be
@@ -481,19 +482,22 @@ struct Unit {
     std::deque<unit_order> order_queue;
     
     Unit() {
-        bzero(this, sizeof(Unit));
+//        bzero(this, sizeof(Unit));
         name = "prototype";
         id = unit_next_uid++;
+        owner_id = 0;
         new(&body) PhysicsObject();
+        limbs_dirty = false;
+        components_dirty = false;
     }
 
     void addLimb(dMesh pmesh) {
-        limbs.emplace_back(PhysicsObject(pmesh, &body));
+        limbs.emplace_back(pmesh, &body);
         limbs_dirty = true;
     }
 
     void addComponent(dMesh pmesh) {
-        components.emplace_back(PhysicsObject(pmesh, &body));
+        components.emplace_back(pmesh, &body);
         components_dirty = true;
     }
 
@@ -717,7 +721,7 @@ struct TerrainTree {
         seed = pseed;
         radius = pradius;
         noise_yscaling = sqrt(radius);
-        LOD_DISTANCE_SCALE = 60.0;
+        LOD_DISTANCE_SCALE = 4.0;
         MAX_LOD = 18;
         generator = new TerrainGenerator(seed, roughness);
         // 6 corners

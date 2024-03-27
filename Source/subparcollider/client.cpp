@@ -455,7 +455,7 @@ int main() {
     nonstd::vector<Unit> units;
     nonstd::vector<RenderObject> ros;
 
-    units.emplace_back(Unit()); // 1
+    units.emplace_back(); // 1
     Unit *spinningCube = &units[0]; // 2
     spinningCube->addComponent(dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0)); // 3
     spinningCube->addComponent(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 0.01));
