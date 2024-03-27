@@ -137,6 +137,11 @@ struct RenderObject {
     bool firstTime;
 
     RenderObject(PhysicsObject *ppo) { po = ppo; firstTime = true; }
+    ~RenderObject() {
+        glDeleteBuffers(1, &vbo);
+        glDeleteBuffers(1, &ebo);
+        glDeleteVertexArrays(1, &vao);
+    }
 };
 
 // uploads a mesh composed of one or more box meshes to the gpu

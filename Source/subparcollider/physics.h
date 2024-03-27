@@ -431,6 +431,13 @@ struct PhysicsObject {
         rot = glm::dquat(1.0, 0.0, 0.0, 0.0);
     }
 
+    ~PhysicsObject() {
+        if(active_collisions) {
+            collision_pool.free(active_collisions);
+            active_collisions = 0;
+        }
+    }
+
     // this just assumes that pos is at the center, of course in practice it will often not be
     double calculateRadius() {
         double greatestRsquared = 0.0;
