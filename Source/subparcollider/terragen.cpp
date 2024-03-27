@@ -88,8 +88,8 @@ void TerrainGenerator::getMultiple(float *elevations, vec3 *scaled_verts, int nu
     float roughnesses[12];
     fnFractal->GenPositionArray3D(elevations, 6, xs, ys, zs, 0, 0, 0, seed);
     fnFractal->GenPositionArray3D(&elevations[6], 6, &xs[6], &ys[6], &zs[6], 0, 0, 0, ~seed);
-    fnFractal->GenPositionArray3D(roughnesses, 6, zs, xs, ys, 0, 0, 0, seed ^ 0xF0F0F0F0F0F0);
-    fnFractal->GenPositionArray3D(&roughnesses[6], 6, &zs[6], &xs[6], &ys[6], 0, 0, 0, ~seed ^ 0xF0F0F0F0F0F0);
+    fnFractal->GenPositionArray3D(&roughnesses[6], 6, zs, xs, ys, 0, 0, 0, seed ^ 0xF0F0F0F0F0F0);
+    fnFractal->GenPositionArray3D(&roughnesses[0], 6, &zs[6], &xs[6], &ys[6], 0, 0, 0, ~seed ^ 0xF0F0F0F0F0F0);
     for(int i = 0; i < 12; i++) {
         elevations[i] = elevations[i] * (glm::max(roughnesses[i], -roughness) + roughness);
     }
