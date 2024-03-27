@@ -211,7 +211,7 @@ void upload_terrain_mesh(RenderObject *obj, Celestial *celestial) {
         float inclination = glm::angle(normal, glm::vec3(t->normal));
         float insolation = glm::dot(normal, glm::vec3(0.4, 0.4, 0.4));
         for(int j = 0; j < 3; j++){
-            vertices.insert(vertices.end(), {floatverts[j], glm::vec3(inclination, insolation, t->elevation)});
+            vertices.insert(vertices.end(), {floatverts[j], glm::vec3(inclination, insolation, t->elevation[j])});
         }
     }
     glGenBuffers(1, &obj->vbo);
