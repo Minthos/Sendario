@@ -711,7 +711,7 @@ struct TerrainTree {
         radius = pradius;
         noise_yscaling = sqrt(radius);
         LOD_DISTANCE_SCALE = 60.0;
-        MAX_LOD = 17;
+        MAX_LOD = 18;
         generator = new TerrainGenerator(seed, roughness);
         // 6 corners
         dvec3 initial_corners[6] = {

@@ -521,7 +521,7 @@ int main() {
                 ro.texture = textures["green_transparent_wireframe_box_64x64.png"];
                 glDisable(GL_CULL_FACE);
                 render(&ro);
-//                glEnable(GL_CULL_FACE);
+                glEnable(GL_CULL_FACE);
 #endif
             }
         }
