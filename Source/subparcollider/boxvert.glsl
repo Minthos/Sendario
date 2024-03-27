@@ -1,7 +1,7 @@
 #version 430
 
 layout(location = 0) in vec3 vertexPosition;
-layout(location = 1) in vec2 vertexTexCoord;
+layout(location = 1) in vec3 vertexTexCoord;
 
 uniform mat4 current;
 uniform mat4 previous;
@@ -23,7 +23,7 @@ void main() {
 
     velocity = curPos.xy / curPos.w - prevPos.xy / prevPos.w;
     gl_Position = curPos;
-    texCoord = vertexTexCoord;
+    texCoord = vertexTexCoord.xy;
     z = gl_Position.z;
 }
 

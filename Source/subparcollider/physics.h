@@ -259,6 +259,7 @@ constexpr dvec3 operator-(const dvec3 lhs, const vec3 rhs) {
 
 struct dTri {
     uint32_t verts[3];
+    float elevation;
     glm::dvec3 normal;
 
     dTri() {}
@@ -778,6 +779,7 @@ struct TerrainTree {
 
            if(ratio > LOD_DISTANCE_SCALE || level > MAX_LOD) {
                 dTri t;
+                t.elevation = 0;
                 dvec3 center = {0, 0, 0};
                 for(int i = 0; i < 3; i++) {
                     t.verts[i] = verts->size();
@@ -788,8 +790,10 @@ struct TerrainTree {
                     point = point - location + ((nodes[node_idx].elevation[i] * noise_yscaling) * (point / length));
                     verts->push_back(point);
                     center += point;
+                    t.elevation += nodes[node_idx].elevation[i] * noise_yscaling;
                 }
                 t.normal = glm::normalize(nodes[node_idx].verts[0]);
+                t.elevation /= 3.0f;
                 
                 tris->push_back(t);
                 nodes[node_idx].rendered_at_level = level;

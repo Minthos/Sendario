@@ -123,9 +123,9 @@ GLuint loadTexture(const char* filename, bool smooth) {
 
 struct texvert {
     glm::vec3 xyz;
-    glm::vec2 uv;
+    glm::vec3 uv;
 
-    texvert(glm::vec3 a, glm::vec2 b) { xyz = a; uv = b; }
+    texvert(glm::vec3 a, glm::vec3 b) { xyz = a; uv = b; }
 };
 
 struct RenderObject {
@@ -156,11 +156,11 @@ void upload_boxen_mesh(RenderObject *obj) {
         3, 1, 7, 5, // right
         3, 2, 7, 6, // back
         5, 4, 7, 6}; // bottom
-    glm::vec2 texture_corners[4] = {
-        glm::vec2(1.0f, 1.0f),
-        glm::vec2(0.0f, 1.0f),
-        glm::vec2(1.0f, 0.0f),
-        glm::vec2(0.0f, 0.0f)};
+    glm::vec3 texture_corners[4] = {
+        glm::vec3(1.0f, 1.0f, 0.0f),
+        glm::vec3(0.0f, 1.0f, 0.0f),
+        glm::vec3(1.0f, 0.0f, 0.0f),
+        glm::vec3(0.0f, 0.0f, 0.0f)};
     for (uint32_t i = 0; i < obj->po->mesh.num_tris / 2; ++i) {
         dTri* t1 = &obj->po->mesh.tris[i * 2];
         dTri* t2 = &obj->po->mesh.tris[i * 2 + 1];
@@ -187,10 +187,10 @@ void upload_boxen_mesh(RenderObject *obj) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj->ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
     // Position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0);
     glEnableVertexAttribArray(0);
     // Texture coordinate attribute
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
     glEnableVertexAttribArray(1);
     glBindVertexArray(0);
 }
@@ -211,7 +211,7 @@ void upload_terrain_mesh(RenderObject *obj, Celestial *celestial) {
         float inclination = glm::angle(normal, glm::vec3(t->normal));
         float insolation = glm::dot(normal, glm::vec3(0.4, 0.4, 0.4));
         for(int j = 0; j < 3; j++){
-            vertices.insert(vertices.end(), {floatverts[j], glm::vec2(inclination, insolation)});
+            vertices.insert(vertices.end(), {floatverts[j], glm::vec3(inclination, insolation, t->elevation)});
         }
     }
     glGenBuffers(1, &obj->vbo);
@@ -221,10 +221,10 @@ void upload_terrain_mesh(RenderObject *obj, Celestial *celestial) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj->ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
     // Position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0);
     glEnableVertexAttribArray(0);
     // Texture coordinate attribute
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
     glEnableVertexAttribArray(1);
     glBindVertexArray(0);
 }
