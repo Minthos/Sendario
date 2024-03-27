@@ -710,7 +710,7 @@ struct TerrainTree {
         seed = pseed;
         radius = pradius;
         noise_yscaling = sqrt(radius);
-        LOD_DISTANCE_SCALE = 60.0;
+        LOD_DISTANCE_SCALE = 200.0;
         MAX_LOD = 18;
         generator = new TerrainGenerator(seed, roughness);
         // 6 corners
@@ -825,7 +825,7 @@ struct TerrainTree {
                 glm::normalize(nodes[node_idx].verts[1]) * radius * noise_xzscaling2,
                 glm::normalize(nodes[node_idx].verts[2]) * radius * noise_xzscaling2};
             float elevations[12];
-            generator->getMultiple(elevations, scaled_verts, 12);
+            generator->getMultiple(elevations, scaled_verts, 12, 0.2);
 
             for(int i = 0; i < 6; i++) {
                 elevations[i] += (elevations[i+6] * 5.0);

@@ -16,7 +16,7 @@ public:
 
     TerrainGenerator(int pseed, float proughness);
     float getElevation(dvec3 pos);
-    void getMultiple(float *elevations, vec3 *positions, int num);
+    void getMultiple(float *elevations, vec3 *positions, int num, float typeslider);
 };
 
 
