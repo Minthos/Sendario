@@ -394,12 +394,14 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
 static void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
 {
-    if(camera_initial_x == 0 && camera_initial_y == 0){
-        camera_initial_x = xpos;
-        camera_initial_y = ypos;
+    if(!((camera_initial_x == 0 && camera_initial_y == 0) ||
+                abs(xpos - camera_initial_x) > 200.0 || abs(ypos - camera_initial_y) > 200.0)){
+        camera_rot = glm::angleAxis((float)(xpos - camera_initial_x) / 1000.0f, glm::vec3(0.0, 1.0, 0.0)) * camera_rot;
+        camera_rot = glm::angleAxis((float)(ypos - camera_initial_y) / 1000.0f, glm::vec3(1.0, 0.0, 0.0)) * camera_rot;
+        camera_rot = glm::normalize(camera_rot);
     }
-    camera_rot = glm::normalize(glm::angleAxis((float)(xpos - camera_initial_x) / 1000.0f, glm::vec3(0.0, 1.0, 0.0)));
-    camera_rot = glm::normalize(glm::angleAxis((float)(ypos - camera_initial_y) / 1000.0f, glm::vec3(1.0, 0.0, 0.0)) * camera_rot);
+    camera_initial_x = xpos;
+    camera_initial_y = ypos;
 }
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
