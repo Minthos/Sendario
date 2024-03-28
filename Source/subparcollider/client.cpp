@@ -484,46 +484,33 @@ int main(int argc, char** argv) {
     nonstd::vector<RenderObject> ros;
 
     units.emplace_back(); // 1
-    Unit *spinningCube = &units[0]; // 2
-    spinningCube->addComponent(dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0)); // 3
-    spinningCube->addComponent(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 0.01));
-    spinningCube->addComponent(dMesh::createBox(glm::dvec3(-1.2, 0.0, 0.0), 1.0, 0.05, 1.0));
-    spinningCube->bake(); // 4
+    Unit *player_character = &units[0]; // 2
+    player_character->addComponent(dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0)); // 3
+    player_character->addComponent(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 0.01));
+    player_character->addComponent(dMesh::createBox(glm::dvec3(-1.2, 0.0, 0.0), 1.0, 0.05, 1.0));
+    player_character->bake(); // 4
 
-    ros.emplace_back(&spinningCube->body); // 5
+    ros.emplace_back(&player_character->body); // 5
     ros.emplace_back(&glitch.body); // 5
-    spinningCube->body.ro = &ros[0]; // 6
+    player_character->body.ro = &ros[0]; // 6
     glitch.body.ro = &ros[1]; // 6
 
-    for(int i = 0; i < spinningCube->components.size(); i++) {
-//        ros.push_back(RenderObject(&spinningCube->components[i]));
-//        ros[ros.size() - 1].po->rot = glm::angleAxis(3.14, glm::dvec3(0.0001, 0.0, 0.9999)) * ros[ros.size() - 1].po->rot;
-    }    
-//    for(int i = 0; i < ros.size(); i++) {
-        upload_boxen_mesh(spinningCube->body.ro);
-        spinningCube->body.ro->shader = shaders["box"];
-        spinningCube->body.ro->texture = textures["isqswjwki55a1.png"];
+    upload_boxen_mesh(player_character->body.ro);
+    player_character->body.ro->shader = shaders["box"];
+    player_character->body.ro->texture = textures["isqswjwki55a1.png"];
 
-        upload_terrain_mesh(glitch.body.ro, &glitch);
-        glitch.body.ro->shader = shaders["terrain"];
-        glitch.body.ro->texture = textures["isqswjwki55a1.png"];
-
-//    }
+    upload_terrain_mesh(glitch.body.ro, &glitch);
+    glitch.body.ro->shader = shaders["terrain"];
+    glitch.body.ro->texture = textures["isqswjwki55a1.png"];
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
-
         if(!game_paused){
-            if((frames_rendered / 1100) % 2){
-    //            spinningCube->body.rot = glm::angleAxis(-0.000001, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
-                ros[0].po->pos += dvec3(0.01, 0.01, 0.01);
-            } else {
-                ros[0].po->pos -= dvec3(0.01, 0.01, 0.01);
-            }
+            player_character->body.rot = camera_rot;
+            ttnode* tile = glitch.terrain[player_character->body.pos];
+            ttnode* northpole = glitch.terrain[0x2aaaaaaaa8];
 
-            spinningCube->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 0.0, 1.0)) * spinningCube->body.rot;
-            //glitch.body.rot = glm::normalize(glm::angleAxis(0.004, glm::dvec3(0.4, 0.4, 0.4)) * glitch.body.rot);
-            glitch.body.rot = glm::normalize(glm::angleAxis(0.0004, glm::dvec3(0.0, 1.0, 0.0)) * glitch.body.rot);
+            //glitch.body.rot = glm::normalize(glm::angleAxis(0.0004, glm::dvec3(0.0, 0.0, 0.0)) * glitch.body.rot);
         }
 
         if(game_paused && !camera_dirty){
@@ -538,7 +525,7 @@ int main(int argc, char** argv) {
 
 //        ground->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * ground->body.rot;
         render(glitch.body.ro);
-        ctleaf l = ctleaf(&spinningCube->body);
+        ctleaf l = ctleaf(&player_character->body);
         CollisionTree t = CollisionTree(dvec3(0.0), &l, 1);
 
         nonstd::vector<ctnode*> stack;

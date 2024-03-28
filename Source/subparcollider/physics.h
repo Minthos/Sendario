@@ -681,6 +681,7 @@ struct CollisionTree {
 };
 
 struct ttnode {
+    uint64_t path;
     uint32_t first_child;
     uint32_t neighbors[3];
     uint32_t rendered_at_level; // number of subdivisions to reach this node, if it was rendered. otherwise 0.
@@ -755,8 +756,8 @@ struct TerrainTree {
             {5, 1, 7},
             {6, 0, 4},
         };
-        for(int i = 0; i < 8; i++){
-            nodes.push_back({ 0, 0,
+        for(uint64_t i = 0; i < 8; i++){
+            nodes.push_back({i, 0, 0,
                     neighbors[i][0], neighbors[i][1], neighbors[i][2],
                     generator->getElevation(initial_corners[indices[i][0]]),
                     generator->getElevation(initial_corners[indices[i][1]]),
@@ -767,19 +768,23 @@ struct TerrainTree {
         }
     }
 
+    ttnode* operator[](uint64_t tile_id) {
+        return nullptr;
+    }
+
+    ttnode* operator[](dvec3 pos) {
+        return nullptr;
+    }
+
     // to keep things simple I will define a zone as a triangle at some reasonable subdivision level
     // (~1 km on earth's surface?)
     // and a zone's id will be encoded in a 64 bit unsigned integer
-    // the least significant bit separates north/south
-    // the next two bits encode which of the 4 subdivisions to traverse
-    // 0 - 3: lat lon (0 - 90, 0 - 90), (0 - 90, 90 - 180), (0 - 90, 180 - 270), (0 - 90, 270 - 0)
-    // 4 - 7: lat lon (-90 - 0, -90 - 0), (-90 - 0, 90 - 180), (-90 - 0, 180 - 270), (-90 - 0, 270 - 0)
-    // for every 2 additional bits we encode one more level of subdivision in clockwise order seen from above the
-    // nearest pole (so the northern hemisphere will be traversed west-east and the southern east-west)
-    //
-    // initially we can just ignore location and set min_subdivisions to something low like 2 or 3
+    // the two least significant bits encode which quadrant of the hemisphere
+    // the third least significant bit separates north/south
+    // for every 2 additional bits we encode one more level of subdivision in clockwise order
 
-    void generate(dvec3 location, uint32_t node_idx, nonstd::vector<glm::dvec3> *verts, nonstd::vector<dTri> *tris, int level, int min_level) {
+    void generate(dvec3 location, uint32_t node_idx, nonstd::vector<glm::dvec3> *verts, nonstd::vector<dTri> *tris, uint64_t level, int min_level, uint64_t path) {
+        nodes[node_idx].path = path;
         double noise_xzscaling = 0.0001;
         double noise_xzscaling2 = -0.00001;
         // a LOD going on here
@@ -809,6 +814,9 @@ struct TerrainTree {
                 if(level <= MAX_LOD){
                     // add a billboard for distant vegetation and buildings
                     
+                } else if(distance < 30.0) {
+                    center /= 3.0;
+                    std::cout << "tile " << std::hex << path << " at (" << center.x << ", " << center.y << ", " << center.z << ")\n";
                 }
                 return;
             }
@@ -843,7 +851,7 @@ struct TerrainTree {
             }
 
             // the center triangle neighbors the other 3 triangles, that's easy
-            nodes.push_back({ 0, 0,
+            nodes.push_back({0, 0, 0,
                 (uint32_t)nodes.size() + 1, (uint32_t)nodes.size() + 2, (uint32_t)nodes.size() + 3,
                 elevations[0],
                 elevations[1],
@@ -854,7 +862,7 @@ struct TerrainTree {
             // the other 3 triangles neighbor the center triangle and child trangles of the parent's neighbors
             // we can't know the parent's neighbors' children because they may not exist yet
             for(int i = 0; i < 3; i++) {
-                nodes.push_back({ 0, 0,
+                nodes.push_back({0, 0, 0,
                     0, 0, (uint32_t)nodes.size(),
                     elevations[i + 3],
                     elevations[i],
@@ -865,8 +873,10 @@ struct TerrainTree {
             }
         }
         // we need to go deeper
-        for(int i = 0; i < 4; i++) {
-            generate(location, nodes[node_idx].first_child + i, verts, tris, level + 1, min_level);
+        for(uint64_t i = 0; i < 4; i++) {
+            generate(location, nodes[node_idx].first_child + i, verts, tris, level + 1, min_level,
+                    path | (i << (1 + 2 * level))
+                    );
         }
     }
 
@@ -920,7 +930,7 @@ struct TerrainTree {
         nonstd::vector<glm::dvec3> verts;
         nonstd::vector<dTri> tris;
         for(int i = 0; i < 8; i++) {
-            generate(location, i, &verts, &tris, 1, min_subdivisions);
+            generate(location, i, &verts, &tris, 1, min_subdivisions, i);
         }
         dvec3 *vertices = (dvec3*)malloc(verts.size() * sizeof(dvec3) + tris.size() * sizeof(dTri));
         dTri *triangles = (dTri*)&vertices[verts.size()];
