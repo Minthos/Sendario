@@ -428,12 +428,26 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
     camera_dirty = true;
 }
 
-int main() {
-    // seed, name, radius, roughness, parent body
-    Celestial glitch(42, "Glitch", 6.371e6, 0.2, NULL);
-    for(int i = 0; i < 5; i++) {
-        glitch.orbiting_bodies.emplace_back(42 + i, fstr("Glitch-%d", i), 1e6, 0.2, &glitch);
+int main(int argc, char** argv) {
+    int seed = 52;
+    int lod = 40;
+    if(argc > 2){
+        seed = atol(argv[1]);
+        lod = atol(argv[2]);
+    } else {
+        std::cout << "\n\nPlease specify prng seed and LOD distance\n";
+        std::cout << "Usage: " << argv[0] << " seed LOD\n";
+        std::cout << "Using default values " << seed << " and " << lod << "\n\n\n";
     }
+
+    // seed, name, radius, roughness, parent body
+    Celestial glitch(seed, (double)lod, "Glitch", 6.371e6, 0.2, NULL);
+    
+    glitch.orbiting_bodies.emplace_back(seed + 1, (double)lod, "Jank", 1e6, 0.2, &glitch);
+    glitch.orbiting_bodies.emplace_back(seed + 2, (double)lod, "Kludge", 1e6, 0.2, &glitch);
+    glitch.orbiting_bodies.emplace_back(seed + 3, (double)lod, "Artifact", 1e6, 0.2, &glitch);
+    glitch.orbiting_bodies.emplace_back(seed + 4, (double)lod, "Haxx", 1e6, 0.2, &glitch);
+
     initializeGLFW();
     GLFWwindow* window = createWindow(screenwidth, screenheight, "Takeoff Sendario");
     glfwWindowHint(GLFW_AUTO_ICONIFY, GL_FALSE);

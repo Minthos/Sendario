@@ -717,11 +717,11 @@ struct TerrainTree {
     // noise generator.
     // LOD_DISTANCE_SCALE should be roughly on the order of 10 to 100 for decent performance. The gpu can handle more
     // polygons but generating the geometry on the cpu is slow
-    TerrainTree(uint64_t pseed, double pradius, float roughness) {
+    TerrainTree(uint64_t pseed, double pLOD, double pradius, float roughness) {
         seed = pseed;
         radius = pradius;
         noise_yscaling = sqrt(radius);
-        LOD_DISTANCE_SCALE = 60.0;
+        LOD_DISTANCE_SCALE = pLOD;
         MAX_LOD = 18;
         generator = new TerrainGenerator(seed, roughness);
         // 6 corners
@@ -949,11 +949,11 @@ struct Celestial {
         std::cout << "Celestial " << name << " memcpy copy constructor\n";
     }
 
-    Celestial(uint64_t pseed, std::string pname, double pradius, float proughness, Celestial *pnearest_star) {
+    Celestial(uint64_t pseed, double pLOD, std::string pname, double pradius, float proughness, Celestial *pnearest_star) {
         bzero(this, sizeof(Celestial));
         seed = pseed;
         name = pname;
-        new(&terrain) TerrainTree(pseed, pradius, proughness);
+        new(&terrain) TerrainTree(pseed, pLOD, pradius, proughness);
         auto time_begin = now();
         std::cout << "Generating mesh..\n";
         new(&body) PhysicsObject(terrain.buildMesh(dvec3(0, 6.37101e6, 0), 3), NULL);
