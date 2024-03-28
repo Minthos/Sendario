@@ -19,8 +19,10 @@ void main() {
     vec3 color = mix(grass, rock, max(0.0, min(1.0, (-0.5 + 5 * inclination) - max(0.0, (elevation - 3000) / 2000.0) )));
     if(elevation < 1.0){
         color = vec3(0.1, 0.2, 0.3);
+        fragColor = vec4(color * (3.0 + insolation) * 0.25, 1.0);
+    } else {
+        fragColor = vec4(color * insolation, 1.0);
     }
-    fragColor = vec4(color * insolation, 1.0);
     velocityOut = velocity;
     gl_FragDepth = log2(z + 2.0) * 0.03;
 }
