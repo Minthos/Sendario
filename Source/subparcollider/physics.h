@@ -653,10 +653,7 @@ struct CollisionTree {
             free(root);
             root = 0;
         }
-        if(leaves){
-//            free(leaves);
-            leaves = 0;
-        }
+        leaves = 0;
     }
 
     CollisionTree(dvec3 origo) {
@@ -689,6 +686,14 @@ struct ttnode {
     dvec3 verts[3]; // vertices on the unit sphere
 
     // add more stuff like temperature, moisture, vegetation
+    
+    vec3 LODspacePosition(dvec3 location, float noise_yscaling, double radius, int i) {
+        glm::vec3 point = verts[i];
+        double length = glm::length(point);
+        point = point * (radius / length);
+        point = point - location + ((elevation[i] * noise_yscaling) * (point / length));
+        return point;
+    }
 };
 
 struct TerrainTree {
@@ -768,21 +773,6 @@ struct TerrainTree {
         }
     }
 
-    ttnode* operator[](uint64_t tile_id) {
-        return nullptr;
-    }
-
-    ttnode* operator[](dvec3 pos) {
-        return nullptr;
-    }
-
-    // to keep things simple I will define a zone as a triangle at some reasonable subdivision level
-    // (~1 km on earth's surface?)
-    // and a zone's id will be encoded in a 64 bit unsigned integer
-    // the two least significant bits encode which quadrant of the hemisphere
-    // the third least significant bit separates north/south
-    // for every 2 additional bits we encode one more level of subdivision in clockwise order
-
     void generate(dvec3 location, uint32_t node_idx, nonstd::vector<glm::dvec3> *verts, nonstd::vector<dTri> *tris, uint64_t level, int min_level, uint64_t path) {
         nodes[node_idx].path = path;
         double noise_xzscaling = 0.0001;
@@ -799,10 +789,7 @@ struct TerrainTree {
                 for(int i = 0; i < 3; i++) {
                     t.verts[i] = verts->size();
                     // scaling each point to the surface of the spheroid and adding the elevation value
-                    glm::vec3 point = nodes[node_idx].verts[i];
-                    double length = glm::length(point);
-                    point = point * (radius / length);
-                    point = point - location + ((nodes[node_idx].elevation[i] * noise_yscaling) * (point / length));
+                    glm::vec3 point = nodes[node_idx].LODspacePosition(location, noise_yscaling, radius, i);
                     verts->push_back(point);
                     center += point;
                     t.elevation[i] = nodes[node_idx].elevation[i] * noise_yscaling;
@@ -812,11 +799,11 @@ struct TerrainTree {
                 tris->push_back(t);
                 nodes[node_idx].rendered_at_level = level;
                 if(level <= MAX_LOD){
-                    // add a billboard for distant vegetation and buildings
+                    // TODO: add a billboard for distant vegetation and buildings
                     
                 } else if(distance < 30.0) {
                     center /= 3.0;
-                    std::cout << "tile " << std::hex << path << " at (" << center.x << ", " << center.y << ", " << center.z << ")\n";
+                    std::cout << "tile " << fstr("%llx", path) << " at (" << center.x << ", " << center.y << ", " << center.z << ")\n";
                 }
                 return;
             }
@@ -879,6 +866,36 @@ struct TerrainTree {
                     );
         }
     }
+
+    ttnode* operator[](uint64_t tile) {
+        ttnode* n = &nodes[tile & 7];
+        uint64_t i = 0;
+        while(n->first_child){
+            ++i;
+            n = &nodes[n->first_child + ((tile >> (1 + 2 * i)) & 3)];
+        }
+        return n;
+    }
+
+    // TODO URGENT: implement this
+    // I guess pos must be relative to the center of the celestial, not relative to the player's zone
+    ttnode* operator[](dvec3 pos) {
+        // transform pos to subdivision coordinate space
+        // find the starting quadrant and hemisphere
+        // traverse tree, for each level check if pos is inside the center triangle
+        // if not, pos is inside the triangle whose far corner is closest to pos
+
+        return nullptr;
+    }
+
+    // to keep things simple I define a zone as a triangle at some reasonable subdivision level
+    // (~1 km on earth's surface?)
+    // and a zone's id will be encoded in a 64 bit unsigned integer
+    // actually any terrain node can be encoded like this since the terrain tree is only 18 levels deep (=37 bits)
+    // the two least significant bits encode which quadrant of the hemisphere
+    // the third least significant bit separates north/south
+    // for every 2 additional bits we encode one more level of subdivision in clockwise order
+
 
     // breadth-first traversal of all the nodes in the terrain tree
     // TODO: somehow set the correct neighbor pointers for each node

@@ -273,6 +273,7 @@ int frames_rendered = 0;
 auto prevFrameTime = now();
 bool game_paused = false;
 
+glm::vec3 camera_target = vec3(0,0,0);
 glm::quat camera_rot;
 double camera_initial_x;
 double camera_initial_y;
@@ -369,8 +370,8 @@ void reshape(GLFWwindow* window, int width, int height) {
 void render(RenderObject *obj) {
     glm::mat4 translation = glm::translate(glm::mat4(1.0f), obj->po->zoneSpacePosition());
     glm::mat4 rotation = glm::mat4(glm::quat(obj->po->rot));
-    glm::mat4 view = glm::lookAt(glm::vec3(2.00,1.5,1.5) * glm::max(1.0f, (float)camera_zoom),
-            glm::vec3(0,0,0), glm::vec3(0,1,0));
+    glm::mat4 view = glm::lookAt(camera_target + glm::vec3(2.00,1.5,1.5) * glm::max(1.0f, (float)camera_zoom),
+            camera_target, glm::vec3(0,1,0));
     view = glm::mat4(camera_rot) * view;
     glm::mat4 projection = glm::perspective(glm::radians(90.0f * glm::min(1.0f, (float)camera_zoom)),
             (float)screenwidth / (float)screenheight, 0.001f, 1e38f);
@@ -509,6 +510,10 @@ int main(int argc, char** argv) {
             player_character->body.rot = camera_rot;
             ttnode* tile = glitch.terrain[player_character->body.pos];
             ttnode* northpole = glitch.terrain[0x2aaaaaaaa8];
+
+            //player_character->body.pos.y = tile->elevation[0] * glitch.terrain.noise_yscaling;
+            player_character->body.pos.y = northpole->elevation[0] * glitch.terrain.noise_yscaling;
+            camera_target = vec3(player_character->body.pos);
 
             //glitch.body.rot = glm::normalize(glm::angleAxis(0.0004, glm::dvec3(0.0, 0.0, 0.0)) * glitch.body.rot);
         }
