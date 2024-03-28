@@ -271,11 +271,13 @@ int framerate_handicap = 1;
 //int framerate_handicap = 10000;
 int frames_rendered = 0;
 auto prevFrameTime = now();
+bool game_paused = false;
 
 glm::quat camera_rot;
 double camera_initial_x;
 double camera_initial_y;
 double camera_zoom = 1.0;
+bool camera_dirty = true;
 
 GLuint framebuffer, colorTex, velocityTex;
 GLuint ppshader;
@@ -393,6 +395,16 @@ void render(RenderObject *obj) {
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
+    if(action == GLFW_PRESS){
+        switch(key) {
+            case GLFW_KEY_ESCAPE:
+                glfwSetWindowShouldClose(window, GL_TRUE);
+                break;
+            case GLFW_KEY_SPACE:
+                game_paused = !game_paused;
+                break;
+        }
+    }
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GL_TRUE);
 }
@@ -407,11 +419,13 @@ static void cursor_position_callback(GLFWwindow* window, double xpos, double ypo
     }
     camera_initial_x = xpos;
     camera_initial_y = ypos;
+    camera_dirty = true;
 }
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
     camera_zoom *= 1.0 + (-0.3 * yoffset);
+    camera_dirty = true;
 }
 
 int main() {
@@ -462,8 +476,8 @@ int main() {
     spinningCube->addComponent(dMesh::createBox(glm::dvec3(-1.2, 0.0, 0.0), 1.0, 0.05, 1.0));
     spinningCube->bake(); // 4
 
-    ros.emplace_back(RenderObject(&spinningCube->body)); // 5
-    ros.emplace_back(RenderObject(&glitch.body)); // 5
+    ros.emplace_back(&spinningCube->body); // 5
+    ros.emplace_back(&glitch.body); // 5
     spinningCube->body.ro = &ros[0]; // 6
     glitch.body.ro = &ros[1]; // 6
 
@@ -484,23 +498,32 @@ int main() {
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
+
+        if(!game_paused){
+            if((frames_rendered / 1100) % 2){
+    //            spinningCube->body.rot = glm::angleAxis(-0.000001, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
+                ros[0].po->pos += dvec3(0.01, 0.01, 0.01);
+            } else {
+                ros[0].po->pos -= dvec3(0.01, 0.01, 0.01);
+            }
+
+            spinningCube->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 0.0, 1.0)) * spinningCube->body.rot;
+            //glitch.body.rot = glm::normalize(glm::angleAxis(0.004, glm::dvec3(0.4, 0.4, 0.4)) * glitch.body.rot);
+            glitch.body.rot = glm::normalize(glm::angleAxis(0.0004, glm::dvec3(0.0, 1.0, 0.0)) * glitch.body.rot);
+        }
+
+        if(game_paused && !camera_dirty){
+            usleep(8000.0);
+            glfwPollEvents();
+            continue;
+        }
+        camera_dirty = false;
+
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 //        ground->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * ground->body.rot;
         render(glitch.body.ro);
-
-        if((frames_rendered / 1100) % 2){
-//            spinningCube->body.rot = glm::angleAxis(-0.000001, glm::dvec3(0.0, 1.0, 0.0)) * spinningCube->body.rot;
-            ros[0].po->pos += dvec3(0.01, 0.01, 0.01);
-        } else {
-            ros[0].po->pos -= dvec3(0.01, 0.01, 0.01);
-        }
-
-        spinningCube->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 0.0, 1.0)) * spinningCube->body.rot;
-        //glitch.body.rot = glm::normalize(glm::angleAxis(0.004, glm::dvec3(0.4, 0.4, 0.4)) * glitch.body.rot);
-        glitch.body.rot = glm::normalize(glm::angleAxis(0.0004, glm::dvec3(0.0, 1.0, 0.0)) * glitch.body.rot);
-       
         ctleaf l = ctleaf(&spinningCube->body);
         CollisionTree t = CollisionTree(dvec3(0.0), &l, 1);
 
