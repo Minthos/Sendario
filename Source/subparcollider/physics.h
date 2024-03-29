@@ -680,21 +680,25 @@ struct CollisionTree {
 struct ttnode {
     uint64_t path;
     uint32_t first_child;
+    uint32_t triangle;
     uint32_t neighbors[3];
     uint32_t rendered_at_level; // number of subdivisions to reach this node, if it was rendered. otherwise 0.
-    double elevations[3]; // elevation of the node's 3 corners
-    dvec3 verts[3]; // vertices on the unit sphere
+    double elevations[3]; // elevation of the node's 3 corners above the planet's spheroid
+    dvec3 verts[3]; // vertices (node space (octahedron with manhattan distance to center = r everywhere on the surface))
 
     // add more stuff like temperature, moisture, vegetation
+
     
-    vec3 LODspacePosition(dvec3 location, float noise_yscaling, double radius, int i) {
+    // position of 0th vertex transformed to zone space (LOD space)
+    vec3 LODspacePosition(dvec3 location, double radius, int i) {
         glm::vec3 point = verts[i];
         double length = glm::length(point);
         point = point * (radius / length);
-        point = point - location + ((elevations[i] * noise_yscaling) * (point / length));
+        point = point - location + (elevations[i] * (point / length));
         return point;
     }
 
+    // node space center
     dvec3 center() {
         dvec3 pos(0.0);
         for(int i = 0; i < 3; i++) {
@@ -713,31 +717,60 @@ struct ttnode {
         return elevation;
     }
 
-    double elevation(dvec3 pos) {
-        glm::dvec2 location = glm::dvec2(pos.x, pos.z);
+    // pos should be direction from center of celestial, length >= 1mm
+    double elevation(dvec3 pos, double radius) {
+        double manhattan_length = abs(pos[0]) + abs(pos[1]) + abs(pos[2]);
+        if(manhattan_length < 0.001){
+            return 0;
+        }
+        // location is pos projected onto the surface of the node space octahedron
+        dvec3 location = pos * (radius / manhattan_length);
+
+//    double elevation(dvec3 pos, dMesh* mesh) {
+//        dTri *tri = mesh->triangles[triangle];
+     
+
+        
+        dvec3 v0 = verts[1] - verts[0], v1 = verts[2] - verts[0], v2 = location - verts[0];
+        double d00 = glm::dot(v0, v0);
+        double d01 = glm::dot(v0, v1);
+        double d11 = glm::dot(v1, v1);
+        double d20 = glm::dot(v2, v0);
+        double d21 = glm::dot(v2, v1);
+        double denom = d00 * d11 - d01 * d01;
+        double v = (d11 * d20 - d01 * d21) / denom;
+        double w = (d00 * d21 - d01 * d20) / denom;
+        double u = 1.0 - v - w;
+
+        std::cout << "u: " << u << "v: " << v << "w: " << w << "\n";
+        u = max(0.0, u);
+        v = max(0.0, v);
+        w = max(0.0, w);
+        std::cout << "u: " << u << "v: " << v << "w: " << w << "\n";
+        std::cout << "elevations: " << elevations[0] << ", " << elevations[1] << ", " << elevations[2] << "\n";
+
+        return (u * elevations[0] + v * elevations[1] + w * elevations[2]) / (u + v + w);
+        
+
+/*
         double e = 0;
         double sum_distance = 0;
         for(uint64_t i = 0; i < 3; i++){
-            double distance = glm::length(location - glm::dvec2(verts[i].x, verts[i].z));
+            double distance = glm::length(location - verts[i]);
             sum_distance += distance;
         }
         for(uint64_t i = 0; i < 3; i++){
-            double distance = glm::length(location - glm::dvec2(verts[i].x, verts[i].z));
+            double distance = glm::length(location - verts[i]);
             e += (sum_distance * 0.5 - distance) * elevations[i];
         }
-//        std::cout << "elevation: " << e << " elevation(): " << elevation() << " sum_distance: " << sum_distance << "\n";
-//        std::cout << location.x << ", " << location.y << "\n";
-//        for(uint64_t i = 0; i < 3; i++){
-//            std::cout << verts[i].x << ", " << verts[i].y << ", " << verts[i].z << "\n";
-//        }
-        return e / (sum_distance * 0.5);
+        return e / (sum_distance * 0.5);*/
     }
 };
 
 struct TerrainTree {
     uint64_t seed;
     double radius;
-    float noise_yscaling;
+    double noise_yscaling;
     double LOD_DISTANCE_SCALE;
     int MAX_LOD;
     float highest_point = 0.0f;
@@ -800,7 +833,7 @@ struct TerrainTree {
             {6, 0, 4},
         };
         for(uint64_t i = 0; i < 8; i++){
-            nodes.push_back({i, 0, 0,
+            nodes.push_back({i, 0, 0, 0,
                     neighbors[i][0], neighbors[i][1], neighbors[i][2],
                     generator->getElevation(initial_corners[indices[i][0]]),
                     generator->getElevation(initial_corners[indices[i][1]]),
@@ -828,13 +861,14 @@ struct TerrainTree {
                 for(int i = 0; i < 3; i++) {
                     t.verts[i] = verts->size();
                     // scaling each point to the surface of the spheroid and adding the elevation value
-                    glm::vec3 point = nodes[node_idx].LODspacePosition(location, noise_yscaling, radius, i);
+                    glm::vec3 point = nodes[node_idx].LODspacePosition(location, radius, i);
                     verts->push_back(point);
                     center += point;
-                    t.elevations[i] = nodes[node_idx].elevations[i] * noise_yscaling;
+                    t.elevations[i] = nodes[node_idx].elevations[i];
                 }
                 t.normal = glm::normalize(nodes[node_idx].verts[0]);
                 
+                nodes[node_idx].triangle = tris->size();
                 tris->push_back(t);
                 nodes[node_idx].rendered_at_level = level;
                 if(level <= MAX_LOD){
@@ -842,7 +876,8 @@ struct TerrainTree {
                     
                 } else if(distance < 30.0) {
                     center /= 3.0;
-                    std::cout << "tile " << fstr("%llx", path) << " at (" << center.x << ", " << center.y << ", " << center.z << ")\n";
+                    std::cout << "tile " << fstr("%llx", path) << " at (" << center.x << ", " << center.y << ", " << center.z << ") zone space, (";
+                    std::cout << nodes[node_idx].verts[0].x << ", " << nodes[node_idx].verts[0].y << ", " << nodes[node_idx].verts[0].z << ") node space\n";
                 }
                 return;
             }
@@ -872,27 +907,27 @@ struct TerrainTree {
 
             for(int i = 0; i < 6; i++) {
                 elevations[i] += (elevations[i+6] * 5.0);
-                lowest_point = glm::min(elevations[i] * noise_yscaling, lowest_point);
-                highest_point = glm::max(elevations[i] * noise_yscaling, highest_point);
+                lowest_point = glm::min(elevations[i] * (float)noise_yscaling, lowest_point);
+                highest_point = glm::max(elevations[i] * (float)noise_yscaling, highest_point);
             }
 
             // the center triangle neighbors the other 3 triangles, that's easy
-            nodes.push_back({0, 0, 0,
+            nodes.push_back({0, 0, 0, 0,
                 (uint32_t)nodes.size() + 1, (uint32_t)nodes.size() + 2, (uint32_t)nodes.size() + 3,
-                elevations[0],
-                elevations[1],
-                elevations[2],
+                elevations[0] * noise_yscaling,
+                elevations[1] * noise_yscaling,
+                elevations[2] * noise_yscaling,
                 new_verts[0],
                 new_verts[1],
                 new_verts[2] });
             // the other 3 triangles neighbor the center triangle and child trangles of the parent's neighbors
             // we can't know the parent's neighbors' children because they may not exist yet
             for(int i = 0; i < 3; i++) {
-                nodes.push_back({0, 0, 0,
+                nodes.push_back({0, 0, 0, 0,
                     0, 0, (uint32_t)nodes.size(),
-                    elevations[i + 3],
-                    elevations[i],
-                    elevations[((i + 2) % 3)],
+                    elevations[i + 3] * noise_yscaling,
+                    elevations[i] * noise_yscaling,
+                    elevations[((i + 2) % 3)] * noise_yscaling,
                     nodes[node_idx].verts[i],
                     new_verts[i],
                     new_verts[(i + 2) % 3] });
@@ -922,6 +957,7 @@ struct TerrainTree {
         if(manhattan_length < 0.001){
             return nullptr;
         }
+        // location is pos projected onto the surface of the node space octahedron
         dvec3 location = pos * (radius / manhattan_length);
         
         uint64_t tile = (location[1] > 0) ? 0 : 4;

@@ -527,6 +527,8 @@ int main(int argc, char** argv) {
     glitch.body.ro->shader = shaders["terrain"];
     glitch.body.ro->texture = textures["isqswjwki55a1.png"];
 
+    ttnode* zone_origo = glitch.terrain[0x2aaaaaaaa8];
+
     // Main loop
     while (!glfwWindowShouldClose(window)) {
         if(!game_paused){
@@ -541,10 +543,10 @@ int main(int argc, char** argv) {
             //ttnode* northpole = glitch.terrain[0x2aaaaaaaa8];
 
             double dt = 0.008;
-            player_character->body.pos += player_character->body.rot * input_vector(window) * dt * 100.0;
-            ttnode* tile = glitch.terrain[player_character->body.pos + dvec3(0.0, 6e6, 0.0)];
+            player_character->body.pos += player_character->body.rot * input_vector(window) * dt * 10.0;
+            ttnode* tile = glitch.terrain[player_character->body.pos + zone_origo->verts[0]];
 
-            player_character->body.pos.y = tile->elevation(player_character->body.pos + dvec3(0.0, 6e6, 0.0)) * glitch.terrain.noise_yscaling;
+            player_character->body.pos.y = tile->elevation(player_character->body.pos + zone_origo->verts[0], glitch.body.radius);
 //            player_character->body.pos.y = tile->elevation() * glitch.terrain.noise_yscaling;
 
             // optimization: compute view matrix here instead of in render()
