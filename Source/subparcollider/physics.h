@@ -717,21 +717,13 @@ struct ttnode {
         return elevation;
     }
 
-    // pos should be direction from center of celestial, length >= 1mm
-    double elevation(dvec3 pos, double radius) {
-        double manhattan_length = abs(pos[0]) + abs(pos[1]) + abs(pos[2]);
-        if(manhattan_length < 0.001){
-            return 0;
-        }
-        // location is pos projected onto the surface of the node space octahedron
-        dvec3 location = pos * (radius / manhattan_length);
-
-//    double elevation(dvec3 pos, dMesh* mesh) {
-//        dTri *tri = mesh->triangles[triangle];
-     
-
+    double elevation(dvec3 pos, dMesh* mesh) {
+        dTri *tri = &mesh->tris[triangle];
+        dvec3 &a = mesh->verts[tri->verts[0]];
+        dvec3 &b = mesh->verts[tri->verts[1]];
+        dvec3 &c = mesh->verts[tri->verts[2]];
         
-        dvec3 v0 = verts[1] - verts[0], v1 = verts[2] - verts[0], v2 = location - verts[0];
+        dvec3 v0 = b - a, v1 = c - a, v2 = pos - a;
         double d00 = glm::dot(v0, v0);
         double d01 = glm::dot(v0, v1);
         double d11 = glm::dot(v1, v1);
@@ -742,12 +734,9 @@ struct ttnode {
         double w = (d00 * d21 - d01 * d20) / denom;
         double u = 1.0 - v - w;
 
-        std::cout << "u: " << u << "v: " << v << "w: " << w << "\n";
-        u = max(0.0, u);
-        v = max(0.0, v);
-        w = max(0.0, w);
-        std::cout << "u: " << u << "v: " << v << "w: " << w << "\n";
-        std::cout << "elevations: " << elevations[0] << ", " << elevations[1] << ", " << elevations[2] << "\n";
+//        std::cout << "u: " << u << " v: " << v << " w: " << w << "\n";
+//        std::cout << "u: " << u << " v: " << v << " w: " << w << "\n";
+//        std::cout << "elevations: " << elevations[0] << ", " << elevations[1] << ", " << elevations[2] << "\n";
 
         return (u * elevations[0] + v * elevations[1] + w * elevations[2]) / (u + v + w);
         

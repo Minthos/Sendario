@@ -543,10 +543,10 @@ int main(int argc, char** argv) {
             //ttnode* northpole = glitch.terrain[0x2aaaaaaaa8];
 
             double dt = 0.008;
-            player_character->body.pos += player_character->body.rot * input_vector(window) * dt * 10.0;
+            player_character->body.pos += player_character->body.rot * input_vector(window) * dt * 1000.0;
             ttnode* tile = glitch.terrain[player_character->body.pos + zone_origo->verts[0]];
 
-            player_character->body.pos.y = tile->elevation(player_character->body.pos + zone_origo->verts[0], glitch.body.radius);
+            player_character->body.pos.y = tile->elevation(player_character->body.pos, &glitch.body.mesh);
 //            player_character->body.pos.y = tile->elevation() * glitch.terrain.noise_yscaling;
 
             // optimization: compute view matrix here instead of in render()
