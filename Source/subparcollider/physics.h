@@ -717,12 +717,27 @@ struct ttnode {
         return elevation;
     }
 
-    double elevation(dvec3 pos, dMesh* mesh) {
+    // this is the good one
+    double elevation_projected(dvec3 pos, dMesh* mesh) {
         dTri *tri = &mesh->tris[triangle];
         dvec3 &a = mesh->verts[tri->verts[0]];
         dvec3 &b = mesh->verts[tri->verts[1]];
         dvec3 &c = mesh->verts[tri->verts[2]];
-        
+        dvec3 ab = b - a;
+        dvec3 ac = c - a;
+        dvec3 norm = normalize(cross(ab, ac));
+        dvec3 gravity_dir = normalize(verts[0]);
+        double d = dot(norm, (a - pos)) / dot(norm, gravity_dir);
+        dvec3 intersection = pos + gravity_dir * d;
+        return intersection.y;
+    }
+
+    // this one consistently overestimates elevation by a few meters
+    double elevation_barycentric(dvec3 pos, dMesh* mesh) {
+        dTri *tri = &mesh->tris[triangle];
+        dvec3 &a = mesh->verts[tri->verts[0]];
+        dvec3 &b = mesh->verts[tri->verts[1]];
+        dvec3 &c = mesh->verts[tri->verts[2]];
         dvec3 v0 = b - a, v1 = c - a, v2 = pos - a;
         double d00 = glm::dot(v0, v0);
         double d01 = glm::dot(v0, v1);
@@ -733,26 +748,23 @@ struct ttnode {
         double v = (d11 * d20 - d01 * d21) / denom;
         double w = (d00 * d21 - d01 * d20) / denom;
         double u = 1.0 - v - w;
-
-//        std::cout << "u: " << u << " v: " << v << " w: " << w << "\n";
-//        std::cout << "u: " << u << " v: " << v << " w: " << w << "\n";
-//        std::cout << "elevations: " << elevations[0] << ", " << elevations[1] << ", " << elevations[2] << "\n";
-
         return (u * elevations[0] + v * elevations[1] + w * elevations[2]) / (u + v + w);
-        
+    }
 
-/*
+    // this one is wrong in both directions
+    double elevation_naive(dvec3 pos, dMesh* mesh) {
+        dTri *tri = &mesh->tris[triangle];
         double e = 0;
         double sum_distance = 0;
         for(uint64_t i = 0; i < 3; i++){
-            double distance = glm::length(location - verts[i]);
+            double distance = glm::length(pos - tri->verts[i]);
             sum_distance += distance;
         }
         for(uint64_t i = 0; i < 3; i++){
-            double distance = glm::length(location - verts[i]);
+            double distance = glm::length(pos - tri->verts[i]);
             e += (sum_distance * 0.5 - distance) * elevations[i];
         }
-        return e / (sum_distance * 0.5);*/
+        return e / (sum_distance * 0.5);
     }
 };
 
