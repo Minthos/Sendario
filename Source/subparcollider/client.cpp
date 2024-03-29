@@ -507,11 +507,11 @@ int main(int argc, char** argv) {
     while (!glfwWindowShouldClose(window)) {
         if(!game_paused){
             player_character->body.rot = camera_rot;
-            ttnode* tile = glitch.terrain[player_character->body.pos];
+            ttnode* tile = glitch.terrain[player_character->body.pos + dvec3(0.0, 6e6, 0.0)];
             ttnode* northpole = glitch.terrain[0x2aaaaaaaa8];
 
-            //player_character->body.pos.y = tile->elevations[0] * glitch.terrain.noise_yscaling;
-            player_character->body.pos.y = northpole->elevation() * glitch.terrain.noise_yscaling;
+            player_character->body.pos.y = tile->elevation() * glitch.terrain.noise_yscaling;
+            //player_character->body.pos.y = northpole->elevation() * glitch.terrain.noise_yscaling;
             camera_target = vec3(player_character->body.pos);
 
             //glitch.body.rot = glm::normalize(glm::angleAxis(0.0004, glm::dvec3(0.0, 0.0, 0.0)) * glitch.body.rot);

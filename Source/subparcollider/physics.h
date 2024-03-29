@@ -898,15 +898,31 @@ struct TerrainTree {
         return n;
     }
 
-    // TODO URGENT: implement this
-    // I guess pos must be relative to the center of the celestial, not relative to the player's zone
+    // pos must be a direction from the center of the celestial, length >= 1mm
     ttnode* operator[](dvec3 pos) {
-        // transform pos to subdivision coordinate space
-        // find the starting quadrant and hemisphere
-        // traverse tree, for each level check if pos is inside the center triangle
-        // if not, pos is inside the triangle whose far corner is closest to pos
-
-        return nullptr;
+        double manhattan_length = abs(pos[0]) + abs(pos[1]) + abs(pos[2]);
+        if(manhattan_length < 0.001){
+            return nullptr;
+        }
+        dvec3 location = pos * (radius / manhattan_length);
+        
+        uint64_t tile = (location[1] > 0) ? 0 : 4;
+        uint64_t i = 0;
+        ttnode* n = nullptr;
+        do {
+            n = &nodes[tile];
+            double shortest_distance = glm::length(location - n->center());
+            for(uint64_t i = 1; i < 4; i++){
+                double distance = glm::length(location - nodes[tile + i].center());
+                if(distance < shortest_distance){
+                    shortest_distance = distance;
+                    n = &nodes[tile + i];
+                }
+            }
+            tile = n->first_child;
+            ++i;
+        } while (n->first_child);
+        return n;
     }
 
     // to keep things simple I define a zone as a triangle at some reasonable subdivision level
