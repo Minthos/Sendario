@@ -216,7 +216,7 @@ void upload_terrain_mesh(RenderObject *obj, Celestial *celestial) {
         float inclination = glm::angle(normal, glm::vec3(t->normal));
         float insolation = glm::dot(normal, glm::vec3(0.4, 0.4, 0.4));
         for(int j = 0; j < 3; j++){
-            vertices.insert(vertices.end(), {floatverts[j], glm::vec3(inclination, insolation, t->elevation[j])});
+            vertices.insert(vertices.end(), {floatverts[j], glm::vec3(inclination, insolation, t->elevations[j])});
         }
     }
     glGenBuffers(1, &obj->vbo);
@@ -443,7 +443,6 @@ int main(int argc, char** argv) {
 
     // seed, name, radius, roughness, parent body
     Celestial glitch(seed, (double)lod, "Glitch", 6.371e6, 0.2, NULL);
-    
     glitch.orbiting_bodies.emplace_back(seed + 1, (double)lod, "Jank", 1e6, 0.2, &glitch);
     glitch.orbiting_bodies.emplace_back(seed + 2, (double)lod, "Kludge", 1e6, 0.2, &glitch);
     glitch.orbiting_bodies.emplace_back(seed + 3, (double)lod, "Artifact", 1e6, 0.2, &glitch);
@@ -511,8 +510,8 @@ int main(int argc, char** argv) {
             ttnode* tile = glitch.terrain[player_character->body.pos];
             ttnode* northpole = glitch.terrain[0x2aaaaaaaa8];
 
-            //player_character->body.pos.y = tile->elevation[0] * glitch.terrain.noise_yscaling;
-            player_character->body.pos.y = northpole->elevation[0] * glitch.terrain.noise_yscaling;
+            //player_character->body.pos.y = tile->elevations[0] * glitch.terrain.noise_yscaling;
+            player_character->body.pos.y = northpole->elevation() * glitch.terrain.noise_yscaling;
             camera_target = vec3(player_character->body.pos);
 
             //glitch.body.rot = glm::normalize(glm::angleAxis(0.0004, glm::dvec3(0.0, 0.0, 0.0)) * glitch.body.rot);

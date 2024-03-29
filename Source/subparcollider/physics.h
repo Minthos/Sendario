@@ -259,7 +259,7 @@ constexpr dvec3 operator-(const dvec3 lhs, const vec3 rhs) {
 
 struct dTri {
     uint32_t verts[3];
-    float elevation[3];
+    float elevations[3];
     glm::dvec3 normal;
 
     dTri() {}
@@ -682,7 +682,7 @@ struct ttnode {
     uint32_t first_child;
     uint32_t neighbors[3];
     uint32_t rendered_at_level; // number of subdivisions to reach this node, if it was rendered. otherwise 0.
-    double elevation[3]; // elevation of the node's 3 corners
+    double elevations[3]; // elevation of the node's 3 corners
     dvec3 verts[3]; // vertices on the unit sphere
 
     // add more stuff like temperature, moisture, vegetation
@@ -691,9 +691,29 @@ struct ttnode {
         glm::vec3 point = verts[i];
         double length = glm::length(point);
         point = point * (radius / length);
-        point = point - location + ((elevation[i] * noise_yscaling) * (point / length));
+        point = point - location + ((elevations[i] * noise_yscaling) * (point / length));
         return point;
     }
+
+    dvec3 center() {
+        dvec3 pos(0.0);
+        for(int i = 0; i < 3; i++) {
+            pos += verts[i];
+        }
+        pos /= 3.0;
+        return pos;
+    }
+
+    double elevation() {
+        double elevation = 0.0;
+        for(int i = 0; i < 3; i++) {
+            elevation += elevations[i];
+        }
+        elevation /= 3.0;
+        return elevation;
+    }
+
+
 };
 
 struct TerrainTree {
@@ -779,7 +799,8 @@ struct TerrainTree {
         double noise_xzscaling2 = -0.00001;
         // a LOD going on here
         if(level > min_level) {
-            double distance = glm::length(location - nodes[node_idx].verts[0]);
+            //double distance = glm::length(location - nodes[node_idx].verts[0]);
+            double distance = glm::length(location - nodes[node_idx].center());
             double nodeWidth = glm::length(nodes[node_idx].verts[0] - nodes[node_idx].verts[1]);
             double ratio = distance / nodeWidth;
 
@@ -792,7 +813,7 @@ struct TerrainTree {
                     glm::vec3 point = nodes[node_idx].LODspacePosition(location, noise_yscaling, radius, i);
                     verts->push_back(point);
                     center += point;
-                    t.elevation[i] = nodes[node_idx].elevation[i] * noise_yscaling;
+                    t.elevations[i] = nodes[node_idx].elevations[i] * noise_yscaling;
                 }
                 t.normal = glm::normalize(nodes[node_idx].verts[0]);
                 
