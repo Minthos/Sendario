@@ -713,7 +713,25 @@ struct ttnode {
         return elevation;
     }
 
-
+    double elevation(dvec3 pos) {
+        glm::dvec2 location = glm::dvec2(pos.x, pos.z);
+        double e = 0;
+        double sum_distance = 0;
+        for(uint64_t i = 0; i < 3; i++){
+            double distance = glm::length(location - glm::dvec2(verts[i].x, verts[i].z));
+            sum_distance += distance;
+        }
+        for(uint64_t i = 0; i < 3; i++){
+            double distance = glm::length(location - glm::dvec2(verts[i].x, verts[i].z));
+            e += (sum_distance * 0.5 - distance) * elevations[i];
+        }
+//        std::cout << "elevation: " << e << " elevation(): " << elevation() << " sum_distance: " << sum_distance << "\n";
+//        std::cout << location.x << ", " << location.y << "\n";
+//        for(uint64_t i = 0; i < 3; i++){
+//            std::cout << verts[i].x << ", " << verts[i].y << ", " << verts[i].z << "\n";
+//        }
+        return e / (sum_distance * 0.5);
+    }
 };
 
 struct TerrainTree {

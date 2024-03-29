@@ -278,7 +278,7 @@ glm::vec3 camera_target = vec3(0,0,0);
 glm::quat camera_rot;
 double camera_initial_x;
 double camera_initial_y;
-double camera_zoom = 1.0;
+double camera_zoom = 3.0;
 bool camera_dirty = true;
 
 GLuint framebuffer, colorTex, velocityTex;
@@ -530,14 +530,24 @@ int main(int argc, char** argv) {
     // Main loop
     while (!glfwWindowShouldClose(window)) {
         if(!game_paused){
+
+            if(glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS){
+                camera_rot = glm::angleAxis(-0.01f, glm::vec3(0.0, 0.0, 1.0)) * camera_rot;
+            } if(glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS){
+                camera_rot = glm::angleAxis(0.01f, glm::vec3(0.0, 0.0, 1.0)) * camera_rot;                              
+            }
+
             player_character->body.rot = glm::conjugate(camera_rot * glm::angleAxis(glm::radians(0.0f), glm::vec3(0.0, 1.0, 0.0)));
             //ttnode* northpole = glitch.terrain[0x2aaaaaaaa8];
 
             double dt = 0.008;
             player_character->body.pos += player_character->body.rot * input_vector(window) * dt * 100.0;
             ttnode* tile = glitch.terrain[player_character->body.pos + dvec3(0.0, 6e6, 0.0)];
-            player_character->body.pos.y = tile->elevation() * glitch.terrain.noise_yscaling;
-            //player_character->body.pos.y = northpole->elevation() * glitch.terrain.noise_yscaling;
+
+            player_character->body.pos.y = tile->elevation(player_character->body.pos + dvec3(0.0, 6e6, 0.0)) * glitch.terrain.noise_yscaling;
+//            player_character->body.pos.y = tile->elevation() * glitch.terrain.noise_yscaling;
+
+            // optimization: compute view matrix here instead of in render()
             camera_target = vec3(player_character->body.pos);
 
             //glitch.body.rot = glm::normalize(glm::angleAxis(0.0004, glm::dvec3(0.0, 0.0, 0.0)) * glitch.body.rot);
