@@ -27,6 +27,7 @@ int antialiasing = 2; // 1 (no upscaling) and 2 (4 samples per pixel) are good v
 int motion_blur_mode = 1; // 0 = off, 1 = nonlinear (sharp), 2 = linear (blurry)
 float motion_blur_invstr = 5.0f; // motion blur amount. 1.0 = very high. 5.0 = low.
 
+Unit *player_character = nullptr;
 
 using std::string;
 
@@ -370,9 +371,17 @@ void reshape(GLFWwindow* window, int width, int height) {
 void render(RenderObject *obj) {
     glm::mat4 translation = glm::translate(glm::mat4(1.0f), obj->po->zoneSpacePosition());
     glm::mat4 rotation = glm::mat4(glm::quat(obj->po->rot));
-    glm::mat4 view = glm::lookAt(camera_target + glm::vec3(2.00,1.5,1.5) * glm::max(1.0f, (float)camera_zoom),
-            camera_target, glm::vec3(0,1,0));
-    view = glm::mat4(camera_rot) * view;
+    glm::mat4 view = glm::lookAt(camera_target,
+            camera_target + (camera_rot * glm::vec3(0,0,1) * glm::max(1.0f, (float)camera_zoom)),
+             glm::vec3(0,1,0));
+
+
+//            - (camera_rot * vec3(1.0f, 0.0f, 0.0f)) * glm::max(1.0f, (float)camera_zoom),
+//            camera_target, glm::vec3(0,1,0));
+//    view = glm::mat4(camera_rot) * view;
+
+    glm::mat4 camera_offset = glm::translate(glm::mat4(1.0f), (glm::quat(player_character->body.rot) * vec3(0.0f, 0.0f, -1.0f)) * glm::max(1.0f, (float)camera_zoom));
+    view = glm::mat4(camera_rot) * camera_offset * glm::translate(glm::mat4(1.0f), -camera_target);
     glm::mat4 projection = glm::perspective(glm::radians(90.0f * glm::min(1.0f, (float)camera_zoom)),
             (float)screenwidth / (float)screenheight, 0.001f, 1e38f);
     glm::mat4 transform = projection * view * translation * rotation;
@@ -392,6 +401,21 @@ void render(RenderObject *obj) {
     glBindVertexArray(obj->vao);
     glDrawElements(GL_TRIANGLES, obj->po->mesh.num_tris * 3, GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
+}
+
+dvec3 input_vector(GLFWwindow* window) {
+    dvec3 vel(0.0);
+    if(glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS){
+        vel.z = -1.0;
+    } else if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS){
+        vel.z = 1.0;
+    }
+    if(glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS){
+        vel.x = -1.0;
+    } else if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS){
+        vel.x = 1.0;
+    }   
+    return vel;
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -484,7 +508,7 @@ int main(int argc, char** argv) {
     nonstd::vector<RenderObject> ros;
 
     units.emplace_back(); // 1
-    Unit *player_character = &units[0]; // 2
+    player_character = &units[0]; // 2
     player_character->addComponent(dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0)); // 3
     player_character->addComponent(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 0.01));
     player_character->addComponent(dMesh::createBox(glm::dvec3(-1.2, 0.0, 0.0), 1.0, 0.05, 1.0));
@@ -506,10 +530,12 @@ int main(int argc, char** argv) {
     // Main loop
     while (!glfwWindowShouldClose(window)) {
         if(!game_paused){
-            player_character->body.rot = camera_rot;
-            ttnode* tile = glitch.terrain[player_character->body.pos + dvec3(0.0, 6e6, 0.0)];
-            ttnode* northpole = glitch.terrain[0x2aaaaaaaa8];
+            player_character->body.rot = glm::conjugate(camera_rot * glm::angleAxis(glm::radians(0.0f), glm::vec3(0.0, 1.0, 0.0)));
+            //ttnode* northpole = glitch.terrain[0x2aaaaaaaa8];
 
+            double dt = 0.008;
+            player_character->body.pos += player_character->body.rot * input_vector(window) * dt * 100.0;
+            ttnode* tile = glitch.terrain[player_character->body.pos + dvec3(0.0, 6e6, 0.0)];
             player_character->body.pos.y = tile->elevation() * glitch.terrain.noise_yscaling;
             //player_character->body.pos.y = northpole->elevation() * glitch.terrain.noise_yscaling;
             camera_target = vec3(player_character->body.pos);

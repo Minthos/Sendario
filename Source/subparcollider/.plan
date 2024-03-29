@@ -1,9 +1,58 @@
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 TODO:
 
+fps wasd movement
+re-center the player on a new LOD zone periodically
 gravity, velocity and collision test against ground
-mouselook, camera zooming with scroll wheel and panning with keyboard
+
+positioning celestials relative to each other (galactic center -> star -> planet -> moon)
+universally unambiguous coordinate system (celestial-> zone-> pos)
+rts view with camera panning with keyboard
+
 fluid simulation
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ---

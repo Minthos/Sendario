@@ -482,7 +482,7 @@ struct Unit {
     std::deque<unit_order> order_queue;
     
     Unit() {
-//        bzero(this, sizeof(Unit));
+        bzero(this, sizeof(Unit));
         name = "prototype";
         id = unit_next_uid++;
         owner_id = 0;
