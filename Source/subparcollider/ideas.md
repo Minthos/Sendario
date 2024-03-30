@@ -1,6 +1,46 @@
 
 ----
 
+Difficulty modes
+
+I want the game to have hardcore difficulty. Permadeath, character stays in the game world when the player logs out,
+death from hunger, thirst, asphyxiation, heat, cold, radiation, poisoning etc. Slow healing from injuries.
+Basically become a robot or die trying.
+
+This will alienate a lot of players so I should provide an easy difficulty mode "sunshine and roses" without permadeath,
+without biological needs, with "normal" logout and respawn mechanics
+
+----
+
+Trade, resources and technology
+
+Each tier of technology should require combining multiple resources
+Those resources should be further apart and harder to find for the higher tiers of tech
+
+abundant on habitable celestials: air, water, dirt, sand, wood, stone, salt, plants, animals
+common metals and chemicals slightly rarer: iron, nickel, copper, coal, oil, nitrates, limestone
+rare metals: uranium, thorium, tungsten, silver, aluminium, lithium, titanium, cobalt, gallium, neodymium, niobium
+even rarer metals: gold, platinum
+rare crystals: heisenbergite, diamond, sapphire
+rare gases: helium-3, tritium, deuterium
+
+I shouldn't require all of those to advance a tech level but several of them at each level
+some can be substituted for each other, for example [uranium, thorium] as nuclear fuel and [coal, oil] as fossil fuel
+
+air + water -> nitrates
+[plants, animals, nitrates] -> fertilizer
+fertilizer -> nitrates
+nitrates + [coal, oil] -> explosives
+limestone + sand + water -> concrete
+[copper, aluminium] + plastic -> electric wires
+[cobalt, neodymium] + iron -> magnets
+electric wires + magnets -> electric motors
+[iron, aluminium] + electric wires -> internal combustion engines
+sand -> solar panels
+
+
+----
+
 Transparent crystals
 
 inspired by the crystals in isqswjwki55a1.png it would be cool to have crystals that are transparent.
