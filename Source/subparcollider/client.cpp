@@ -280,6 +280,7 @@ double camera_initial_x;
 double camera_initial_y;
 double camera_zoom = 3.0;
 bool camera_dirty = true;
+glm::vec3 local_gravity_normalized;
 
 GLuint framebuffer, colorTex, velocityTex;
 GLuint ppshader;
@@ -414,7 +415,10 @@ dvec3 input_vector(GLFWwindow* window) {
         vel.x = -1.0;
     } else if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS){
         vel.x = 1.0;
-    }   
+    }
+    if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS){
+        vel *= 100.0;
+    }
     return vel;
 }
 
@@ -434,7 +438,22 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         glfwSetWindowShouldClose(window, GL_TRUE);
 }
 
-static void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
+
+static void mouselook_callback_gimbal_locked(GLFWwindow* window, double xpos, double ypos)
+{
+    if (!((camera_initial_x == 0 && camera_initial_y == 0) ||
+          abs(xpos - camera_initial_x) > 200.0 || abs(ypos - camera_initial_y) > 200.0)) {
+
+        camera_rot = camera_rot * glm::angleAxis((float)(xpos - camera_initial_x) / -1000.0f, local_gravity_normalized);
+        camera_rot = glm::angleAxis((float)(ypos - camera_initial_y) / 1000.0f, glm::vec3(1.0, 0.0, 0.0)) * camera_rot;
+        camera_rot = glm::normalize(camera_rot);
+    }
+    camera_initial_x = xpos;
+    camera_initial_y = ypos;
+    camera_dirty = true;
+}
+
+static void mouselook_callback(GLFWwindow* window, double xpos, double ypos)
 {
     if(!((camera_initial_x == 0 && camera_initial_y == 0) ||
                 abs(xpos - camera_initial_x) > 200.0 || abs(ypos - camera_initial_y) > 200.0)){
@@ -479,7 +498,8 @@ int main(int argc, char** argv) {
     glfwSetKeyCallback(window, key_callback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
-    glfwSetCursorPosCallback(window, cursor_position_callback);
+    //glfwSetCursorPosCallback(window, mouselook_callback);
+    glfwSetCursorPosCallback(window, mouselook_callback_gimbal_locked);
     glfwSetScrollCallback(window, scroll_callback);
     camera_rot = glm::quat(1, 0, 0, 0);
     initializeGLEW();
@@ -532,6 +552,7 @@ int main(int argc, char** argv) {
     // Main loop
     while (!glfwWindowShouldClose(window)) {
         if(!game_paused){
+            local_gravity_normalized = -glm::normalize(zone_origo->verts[0] + player_character->body.pos);
 
             if(glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS){
                 camera_rot = glm::angleAxis(-0.01f, glm::vec3(0.0, 0.0, 1.0)) * camera_rot;
