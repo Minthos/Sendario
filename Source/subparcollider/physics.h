@@ -16,6 +16,8 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/norm.hpp>
 
+#define nil nullptr
+
 using std::string;
 auto now = std::chrono::high_resolution_clock::now;
 using glm::dvec3;
@@ -83,7 +85,7 @@ template <typename T> struct vector {
 std::string fstr(const char* format, ...) {
     va_list args;
     va_start(args, format);
-    std::vector<char> buf(1 + std::vsnprintf(nullptr, 0, format, args));
+    std::vector<char> buf(1 + std::vsnprintf(nil, 0, format, args));
     va_end(args);
     va_start(args, format);
     std::vsnprintf(buf.data(), buf.size(), format, args);
@@ -956,14 +958,14 @@ struct TerrainTree {
     ttnode* operator[](dvec3 pos) {
         double manhattan_length = abs(pos[0]) + abs(pos[1]) + abs(pos[2]);
         if(manhattan_length < 0.001){
-            return nullptr;
+            return nil;
         }
         // location is pos projected onto the surface of the node space octahedron
         dvec3 location = pos * (radius / manhattan_length);
         
         uint64_t tile = (location[1] > 0) ? 0 : 4;
         uint64_t i = 0;
-        ttnode* n = nullptr;
+        ttnode* n = nil;
         do {
             n = &nodes[tile];
             double shortest_distance = glm::length(location - n->center());
@@ -1075,7 +1077,7 @@ struct Celestial {
         new(&terrain) TerrainTree(pseed, pLOD, pradius, proughness);
         auto time_begin = now();
         std::cout << "Generating mesh..\n";
-        new(&body) PhysicsObject(terrain.buildMesh(dvec3(0, 6.37101e6, 0), 3), NULL);
+        new(&body) PhysicsObject(terrain.buildMesh(dvec3(0, 6.37101e6, 0), 3), nil);
         auto time_used = std::chrono::duration_cast<std::chrono::microseconds>(now() - time_begin).count();
         std::cout << "Celestial " << name << ": " << body.mesh.num_tris << " triangles procedurally generated in " << time_used/1000.0 << "ms\n";
         std::cout << "Lowest point: " << terrain.lowest_point << ", highest point: " << terrain.highest_point << "\n";

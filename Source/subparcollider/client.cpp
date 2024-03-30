@@ -27,7 +27,7 @@ int antialiasing = 2; // 1 (no upscaling) and 2 (4 samples per pixel) are good v
 int motion_blur_mode = 1; // 0 = off, 1 = nonlinear (sharp), 2 = linear (blurry)
 float motion_blur_invstr = 5.0f; // motion blur amount. 1.0 = very high. 5.0 = low.
 
-Unit *player_character = nullptr;
+Unit *player_character = nil;
 
 using std::string;
 
@@ -36,7 +36,7 @@ std::unordered_map<string, GLuint> textures;
 
 char* readShaderSource(const char* filePath) {
     FILE* file = fopen(filePath, "rb");
-    if (file == NULL) {
+    if (file == nil) {
         perror("Error opening file");
         exit(EXIT_FAILURE);
     }
@@ -44,7 +44,7 @@ char* readShaderSource(const char* filePath) {
     long length = ftell(file);
     fseek(file, 0, SEEK_SET);
     char* buffer = (char*)malloc(length + 1);
-    if (buffer == NULL) {
+    if (buffer == nil) {
         fprintf(stderr, "Memory allocation failed\n");
         fclose(file);
         exit(EXIT_FAILURE);
@@ -66,14 +66,14 @@ void checkShader(GLenum status_enum, GLuint shader, const char* name) {
     GLchar infoLog[512] = {0};
     glGetShaderiv(shader, status_enum, &success);
     if (!success) {
-        glGetShaderInfoLog(shader, 512, NULL, infoLog);
+        glGetShaderInfoLog(shader, 512, nil, infoLog);
         fprintf(stderr, "Shader compilation error: %s\n%s\n", name, infoLog);
     }
 }
 
 GLuint compileShader(GLenum shaderType, const char* source, const char* name) {
     GLuint shader = glCreateShader(shaderType);
-    glShaderSource(shader, 1, &source, NULL);
+    glShaderSource(shader, 1, &source, nil);
     glCompileShader(shader);
     checkShader(GL_COMPILE_STATUS, shader, name);
     return shader;
@@ -246,7 +246,7 @@ void initializeGLFW() {
 }
 
 GLFWwindow* createWindow(int width, int height, const char* title) {
-    GLFWwindow* window = glfwCreateWindow(width, height, title, NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(width, height, title, nil, nil);
     if (!window) {
         std::cerr << "Failed to create GLFW window\n";
         glfwTerminate();
@@ -346,9 +346,9 @@ void resizeFramebuffer(int w, int h) {
     int height = h * antialiasing;
     glViewport(0, 0, width, height);
     glBindTexture(GL_TEXTURE_2D, colorTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, nil);
     glBindTexture(GL_TEXTURE_2D, velocityTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, width, height, 0, GL_RG, GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, width, height, 0, GL_RG, GL_FLOAT, nil);
     GLuint depthRBO;
     glGenRenderbuffers(1, &depthRBO);
     glBindRenderbuffer(GL_RENDERBUFFER, depthRBO);
@@ -419,6 +419,9 @@ dvec3 input_vector(GLFWwindow* window) {
     if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS){
         vel *= 100.0;
     }
+    if(glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS){
+        vel *= 10000.0;
+    }
     return vel;
 }
 
@@ -485,11 +488,11 @@ int main(int argc, char** argv) {
     }
 
     // seed, name, radius, roughness, parent body
-    Celestial glitch(seed, (double)lod, "Glitch", 6.371e6, 0.2, NULL);
-    glitch.orbiting_bodies.emplace_back(seed + 1, (double)lod, "Jank", 1e6, 0.2, &glitch);
-    glitch.orbiting_bodies.emplace_back(seed + 2, (double)lod, "Kludge", 1e6, 0.2, &glitch);
-    glitch.orbiting_bodies.emplace_back(seed + 3, (double)lod, "Artifact", 1e6, 0.2, &glitch);
-    glitch.orbiting_bodies.emplace_back(seed + 4, (double)lod, "Haxx", 1e6, 0.2, &glitch);
+    Celestial glitch(seed, (double)lod, "Glitch", 6.371e6, 0.2, nil);
+    glitch.orbiting_bodies.emplace_back(seed + 1, (double)lod, "Jank", 1e6, 0.2, nil);
+    glitch.orbiting_bodies.emplace_back(seed + 2, (double)lod, "Kludge", 1e6, 0.2, nil);
+    glitch.orbiting_bodies.emplace_back(seed + 3, (double)lod, "Artifact", 1e6, 0.2, nil);
+    glitch.orbiting_bodies.emplace_back(seed + 4, (double)lod, "Haxx", 1e6, 0.2, nil);
 
     initializeGLFW();
     GLFWwindow* window = createWindow(screenwidth, screenheight, "Takeoff Sendario");
@@ -607,7 +610,7 @@ int main(int argc, char** argv) {
                 dvec3 lo = node->lo.todvec3();
                 dvec3 center = (hi + lo) * 0.5;
                 dvec3 size = (hi - lo);
-                PhysicsObject greencube = PhysicsObject(dMesh::createBox(center, size.x, size.y, size.z), NULL);
+                PhysicsObject greencube = PhysicsObject(dMesh::createBox(center, size.x, size.y, size.z), nil);
                 RenderObject ro = RenderObject(&greencube);
                 upload_boxen_mesh(&ro);
                 ro.shader = shaders["box"];
