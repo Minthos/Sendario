@@ -132,6 +132,9 @@ struct RenderObject {
     GLuint shader;
     GLuint texture;
     GLuint vao, vbo, ebo;
+    GLsync fence;
+    void *vbo_mapped;
+    void *ebo_mapped;
     glm::mat4 prev;
     bool firstTime;
 
@@ -140,6 +143,25 @@ struct RenderObject {
         glDeleteBuffers(1, &vbo);
         glDeleteBuffers(1, &ebo);
         glDeleteVertexArrays(1, &vao);
+    }
+
+    void prepare_buffers(Celestial *celestial) {
+        glGenVertexArrays(1, &vao);
+        glBindVertexArray(vao);
+
+        uint64_t num_verts = po->mesh.num_tris * 3;
+
+        glGenBuffers(1, &vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferStorage(GL_ARRAY_BUFFER, num_verts * sizeof(texvert), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+        vbo_mapped = glMapBufferRange(GL_ARRAY_BUFFER, 0, num_verts * sizeof(texvert), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+
+        glGenBuffers(1, &ebo);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+        glBufferStorage(GL_ELEMENT_ARRAY_BUFFER, num_verts * sizeof(GLuint), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+        ebo_mapped = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, num_verts * sizeof(GLuint), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+
+        glBindVertexArray(0);
     }
 };
 
@@ -201,10 +223,12 @@ void upload_boxen_mesh(RenderObject *obj) {
 
 void upload_terrain_mesh(RenderObject *obj, Celestial *celestial) {
     auto begin = now();
-    glGenVertexArrays(1, &obj->vao);
     glBindVertexArray(obj->vao);
+
     std::vector<texvert> vertices;
+    vertices.reserve(obj->po->mesh.num_tris * 3);
     std::vector<GLuint> indices;
+    indices.reserve(obj->po->mesh.num_tris * 3);
     for (uint32_t i = 0; i < obj->po->mesh.num_tris; ++i) {
         dTri* t = &obj->po->mesh.tris[i];
         indices.insert(indices.end(), {t->verts[0], t->verts[1], t->verts[2]});
@@ -220,22 +244,24 @@ void upload_terrain_mesh(RenderObject *obj, Celestial *celestial) {
         }
     }
     auto begin_upload = now();
-    glGenBuffers(1, &obj->vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, obj->vbo);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(texvert), vertices.data(), GL_STATIC_DRAW);
-    glGenBuffers(1, &obj->ebo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj->ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
+
+    memcpy(obj->vbo_mapped, vertices.data(), vertices.size() * sizeof(texvert));
+    memcpy(obj->ebo_mapped, indices.data(), indices.size() * sizeof(GLuint));
+    obj->fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+
     // Position attribute
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0);
     glEnableVertexAttribArray(0);
     // Texture coordinate attribute
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
     glEnableVertexAttribArray(1);
+
     glBindVertexArray(0);
     auto end = now();
     std::cout << "prepared mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(begin_upload - begin).count() / 1000.0 << " ms\n";
     std::cout << "uploaded mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin_upload).count() / 1000.0 << " ms\n";
+
+//    usleep(1000000.0);
 }
 
 void initializeGLFW() {
@@ -549,6 +575,7 @@ int main(int argc, char** argv) {
     player_character->body.ro->shader = shaders["box"];
     player_character->body.ro->texture = textures["isqswjwki55a1.png"];
 
+    glitch.body.ro->prepare_buffers(&glitch);
     upload_terrain_mesh(glitch.body.ro, &glitch);
     glitch.body.ro->shader = shaders["terrain"];
     glitch.body.ro->texture = textures["isqswjwki55a1.png"];
@@ -592,7 +619,12 @@ int main(int argc, char** argv) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 //        ground->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * ground->body.rot;
-        render(glitch.body.ro);
+
+        if(glClientWaitSync(glitch.body.ro->fence, GL_SYNC_FLUSH_COMMANDS_BIT, 0) == GL_TIMEOUT_EXPIRED) {
+            std::cout << "mesh not ready\n";
+        } else {
+            render(glitch.body.ro);
+        }
         ctleaf l = ctleaf(&player_character->body);
         CollisionTree t = CollisionTree(dvec3(0.0), &l, 1);
 
