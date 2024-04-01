@@ -812,7 +812,8 @@ struct TerrainTree {
         }
     }
 
-    void generate(dvec3 location, uint32_t node_idx, nonstd::vector<glm::dvec3> *verts, nonstd::vector<dTri> *tris, uint64_t level, int min_level, uint64_t path) {
+    void generate(dvec3 location, uint32_t node_idx, nonstd::vector<glm::dvec3> *verts, nonstd::vector<dTri> *tris,
+            uint64_t level, int min_level, uint64_t path) {
         nodes[node_idx].path = path;
         double noise_xzscaling = 0.0001;
         double noise_xzscaling2 = -0.00001;

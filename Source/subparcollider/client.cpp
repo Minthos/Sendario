@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <unordered_map>
 #include <vector>
+#include <thread>
 
 // Rendering quality settings
 float anisotropy = 16.0f; // should be 4 with no upscaling, 16 with upscaling
@@ -132,20 +133,20 @@ struct RenderObject {
     GLuint shader;
     GLuint texture;
     GLuint vao, vbo, ebo;
-    GLsync fence;
     void *vbo_mapped;
     void *ebo_mapped;
     glm::mat4 prev;
     bool firstTime;
+    volatile bool data_uploaded; // volatile is good enough here, we don't need the guarantees provided by atomic
 
-    RenderObject(PhysicsObject *ppo) { po = ppo; firstTime = true; }
+    RenderObject(PhysicsObject *ppo) { po = ppo; firstTime = true; data_uploaded = false; }
     ~RenderObject() {
         glDeleteBuffers(1, &vbo);
         glDeleteBuffers(1, &ebo);
         glDeleteVertexArrays(1, &vao);
     }
 
-    void prepare_buffers(Celestial *celestial) {
+    void prepare_buffers() {
         glGenVertexArrays(1, &vao);
         glBindVertexArray(vao);
 
@@ -161,107 +162,112 @@ struct RenderObject {
         glBufferStorage(GL_ELEMENT_ARRAY_BUFFER, num_verts * sizeof(GLuint), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
         ebo_mapped = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, num_verts * sizeof(GLuint), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
 
+        // Position attribute
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0);
+        glEnableVertexAttribArray(0);
+        // Texture coordinate attribute
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+        glEnableVertexAttribArray(1);
+
         glBindVertexArray(0);
+    }
+
+    // uploads a mesh composed of one or more box meshes to the gpu
+    // TODO: find a better way to set texture coordinates.
+    void upload_boxen_mesh() {
+        glGenVertexArrays(1, &vao);
+        glBindVertexArray(vao);
+
+        std::vector<texvert> vertices;
+        std::vector<GLuint> indices;
+
+        // this ordering reverses the texture on two sides so a texture tiles "correctly" horizontally
+        uint32_t faces[6 * 4] =
+            {0, 1, 2, 3, // top
+            0, 1, 4, 5, // front
+            0, 2, 4, 6, // left
+            3, 1, 7, 5, // right
+            3, 2, 7, 6, // back
+            5, 4, 7, 6}; // bottom
+        glm::vec3 texture_corners[4] = {
+            glm::vec3(1.0f, 1.0f, 0.0f),
+            glm::vec3(0.0f, 1.0f, 0.0f),
+            glm::vec3(1.0f, 0.0f, 0.0f),
+            glm::vec3(0.0f, 0.0f, 0.0f)};
+        for (uint32_t i = 0; i < po->mesh.num_tris / 2; ++i) {
+            dTri* t1 = &po->mesh.tris[i * 2];
+            dTri* t2 = &po->mesh.tris[i * 2 + 1];
+            texvert verts[4] = {
+                texvert(vec3(po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4    ]]), texture_corners[0]),
+                texvert(vec3(po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4 + 1]]), texture_corners[1]),
+                texvert(vec3(po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4 + 2]]), texture_corners[2]),
+                texvert(vec3(po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4 + 3]]), texture_corners[3])};
+            vertices.insert(vertices.end(), {verts[0], verts[1], verts[2], verts[3]});
+            // correct the winding order so we can use backface culling
+            bool ccw = ((i % 6 == 2) || (i % 6 == 3) || (i % 6 == 5) || (i % 6 == 0));
+            if(ccw) {
+                indices.insert(indices.end(), {i * 4, i * 4 + 1, i * 4 + 2});
+                indices.insert(indices.end(), {i * 4 + 3, i * 4 + 2, i * 4 + 1});
+            } else {
+                indices.insert(indices.end(), {i * 4 + 1, i * 4 + 2, i * 4 + 3});
+                indices.insert(indices.end(), {i * 4 + 2, i * 4 + 1, i * 4});
+            }
+        }
+        glGenBuffers(1, &vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(texvert), vertices.data(), GL_STATIC_DRAW);
+        glGenBuffers(1, &ebo);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
+        // Position attribute
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0);
+        glEnableVertexAttribArray(0);
+        // Texture coordinate attribute
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+        glEnableVertexAttribArray(1);
+        glBindVertexArray(0);
+    }
+
+    void upload_terrain_mesh() {
+        auto begin = now();
+
+        std::vector<texvert> vertices;
+        vertices.reserve(po->mesh.num_tris * 3);
+        std::vector<GLuint> indices;
+        indices.reserve(po->mesh.num_tris * 3);
+        for (uint32_t i = 0; i < po->mesh.num_tris; ++i) {
+            dTri* t = &po->mesh.tris[i];
+            indices.insert(indices.end(), {t->verts[0], t->verts[1], t->verts[2]});
+            glm::vec3 floatverts[3] = {
+                glm::vec3(po->mesh.verts[ t->verts[0] ]),
+                glm::vec3(po->mesh.verts[ t->verts[1] ]),
+                glm::vec3(po->mesh.verts[ t->verts[2] ])};
+            glm::vec3 normal = glm::normalize(glm::cross(floatverts[1] - floatverts[0], floatverts[2] - floatverts[0]));
+            float inclination = glm::angle(normal, glm::vec3(t->normal));
+            float insolation = glm::dot(normal, glm::vec3(0.4, 0.4, 0.4));
+            for(int j = 0; j < 3; j++){
+                vertices.insert(vertices.end(), {floatverts[j], glm::vec3(inclination, insolation, t->elevations[j])});
+            }
+        }
+        auto begin_upload = now();
+
+        memcpy(vbo_mapped, vertices.data(), vertices.size() * sizeof(texvert));
+        memcpy(ebo_mapped, indices.data(), indices.size() * sizeof(GLuint));
+
+
+        auto end = now();
+        std::cout << "prepared mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(begin_upload - begin).count() / 1000.0 << " ms\n";
+        std::cout << "uploaded mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin_upload).count() / 1000.0 << " ms\n";
+
+        // experiments have shown that on my computer the time it takes for the upload to complete is less than the
+        // time it takes to prepare the mesh data. since opengl's glClientWaitSync sucks I just wait a while instead..
+        usleep(std::chrono::duration_cast<std::chrono::microseconds>(begin_upload - begin).count());
+        data_uploaded = true;
     }
 };
 
-// uploads a mesh composed of one or more box meshes to the gpu
-// TODO: find a better way to set texture coordinates.
-void upload_boxen_mesh(RenderObject *obj) {
-    glGenVertexArrays(1, &obj->vao);
-    glBindVertexArray(obj->vao);
-
-    std::vector<texvert> vertices;
-    std::vector<GLuint> indices;
-
-    // this ordering reverses the texture on two sides so a texture tiles "correctly" horizontally
-    uint32_t faces[6 * 4] =
-        {0, 1, 2, 3, // top
-        0, 1, 4, 5, // front
-        0, 2, 4, 6, // left
-        3, 1, 7, 5, // right
-        3, 2, 7, 6, // back
-        5, 4, 7, 6}; // bottom
-    glm::vec3 texture_corners[4] = {
-        glm::vec3(1.0f, 1.0f, 0.0f),
-        glm::vec3(0.0f, 1.0f, 0.0f),
-        glm::vec3(1.0f, 0.0f, 0.0f),
-        glm::vec3(0.0f, 0.0f, 0.0f)};
-    for (uint32_t i = 0; i < obj->po->mesh.num_tris / 2; ++i) {
-        dTri* t1 = &obj->po->mesh.tris[i * 2];
-        dTri* t2 = &obj->po->mesh.tris[i * 2 + 1];
-        texvert verts[4] = {
-            texvert(vec3(obj->po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4    ]]), texture_corners[0]),
-            texvert(vec3(obj->po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4 + 1]]), texture_corners[1]),
-            texvert(vec3(obj->po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4 + 2]]), texture_corners[2]),
-            texvert(vec3(obj->po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4 + 3]]), texture_corners[3])};
-        vertices.insert(vertices.end(), {verts[0], verts[1], verts[2], verts[3]});
-        // correct the winding order so we can use backface culling
-        bool ccw = ((i % 6 == 2) || (i % 6 == 3) || (i % 6 == 5) || (i % 6 == 0));
-        if(ccw) {
-            indices.insert(indices.end(), {i * 4, i * 4 + 1, i * 4 + 2});
-            indices.insert(indices.end(), {i * 4 + 3, i * 4 + 2, i * 4 + 1});
-        } else {
-            indices.insert(indices.end(), {i * 4 + 1, i * 4 + 2, i * 4 + 3});
-            indices.insert(indices.end(), {i * 4 + 2, i * 4 + 1, i * 4});
-        }
-    }
-    glGenBuffers(1, &obj->vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, obj->vbo);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(texvert), vertices.data(), GL_STATIC_DRAW);
-    glGenBuffers(1, &obj->ebo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj->ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
-    // Position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0);
-    glEnableVertexAttribArray(0);
-    // Texture coordinate attribute
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
-    glEnableVertexAttribArray(1);
-    glBindVertexArray(0);
-}
-
-void upload_terrain_mesh(RenderObject *obj, Celestial *celestial) {
-    auto begin = now();
-    glBindVertexArray(obj->vao);
-
-    std::vector<texvert> vertices;
-    vertices.reserve(obj->po->mesh.num_tris * 3);
-    std::vector<GLuint> indices;
-    indices.reserve(obj->po->mesh.num_tris * 3);
-    for (uint32_t i = 0; i < obj->po->mesh.num_tris; ++i) {
-        dTri* t = &obj->po->mesh.tris[i];
-        indices.insert(indices.end(), {t->verts[0], t->verts[1], t->verts[2]});
-        glm::vec3 floatverts[3] = {
-            glm::vec3(obj->po->mesh.verts[ t->verts[0] ]),
-            glm::vec3(obj->po->mesh.verts[ t->verts[1] ]),
-            glm::vec3(obj->po->mesh.verts[ t->verts[2] ])};
-        glm::vec3 normal = glm::normalize(glm::cross(floatverts[1] - floatverts[0], floatverts[2] - floatverts[0]));
-        float inclination = glm::angle(normal, glm::vec3(t->normal));
-        float insolation = glm::dot(normal, glm::vec3(0.4, 0.4, 0.4));
-        for(int j = 0; j < 3; j++){
-            vertices.insert(vertices.end(), {floatverts[j], glm::vec3(inclination, insolation, t->elevations[j])});
-        }
-    }
-    auto begin_upload = now();
-
-    memcpy(obj->vbo_mapped, vertices.data(), vertices.size() * sizeof(texvert));
-    memcpy(obj->ebo_mapped, indices.data(), indices.size() * sizeof(GLuint));
-    obj->fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-
-    // Position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0);
-    glEnableVertexAttribArray(0);
-    // Texture coordinate attribute
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
-    glEnableVertexAttribArray(1);
-
-    glBindVertexArray(0);
-    auto end = now();
-    std::cout << "prepared mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(begin_upload - begin).count() / 1000.0 << " ms\n";
-    std::cout << "uploaded mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin_upload).count() / 1000.0 << " ms\n";
-
-//    usleep(1000000.0);
+void upload_terrain_mesh(RenderObject *ro){
+    ro->upload_terrain_mesh();
 }
 
 void initializeGLFW() {
@@ -518,10 +524,10 @@ int main(int argc, char** argv) {
 
     // seed, name, radius, roughness, parent body
     Celestial glitch(seed, (double)lod, "Glitch", 6.371e6, 0.2, nil);
-    glitch.orbiting_bodies.emplace_back(seed + 1, (double)lod, "Jank", 1e6, 0.2, nil);
-    glitch.orbiting_bodies.emplace_back(seed + 2, (double)lod, "Kludge", 1e6, 0.2, nil);
-    glitch.orbiting_bodies.emplace_back(seed + 3, (double)lod, "Artifact", 1e6, 0.2, nil);
-    glitch.orbiting_bodies.emplace_back(seed + 4, (double)lod, "Haxx", 1e6, 0.2, nil);
+//    glitch.orbiting_bodies.emplace_back(seed + 1, (double)lod, "Jank", 1e6, 0.2, nil);
+//    glitch.orbiting_bodies.emplace_back(seed + 2, (double)lod, "Kludge", 1e6, 0.2, nil);
+//    glitch.orbiting_bodies.emplace_back(seed + 3, (double)lod, "Artifact", 1e6, 0.2, nil);
+//    glitch.orbiting_bodies.emplace_back(seed + 4, (double)lod, "Haxx", 1e6, 0.2, nil);
 
     initializeGLFW();
     GLFWwindow* window = createWindow(screenwidth, screenheight, "Takeoff Sendario");
@@ -567,16 +573,26 @@ int main(int argc, char** argv) {
     player_character->bake();
 
     ros.emplace_back(&player_character->body);
-    ros.emplace_back(&glitch.body);
     player_character->body.ro = &ros[0];
-    glitch.body.ro = &ros[1];
 
-    upload_boxen_mesh(player_character->body.ro);
+
+    RenderObject terrain0 = RenderObject(&glitch.body);
+    glitch.body.ro = &terrain0;
+
+    RenderObject terrain1 = RenderObject(&glitch.body);
+
+//    ros.emplace_back(&glitch.body);
+//    glitch.body.ro = &ros[1];
+
+    player_character->body.ro->upload_boxen_mesh();
     player_character->body.ro->shader = shaders["box"];
     player_character->body.ro->texture = textures["isqswjwki55a1.png"];
 
-    glitch.body.ro->prepare_buffers(&glitch);
-    upload_terrain_mesh(glitch.body.ro, &glitch);
+    glitch.body.ro->prepare_buffers();
+
+    std::thread uploadThread(upload_terrain_mesh, glitch.body.ro);
+    uploadThread.detach();
+
     glitch.body.ro->shader = shaders["terrain"];
     glitch.body.ro->texture = textures["isqswjwki55a1.png"];
 
@@ -620,7 +636,7 @@ int main(int argc, char** argv) {
 
 //        ground->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * ground->body.rot;
 
-        if(glClientWaitSync(glitch.body.ro->fence, GL_SYNC_FLUSH_COMMANDS_BIT, 0) == GL_TIMEOUT_EXPIRED) {
+        if(!glitch.body.ro->data_uploaded) {
             std::cout << "mesh not ready\n";
         } else {
             render(glitch.body.ro);
@@ -647,7 +663,7 @@ int main(int argc, char** argv) {
                 dvec3 size = (hi - lo);
                 PhysicsObject greencube = PhysicsObject(dMesh::createBox(center, size.x, size.y, size.z), nil);
                 RenderObject ro = RenderObject(&greencube);
-                upload_boxen_mesh(&ro);
+                ro.upload_boxen_mesh();
                 ro.shader = shaders["box"];
                 ro.texture = textures["green_transparent_wireframe_box_64x64.png"];
                 glDisable(GL_CULL_FACE);
