@@ -19,8 +19,6 @@
 #include <unordered_map>
 #include <vector>
 
-
-
 // Rendering quality settings
 float anisotropy = 16.0f; // should be 4 with no upscaling, 16 with upscaling
 int antialiasing = 2; // 1 (no upscaling) and 2 (4 samples per pixel) are good values
@@ -202,6 +200,7 @@ void upload_boxen_mesh(RenderObject *obj) {
 }
 
 void upload_terrain_mesh(RenderObject *obj, Celestial *celestial) {
+    auto begin = now();
     glGenVertexArrays(1, &obj->vao);
     glBindVertexArray(obj->vao);
     std::vector<texvert> vertices;
@@ -220,6 +219,7 @@ void upload_terrain_mesh(RenderObject *obj, Celestial *celestial) {
             vertices.insert(vertices.end(), {floatverts[j], glm::vec3(inclination, insolation, t->elevations[j])});
         }
     }
+    auto begin_upload = now();
     glGenBuffers(1, &obj->vbo);
     glBindBuffer(GL_ARRAY_BUFFER, obj->vbo);
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(texvert), vertices.data(), GL_STATIC_DRAW);
@@ -233,6 +233,9 @@ void upload_terrain_mesh(RenderObject *obj, Celestial *celestial) {
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
     glEnableVertexAttribArray(1);
     glBindVertexArray(0);
+    auto end = now();
+    std::cout << "prepared mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(begin_upload - begin).count() / 1000.0 << " ms\n";
+    std::cout << "uploaded mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin_upload).count() / 1000.0 << " ms\n";
 }
 
 void initializeGLFW() {
@@ -530,17 +533,17 @@ int main(int argc, char** argv) {
     nonstd::vector<Unit> units;
     nonstd::vector<RenderObject> ros;
 
-    units.emplace_back(); // 1
-    player_character = &units[0]; // 2
-    player_character->addComponent(dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0)); // 3
+    units.emplace_back();
+    player_character = &units[0];
+    player_character->addComponent(dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0));
     player_character->addComponent(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 0.01));
     player_character->addComponent(dMesh::createBox(glm::dvec3(-1.2, 0.0, 0.0), 1.0, 0.05, 1.0));
-    player_character->bake(); // 4
+    player_character->bake();
 
-    ros.emplace_back(&player_character->body); // 5
-    ros.emplace_back(&glitch.body); // 5
-    player_character->body.ro = &ros[0]; // 6
-    glitch.body.ro = &ros[1]; // 6
+    ros.emplace_back(&player_character->body);
+    ros.emplace_back(&glitch.body);
+    player_character->body.ro = &ros[0];
+    glitch.body.ro = &ros[1];
 
     upload_boxen_mesh(player_character->body.ro);
     player_character->body.ro->shader = shaders["box"];
