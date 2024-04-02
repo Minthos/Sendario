@@ -658,26 +658,34 @@ int main(int argc, char** argv) {
 //        terrain1->upload_terrain_mesh(&mesh_in_waiting);
 //        terrain_upload_status = done_uploading;
         
-        vantage = northpole;// + player_character->body.pos;
+        vantage = northpole + player_character->body.pos;
 
-//        zone_origo = glitch->terrain[0x2aaaaaaaa8];
+        zone_origo = glitch->terrain[0x2aaaaaaaa8];
 
-        dvec3 player_global_pos = vantage + player_character->body.pos;
-        local_gravity_normalized = -glm::normalize(vantage);
+//        dvec3 player_global_pos = northpole + player_character->body.pos;
+
+        dvec3 player_global_pos = zone_origo->verts[0] + player_character->body.pos;
+
+
+        local_gravity_normalized = -glm::normalize(zone_origo->verts[0]);
         ttnode* tile = glitch->terrain[player_global_pos];
-        std::cout << "tile at (" << tile->verts[0].x << ", " << tile->verts[0].y << ", " << tile->verts[0].z << ")\n";
+        std::cout << "    zone at (" << zone_origo->verts[0].x << ", " << zone_origo->verts[0].y << ", " << zone_origo->verts[0].z << ")\n";
+        std::cout << "    tile at (" << tile->verts[0].x << ", " << tile->verts[0].y << ", " << tile->verts[0].z << ")\n";
         std::cout << "player at (" << player_global_pos.x << ", " << player_global_pos.y << ", " << player_global_pos.z << ")\n";
-        std::cout << "elevation: " << tile->elevation_projected(player_character->body.pos, &glitch->body.mesh) << "\n";
-
+        std::cout << "elevation: " << tile->elevation_kludgehammer(player_character->body.pos, &glitch->body.mesh) << "\n";
         
-//        dvec3 player_global_pos = zone_origo->verts[0] + player_character->body.pos;
 //        local_gravity_normalized = -glm::normalize(player_global_pos);
 //        ttnode* tile = glitch->terrain[player_global_pos];
 
 
         if(!game_paused){
-            if(abs(tile->elevation_projected(player_character->body.pos, &glitch->body.mesh) - player_character->body.pos.y) > 100.0) {
+            /*
+            if(abs(tile->elevation_kludgehammer(player_character->body.pos, &glitch->body.mesh) - player_character->body.pos.y) > 100.0) {
                 std::cout << "this is weird\n";
+                std::cout << "  projected: " << tile->elevation_projected(player_character->body.pos, &glitch->body.mesh) << "\n";
+                std::cout << "barycentric: " << tile->elevation_barycentric(player_character->body.pos, &glitch->body.mesh) << "\n";
+                std::cout << "      naive: " << tile->elevation_naive(player_character->body.pos, &glitch->body.mesh) << "\n";
+                std::cout << "kludgehammer: " << tile->elevation_kludgehammer(player_character->body.pos, &glitch->body.mesh) << "\n";
 
                 terrain_lock.unlock(); // release mutex
                 usleep(8000.0);
@@ -685,7 +693,7 @@ int main(int argc, char** argv) {
                 continue;
 
             }
-
+*/
             if(glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS){
                 camera_rot = glm::angleAxis(-0.01f, glm::vec3(0.0, 0.0, 1.0)) * camera_rot;
             } if(glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS){
@@ -694,7 +702,7 @@ int main(int argc, char** argv) {
             player_character->body.rot = glm::conjugate(camera_rot * glm::angleAxis(glm::radians(0.0f), glm::vec3(0.0, 1.0, 0.0)));
             double dt = 0.008;
             player_character->body.pos += player_character->body.rot * input_vector(window) * dt * 10.0;
-            player_character->body.pos.y = 1.0 + tile->elevation_projected(player_character->body.pos, &glitch->body.mesh);
+            player_character->body.pos.y = 1.0 + tile->elevation_kludgehammer(player_character->body.pos, &glitch->body.mesh);
             std::cout << "setting player_character->body.pos.y to " << player_character->body.pos.y << "\n";
             // optimization: compute view matrix here instead of in render()
             camera_target = vec3(player_character->body.pos);
