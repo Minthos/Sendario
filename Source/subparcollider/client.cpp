@@ -154,17 +154,17 @@ struct RenderObject {
 
         glGenBuffers(1, &vbo);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferStorage(GL_ARRAY_BUFFER, num_verts * sizeof(texvert), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
-        //glBufferStorage(GL_ARRAY_BUFFER, num_verts * sizeof(texvert), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
-        vbo_mapped = glMapBufferRange(GL_ARRAY_BUFFER, 0, num_verts * sizeof(texvert), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-        //vbo_mapped = glMapBufferRange(GL_ARRAY_BUFFER, 0, num_verts * sizeof(texvert), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+        //glBufferStorage(GL_ARRAY_BUFFER, num_verts * sizeof(texvert), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
+        glBufferStorage(GL_ARRAY_BUFFER, num_verts * sizeof(texvert), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+        //vbo_mapped = glMapBufferRange(GL_ARRAY_BUFFER, 0, num_verts * sizeof(texvert), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+        vbo_mapped = glMapBufferRange(GL_ARRAY_BUFFER, 0, num_verts * sizeof(texvert), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
 
         glGenBuffers(1, &ebo);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-        glBufferStorage(GL_ELEMENT_ARRAY_BUFFER, num_verts * sizeof(GLuint), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
-        //glBufferStorage(GL_ELEMENT_ARRAY_BUFFER, num_verts * sizeof(GLuint), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
-        ebo_mapped = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, num_verts * sizeof(GLuint), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-        //ebo_mapped = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, num_verts * sizeof(GLuint), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+        //glBufferStorage(GL_ELEMENT_ARRAY_BUFFER, num_verts * sizeof(GLuint), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
+        glBufferStorage(GL_ELEMENT_ARRAY_BUFFER, num_verts * sizeof(GLuint), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+        //ebo_mapped = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, num_verts * sizeof(GLuint), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+        ebo_mapped = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, num_verts * sizeof(GLuint), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
 
         // Position attribute
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0);
@@ -276,7 +276,7 @@ struct RenderObject {
         auto begin = now();
         for (uint32_t i = 0; i < mesh->num_tris; ++i) {
             dTri* t = &mesh->tris[i];
-            memcpy(ebo_mapped + i * 3 * sizeof(GLuint), t->verts, 3 * sizeof(GLuint));
+            memcpy((char*)ebo_mapped + i * 3 * sizeof(GLuint), t->verts, 3 * sizeof(GLuint));
             glm::vec3 floatverts[3] = {
                 glm::vec3(mesh->verts[ t->verts[0] ]),
                 glm::vec3(mesh->verts[ t->verts[1] ]),
@@ -286,7 +286,7 @@ struct RenderObject {
             float insolation = glm::dot(normal, glm::vec3(0.4, 0.4, 0.4));
             for(int j = 0; j < 3; j++){
                 texvert tmp = {floatverts[j], glm::vec3(inclination, insolation, t->elevations[j])};
-                memcpy(vbo_mapped + i * 3 * sizeof(texvert) + j * sizeof(texvert), &tmp, sizeof(texvert));
+                memcpy((char*)vbo_mapped + i * 3 * sizeof(texvert) + j * sizeof(texvert), &tmp, sizeof(texvert));
             }
         }
         auto begin_upload = now();
@@ -606,10 +606,12 @@ int main(int argc, char** argv) {
     for(int i = 1; i < argc; i++){
         if(strncmp(argv[i], "sync", 4) == 0){
             async_mode = false;
+            lod = 500;
             std::cout << "sync: using glBufferData which gives higher framerate but stutters on every LOD update\n";
         }
         if(strncmp(argv[i], "async", 5) == 0){
             async_mode = true;
+            lod = 60;
             std::cout << "async: using glMapBufferRange which reduces framerate but eliminates stuttering on LOD updates\n";
         }
     }
@@ -710,14 +712,14 @@ int main(int argc, char** argv) {
             terrain0 = terrain1;
             glitch->body.ro = terrain0;
 
-            if(async_mode){
+/*            if(async_mode){
                 glBindBuffer(GL_ARRAY_BUFFER, terrain0->vbo);
                 glFlushMappedBufferRange(GL_ARRAY_BUFFER, 0, mesh_in_waiting.num_verts * sizeof(texvert));
                 glUnmapBuffer(GL_ARRAY_BUFFER);
                 glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, terrain0->ebo);
                 glFlushMappedBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, mesh_in_waiting.num_verts * sizeof(GLuint));
                 glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
-            }
+            }*/
 
             glitch->body.mesh = mesh_in_waiting;
             the_old_mesh.destroy();
@@ -854,7 +856,7 @@ int main(int argc, char** argv) {
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindTexture(GL_TEXTURE_2D, 0); // Unbind velocity texture
         glBindFramebuffer(GL_FRAMEBUFFER, 0); // Bind back to the default framebuffer
-
+        glFlush();
         ++frames_rendered;
         if(frames_rendered % framerate_handicap == 0) {
             glfwSwapBuffers(window);
