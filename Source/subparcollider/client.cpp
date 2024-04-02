@@ -145,7 +145,7 @@ struct RenderObject {
         glDeleteBuffers(1, &ebo);
         glDeleteVertexArrays(1, &vao);
     }
-
+/*
     void prepare_buffers(dMesh *mesh) {
         glGenVertexArrays(1, &vao);
         glBindVertexArray(vao);
@@ -154,13 +154,17 @@ struct RenderObject {
 
         glGenBuffers(1, &vbo);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferStorage(GL_ARRAY_BUFFER, num_verts * sizeof(texvert), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
-        vbo_mapped = glMapBufferRange(GL_ARRAY_BUFFER, 0, num_verts * sizeof(texvert), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+        glBufferStorage(GL_ARRAY_BUFFER, num_verts * sizeof(texvert), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
+        //glBufferStorage(GL_ARRAY_BUFFER, num_verts * sizeof(texvert), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+        vbo_mapped = glMapBufferRange(GL_ARRAY_BUFFER, 0, num_verts * sizeof(texvert), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+        //vbo_mapped = glMapBufferRange(GL_ARRAY_BUFFER, 0, num_verts * sizeof(texvert), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
 
         glGenBuffers(1, &ebo);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-        glBufferStorage(GL_ELEMENT_ARRAY_BUFFER, num_verts * sizeof(GLuint), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
-        ebo_mapped = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, num_verts * sizeof(GLuint), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+        glBufferStorage(GL_ELEMENT_ARRAY_BUFFER, num_verts * sizeof(GLuint), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
+        //glBufferStorage(GL_ELEMENT_ARRAY_BUFFER, num_verts * sizeof(GLuint), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+        ebo_mapped = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, num_verts * sizeof(GLuint), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+        //ebo_mapped = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, num_verts * sizeof(GLuint), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
 
         // Position attribute
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0);
@@ -170,7 +174,7 @@ struct RenderObject {
         glEnableVertexAttribArray(1);
 
         glBindVertexArray(0);
-    }
+    }*/
 
     // uploads a mesh composed of one or more box meshes to the gpu
     // TODO: find a better way to set texture coordinates.
@@ -228,6 +232,47 @@ struct RenderObject {
         glBindVertexArray(0);
     }
 
+
+void upload_terrain_mesh_blocking(dMesh *mesh) {
+    auto begin = now();
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+    std::vector<texvert> vertices;
+    std::vector<GLuint> indices;
+    for (uint32_t i = 0; i < mesh->num_tris; ++i) {
+        dTri* t = &mesh->tris[i];
+        indices.insert(indices.end(), {t->verts[0], t->verts[1], t->verts[2]});
+        glm::vec3 floatverts[3] = {
+            glm::vec3(mesh->verts[ t->verts[0] ]),
+            glm::vec3(mesh->verts[ t->verts[1] ]),
+            glm::vec3(mesh->verts[ t->verts[2] ])};
+        glm::vec3 normal = glm::normalize(glm::cross(floatverts[1] - floatverts[0], floatverts[2] - floatverts[0]));
+        float inclination = glm::angle(normal, glm::vec3(t->normal));
+        float insolation = glm::dot(normal, glm::vec3(0.4, 0.4, 0.4));
+        for(int j = 0; j < 3; j++){
+            vertices.insert(vertices.end(), {floatverts[j], glm::vec3(inclination, insolation, t->elevations[j])});
+        }
+    }
+    auto begin_upload = now();
+    glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(texvert), vertices.data(), GL_STATIC_DRAW);
+    glGenBuffers(1, &ebo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
+    // Position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0);
+    glEnableVertexAttribArray(0);
+    // Texture coordinate attribute
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+    glEnableVertexAttribArray(1);
+    glBindVertexArray(0);
+    auto end = now();
+    std::cout << "prepared mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(begin_upload - begin).count() / 1000.0 << " ms\n";
+    std::cout << "uploaded mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin_upload).count() / 1000.0 << " ms\n";
+}
+
+    /*
     void upload_terrain_mesh(dMesh *mesh) {
         auto begin = now();
         for (uint32_t i = 0; i < mesh->num_tris; ++i) {
@@ -247,7 +292,7 @@ struct RenderObject {
         }
         auto begin_upload = now();
         std::cout << "prepared mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(begin_upload - begin).count() / 1000.0 << " ms\n";
-    }
+    }*/
 };
 
 void initializeGLFW() {
@@ -539,8 +584,7 @@ void terrain_thread_entry(int seed, double lod) {
             }
             usleep(1000.0);
         }
-        terrain1->upload_terrain_mesh(&mesh_in_waiting);
-        terrain_upload_status = done_uploading;
+  //      terrain_upload_status = done_uploading;
         while(terrain_upload_status == done_uploading) { // wait for main thread to consume the latest data
             if(glfwWindowShouldClose(window)){
                 return;
@@ -620,8 +664,8 @@ int main(int argc, char** argv) {
             terrain0 = new RenderObject(&glitch->body);
             terrain0->shader = shaders["terrain"];
             terrain0->texture = textures["isqswjwki55a1.png"];
-            terrain0->prepare_buffers(&glitch->body.mesh);
-            terrain0->upload_terrain_mesh(&glitch->body.mesh);
+      //      terrain0->prepare_buffers(&glitch->body.mesh);
+            terrain0->upload_terrain_mesh_blocking(&glitch->body.mesh);
             glitch->body.ro = terrain0;
             northpole = glitch->terrain[0x2aaaaaaaa8]->verts[0];
             vantage = northpole;// + player_character->body.pos;
@@ -635,18 +679,22 @@ int main(int argc, char** argv) {
             terrain1 = new RenderObject(&glitch->body);
             terrain1->shader = shaders["terrain"];
             terrain1->texture = textures["isqswjwki55a1.png"];
-            terrain1->prepare_buffers(&mesh_in_waiting);
-            terrain_upload_status = uploading;
+            terrain1->upload_terrain_mesh_blocking(&mesh_in_waiting);
+        //    terrain1->prepare_buffers(&mesh_in_waiting);
+        //    terrain_upload_status = uploading;
+            terrain_upload_status = done_uploading;
         }
         if(terrain_upload_status == done_uploading) {
             delete terrain0;
             terrain0 = terrain1;
             glitch->body.ro = terrain0;
 
-            glBindBuffer(GL_ARRAY_BUFFER, terrain0->vbo);
-            glUnmapBuffer(GL_ARRAY_BUFFER);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, terrain0->ebo);
-            glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+//            glBindBuffer(GL_ARRAY_BUFFER, terrain0->vbo);
+//            glFlushMappedBufferRange(GL_ARRAY_BUFFER, 0, mesh_in_waiting.num_verts * sizeof(texvert));
+//            glUnmapBuffer(GL_ARRAY_BUFFER);
+//            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, terrain0->ebo);
+//            glFlushMappedBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, mesh_in_waiting.num_verts * sizeof(GLuint));
+//            glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
 
             glitch->body.mesh = mesh_in_waiting;
             the_old_mesh.destroy();
