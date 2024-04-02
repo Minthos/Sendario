@@ -530,6 +530,7 @@ void terrain_thread_entry(int seed, double lod) {
     terrain_lock.lock();
     terrain_upload_status = generating;
     glitch = new Celestial(seed, current_lod, "Glitch", 6.371e6, 0.2, nil); // initial terrain generation must block the main thread
+    mesh_in_waiting = glitch->body.mesh;
     terrain_upload_status = done_generating_first_time;
     terrain_lock.unlock();
     while(terrain_upload_status == done_generating_first_time) {
@@ -595,12 +596,10 @@ int main(int argc, char** argv) {
     ppshader = mkShader("pp_motionblur");
     glUseProgram(ppshader);
     glUniform1i(glGetUniformLocation(ppshader, "screenTexture"), 0);
-    
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_BLEND);
-
     shaders["box"] = mkShader("box");
     shaders["terrain"] = mkShader("terrain");
     textures["isqswjwki55a1.png"] = loadTexture("textures/isqswjwki55a1.png", true);
@@ -612,30 +611,23 @@ int main(int argc, char** argv) {
 
     nonstd::vector<Unit> units;
     nonstd::vector<RenderObject> ros;
-
     units.emplace_back();
     player_character = &units[0];
     player_character->addComponent(dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0));
     player_character->addComponent(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 0.01));
     player_character->addComponent(dMesh::createBox(glm::dvec3(-1.2, 0.0, 0.0), 1.0, 0.05, 1.0));
     player_character->bake();
-
     ros.emplace_back(&player_character->body);
     player_character->body.ro = &ros[0];
     player_character->body.ro->upload_boxen_mesh();
     player_character->body.ro->shader = shaders["box"];
     player_character->body.ro->texture = textures["isqswjwki55a1.png"];
 
-
-
     ttnode* zone_origo = nil;
-    //ttnode* northpole = glitch.terrain[0x2aaaaaaaa8];
-
+    dvec3 northpole;
     // Main loop
     while (!glfwWindowShouldClose(window)) {
-
         terrain_lock.lock(); // grab mutex
-
         if(terrain_upload_status == done_generating_first_time) {
             terrain0 = new RenderObject(&glitch->body);
             terrain0->shader = shaders["terrain"];
@@ -643,46 +635,10 @@ int main(int argc, char** argv) {
             terrain0->prepare_buffers(&glitch->body.mesh);
             terrain0->upload_terrain_mesh(&glitch->body.mesh);
             glitch->body.ro = terrain0;
+            northpole = glitch->terrain[0x2aaaaaaaa8]->verts[0];
+            vantage = northpole + player_character->body.pos;
             terrain_upload_status = idle;
         }
-
-        zone_origo = glitch->terrain[0x2aaaaaaaa8];
-        dvec3 player_global_pos = zone_origo->verts[0] + player_character->body.pos;
-        local_gravity_normalized = -glm::normalize(player_global_pos);
-        ttnode* tile = glitch->terrain[player_global_pos];
-        vantage = tile->verts[0];
-
-        if(!game_paused){
-
-            if(glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS){
-                camera_rot = glm::angleAxis(-0.01f, glm::vec3(0.0, 0.0, 1.0)) * camera_rot;
-            } if(glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS){
-                camera_rot = glm::angleAxis(0.01f, glm::vec3(0.0, 0.0, 1.0)) * camera_rot;                              
-            }
-
-            player_character->body.rot = glm::conjugate(camera_rot * glm::angleAxis(glm::radians(0.0f), glm::vec3(0.0, 1.0, 0.0)));
-            double dt = 0.008;
-            player_character->body.pos += player_character->body.rot * input_vector(window) * dt * 10.0;
-            player_character->body.pos.y = 1.0 + tile->elevation_projected(player_character->body.pos, &glitch->body.mesh);
-
-            // optimization: compute view matrix here instead of in render()
-            camera_target = vec3(player_character->body.pos);
-            //glitch.body.rot = glm::normalize(glm::angleAxis(0.0004, glm::dvec3(0.0, 0.0, 0.0)) * glitch.body.rot);
-        }
-
-
-        if(game_paused && !camera_dirty){
-            usleep(8000.0);
-            glfwPollEvents();
-            continue;
-        }
-        camera_dirty = false;
-
-        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-//        ground->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * ground->body.rot;
-
         if(terrain_upload_status == done_generating) {
             terrain1 = new RenderObject(&glitch->body);
             terrain1->shader = shaders["terrain"];
@@ -697,11 +653,45 @@ int main(int argc, char** argv) {
             glitch->body.mesh = mesh_in_waiting;
             terrain_upload_status = idle;
         }
+        
+        vantage = northpole + player_character->body.pos;
+
+//        zone_origo = glitch->terrain[0x2aaaaaaaa8];
+
+//        dvec3 player_global_pos = vantage;
+        local_gravity_normalized = -glm::normalize(vantage);
+        ttnode* tile = glitch->terrain[vantage];
+        
+//        dvec3 player_global_pos = zone_origo->verts[0] + player_character->body.pos;
+//        local_gravity_normalized = -glm::normalize(player_global_pos);
+//        ttnode* tile = glitch->terrain[player_global_pos];
+
+
+        if(!game_paused){
+            if(glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS){
+                camera_rot = glm::angleAxis(-0.01f, glm::vec3(0.0, 0.0, 1.0)) * camera_rot;
+            } if(glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS){
+                camera_rot = glm::angleAxis(0.01f, glm::vec3(0.0, 0.0, 1.0)) * camera_rot;                              
+            }
+            player_character->body.rot = glm::conjugate(camera_rot * glm::angleAxis(glm::radians(0.0f), glm::vec3(0.0, 1.0, 0.0)));
+            double dt = 0.008;
+            player_character->body.pos += player_character->body.rot * input_vector(window) * dt * 10.0;
+            player_character->body.pos.y = 1.0 + tile->elevation_projected(player_character->body.pos, &glitch->body.mesh);
+            // optimization: compute view matrix here instead of in render()
+            camera_target = vec3(player_character->body.pos);
+            //glitch.body.rot = glm::normalize(glm::angleAxis(0.0004, glm::dvec3(0.0, 0.0, 0.0)) * glitch.body.rot);
+        }
+        if(game_paused && !camera_dirty){
+            usleep(8000.0);
+            glfwPollEvents();
+            continue;
+        }
+        camera_dirty = false;
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         render(terrain0);
-
         terrain_lock.unlock(); // release mutex
-
 
         ctleaf l = ctleaf(&player_character->body);
         CollisionTree t = CollisionTree(dvec3(0.0), &l, 1);
@@ -783,6 +773,7 @@ int main(int argc, char** argv) {
 
 
     }
+
 
     for(int i = 0; i < ros.size(); i++) {
         ros[i].po->mesh.destroy();

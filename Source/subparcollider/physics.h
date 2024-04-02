@@ -1027,15 +1027,17 @@ struct TerrainTree {
         for(int i = 0; i < 8; i++) {
             generate(location, i, &verts, &tris, 1, min_subdivisions, i);
         }
+        uint64_t num_verts = verts.size();
+        uint64_t num_tris = tris.size();
         dvec3 *vertices = (dvec3*)malloc(verts.size() * sizeof(dvec3) + tris.size() * sizeof(dTri));
         dTri *triangles = (dTri*)&vertices[verts.size()];
 
         memcpy(vertices, &verts[0], verts.size() * sizeof(dvec3));
         memcpy(triangles, &tris[0], tris.size() * sizeof(dTri));
         std::cout << tris.size() << " triangles generated\n";
-//        verts.destroy();
-//        tris.destroy();
-        return dMesh(vertices, verts.size(), triangles, tris.size());
+        verts.destroy();
+        tris.destroy();
+        return dMesh(vertices, num_verts, triangles, num_tris);
     }
 };
 
