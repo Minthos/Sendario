@@ -742,12 +742,19 @@ struct ttnode {
         };
         int best = 0;
         double min_deviation = 1e38;
+        double max_deviation = 0;
         for(int i = 0; i < 3; i++) {
             double deviation = abs(candidates[i] - expected);
             if(deviation < min_deviation) {
-                deviation = min_deviation;
+                min_deviation = deviation;
                 best = i;
             }
+            if(deviation > min_deviation) {
+                max_deviation = deviation;
+            }
+        }
+        if(max_deviation > 100.0){
+            std::cout << "max deviation: " << max_deviation << "\n";
         }
         return candidates[best];
     }

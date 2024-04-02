@@ -26,6 +26,7 @@ int antialiasing = 2; // 1 (no upscaling) and 2 (4 samples per pixel) are good v
 int motion_blur_mode = 1; // 0 = off, 1 = nonlinear (sharp), 2 = linear (blurry)
 float motion_blur_invstr = 5.0f; // motion blur amount. 1.0 = very high. 5.0 = low.
 
+GLFWwindow* window = nil;
 Unit *player_character = nil;
 
 using std::string;
@@ -154,12 +155,12 @@ struct RenderObject {
         glGenBuffers(1, &vbo);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
         glBufferStorage(GL_ARRAY_BUFFER, num_verts * sizeof(texvert), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
-        vbo_mapped = glMapBufferRange(GL_ARRAY_BUFFER, 0, num_verts * sizeof(texvert), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+        vbo_mapped = glMapBufferRange(GL_ARRAY_BUFFER, 0, num_verts * sizeof(texvert), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
 
         glGenBuffers(1, &ebo);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
         glBufferStorage(GL_ELEMENT_ARRAY_BUFFER, num_verts * sizeof(GLuint), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
-        ebo_mapped = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, num_verts * sizeof(GLuint), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+        ebo_mapped = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, num_verts * sizeof(GLuint), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
 
         // Position attribute
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0);
@@ -227,17 +228,11 @@ struct RenderObject {
         glBindVertexArray(0);
     }
 
-    // we can optimize this by writing directly to vbo_mapped and ebo_mapped instead of the std::vectors
     void upload_terrain_mesh(dMesh *mesh) {
         auto begin = now();
-
-        std::vector<texvert> vertices;
-        vertices.reserve(mesh->num_tris * 3);
-        std::vector<GLuint> indices;
-        indices.reserve(mesh->num_tris * 3);
         for (uint32_t i = 0; i < mesh->num_tris; ++i) {
             dTri* t = &mesh->tris[i];
-            indices.insert(indices.end(), {t->verts[0], t->verts[1], t->verts[2]});
+            memcpy(ebo_mapped + i * 3 * sizeof(GLuint), t->verts, 3 * sizeof(GLuint));
             glm::vec3 floatverts[3] = {
                 glm::vec3(mesh->verts[ t->verts[0] ]),
                 glm::vec3(mesh->verts[ t->verts[1] ]),
@@ -246,22 +241,12 @@ struct RenderObject {
             float inclination = glm::angle(normal, glm::vec3(t->normal));
             float insolation = glm::dot(normal, glm::vec3(0.4, 0.4, 0.4));
             for(int j = 0; j < 3; j++){
-                vertices.insert(vertices.end(), {floatverts[j], glm::vec3(inclination, insolation, t->elevations[j])});
+                texvert tmp = {floatverts[j], glm::vec3(inclination, insolation, t->elevations[j])};
+                memcpy(vbo_mapped + i * 3 * sizeof(texvert) + j * sizeof(texvert), &tmp, sizeof(texvert));
             }
         }
         auto begin_upload = now();
-
-        memcpy(vbo_mapped, vertices.data(), vertices.size() * sizeof(texvert));
-        memcpy(ebo_mapped, indices.data(), indices.size() * sizeof(GLuint));
-
-
-        auto end = now();
         std::cout << "prepared mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(begin_upload - begin).count() / 1000.0 << " ms\n";
-        std::cout << "uploaded mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin_upload).count() / 1000.0 << " ms\n";
-
-        // experiments have shown that on my computer the time it takes for the upload to complete is less than the
-        // time it takes to prepare the mesh data. since opengl's glClientWaitSync sucks I just wait a while instead..
-        usleep(std::chrono::duration_cast<std::chrono::microseconds>(begin_upload - begin).count());
     }
 };
 
@@ -271,7 +256,7 @@ void initializeGLFW() {
         exit(EXIT_FAILURE);
     }
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 }
 
@@ -515,7 +500,6 @@ enum terrain_upload_status_enum {
     done_uploading
 };
 
-GLFWwindow* window = nil;
 RenderObject *terrain0 = nil;
 RenderObject *terrain1 = nil;
 Celestial *glitch = nil;
@@ -539,7 +523,10 @@ void terrain_thread_entry(int seed, double lod) {
         usleep(1000.0);
     }
     while(!glfwWindowShouldClose(window)) {
-        current_lod = min(current_lod + 1.0, lod);
+        current_lod = min(current_lod + 10.0, lod);
+        if(current_lod >= lod){
+            usleep(5000000.0);
+        }
         std::cout << "generating terrain mesh with LOD " << current_lod << "\n";
         dvec3 vantage_copy = vantage;
         terrain_in_waiting = glitch->terrain.copy();
@@ -547,20 +534,27 @@ void terrain_thread_entry(int seed, double lod) {
         mesh_in_waiting = terrain_in_waiting.buildMesh(vantage_copy, 3);
         terrain_upload_status = done_generating;
         while(terrain_upload_status == done_generating) { // wait for main thread to create and map opengl buffers for us
+            if(glfwWindowShouldClose(window)){
+                return;
+            }
             usleep(1000.0);
         }
         terrain1->upload_terrain_mesh(&mesh_in_waiting);
         terrain_upload_status = done_uploading;
         while(terrain_upload_status == done_uploading) { // wait for main thread to consume the latest data
+            if(glfwWindowShouldClose(window)){
+                return;
+            }
             usleep(1000.0);
         }
+        usleep(5000000.0);
         terrain_upload_status = generating;
     }
 }
 
 int main(int argc, char** argv) {
     int seed = 52;
-    int lod = 40;
+    int lod = 140;
     if(argc > 2){
         seed = atol(argv[1]);
         lod = atol(argv[2]);
@@ -571,6 +565,7 @@ int main(int argc, char** argv) {
     }
     initializeGLFW();
     window = createWindow(screenwidth, screenheight, "Takeoff Sendario");
+//    glfwSwapInterval(0); // disabling vsync didn't help
     glfwWindowHint(GLFW_AUTO_ICONIFY, GL_FALSE);
     glfwSetWindowSizeCallback(window, reshape);
     glfwSetKeyCallback(window, key_callback);
@@ -629,7 +624,7 @@ int main(int argc, char** argv) {
             terrain0->upload_terrain_mesh(&glitch->body.mesh);
             glitch->body.ro = terrain0;
             northpole = glitch->terrain[0x2aaaaaaaa8]->verts[0];
-            vantage = northpole + player_character->body.pos;
+            vantage = northpole;// + player_character->body.pos;
             terrain_upload_status = idle;
             player_character->body.pos.y = 2686.57;
         }
@@ -647,6 +642,12 @@ int main(int argc, char** argv) {
             delete terrain0;
             terrain0 = terrain1;
             glitch->body.ro = terrain0;
+
+            glBindBuffer(GL_ARRAY_BUFFER, terrain0->vbo);
+            glUnmapBuffer(GL_ARRAY_BUFFER);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, terrain0->ebo);
+            glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+
             glitch->body.mesh = mesh_in_waiting;
             the_old_mesh.destroy();
             the_old_mesh = glitch->body.mesh;
@@ -658,7 +659,6 @@ int main(int argc, char** argv) {
 //        terrain1->upload_terrain_mesh(&mesh_in_waiting);
 //        terrain_upload_status = done_uploading;
         
-        vantage = northpole + player_character->body.pos;
 
         zone_origo = glitch->terrain[0x2aaaaaaaa8];
 
@@ -669,11 +669,19 @@ int main(int argc, char** argv) {
 
         local_gravity_normalized = -glm::normalize(zone_origo->verts[0]);
         ttnode* tile = glitch->terrain[player_global_pos];
+        double elevation = tile->elevation_kludgehammer(player_character->body.pos, &glitch->body.mesh);
+        vantage = northpole;
+        terrain_lock.unlock(); // release mutex
+
+        // TODO: make this work
+        //vantage = northpole + player_character->body.pos - elevation;
+
+/*
         std::cout << "    zone at (" << zone_origo->verts[0].x << ", " << zone_origo->verts[0].y << ", " << zone_origo->verts[0].z << ")\n";
         std::cout << "    tile at (" << tile->verts[0].x << ", " << tile->verts[0].y << ", " << tile->verts[0].z << ")\n";
         std::cout << "player at (" << player_global_pos.x << ", " << player_global_pos.y << ", " << player_global_pos.z << ")\n";
         std::cout << "elevation: " << tile->elevation_kludgehammer(player_character->body.pos, &glitch->body.mesh) << "\n";
-        
+  */      
 //        local_gravity_normalized = -glm::normalize(player_global_pos);
 //        ttnode* tile = glitch->terrain[player_global_pos];
 
@@ -703,13 +711,12 @@ int main(int argc, char** argv) {
             double dt = 0.008;
             player_character->body.pos += player_character->body.rot * input_vector(window) * dt * 10.0;
             player_character->body.pos.y = 1.0 + tile->elevation_kludgehammer(player_character->body.pos, &glitch->body.mesh);
-            std::cout << "setting player_character->body.pos.y to " << player_character->body.pos.y << "\n";
+            //std::cout << "setting player_character->body.pos.y to " << player_character->body.pos.y << "\n";
             // optimization: compute view matrix here instead of in render()
             camera_target = vec3(player_character->body.pos);
             //glitch.body.rot = glm::normalize(glm::angleAxis(0.0004, glm::dvec3(0.0, 0.0, 0.0)) * glitch.body.rot);
         }
         if(game_paused && !camera_dirty){
-            terrain_lock.unlock(); // release mutex
             usleep(8000.0);
             glfwPollEvents();
             continue;
@@ -719,7 +726,6 @@ int main(int argc, char** argv) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         render(terrain0);
-        terrain_lock.unlock(); // release mutex
 
         ctleaf l = ctleaf(&player_character->body);
         CollisionTree t = CollisionTree(dvec3(0.0), &l, 1);
@@ -799,8 +805,14 @@ int main(int argc, char** argv) {
 
 //        usleep(40000);
 
-
     }
+
+    terrain_thread.join();
+
+    delete the_old_terrain.generator;
+    delete terrain0;
+//    delete terrain1;
+    delete glitch;
 
 
     for(int i = 0; i < ros.size(); i++) {
@@ -812,7 +824,6 @@ int main(int argc, char** argv) {
     glDeleteTextures(1, &velocityTex);
 
     glfwTerminate();
-    delete glitch;
     return 0;
 }
 
