@@ -137,20 +137,19 @@ struct RenderObject {
     void *ebo_mapped;
     glm::mat4 prev;
     bool firstTime;
-    volatile bool data_uploaded; // volatile is good enough here, we don't need the guarantees provided by atomic
 
-    RenderObject(PhysicsObject *ppo) { po = ppo; firstTime = true; data_uploaded = false; }
+    RenderObject(PhysicsObject *ppo) { po = ppo; firstTime = true; }
     ~RenderObject() {
         glDeleteBuffers(1, &vbo);
         glDeleteBuffers(1, &ebo);
         glDeleteVertexArrays(1, &vao);
     }
 
-    void prepare_buffers() {
+    void prepare_buffers(dMesh *mesh) {
         glGenVertexArrays(1, &vao);
         glBindVertexArray(vao);
 
-        uint64_t num_verts = po->mesh.num_tris * 3;
+        uint64_t num_verts = mesh->num_tris * 3;
 
         glGenBuffers(1, &vbo);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
@@ -228,20 +227,21 @@ struct RenderObject {
         glBindVertexArray(0);
     }
 
-    void upload_terrain_mesh() {
+    // we can optimize this by writing directly to vbo_mapped and ebo_mapped instead of the std::vectors
+    void upload_terrain_mesh(dMesh *mesh) {
         auto begin = now();
 
         std::vector<texvert> vertices;
-        vertices.reserve(po->mesh.num_tris * 3);
+        vertices.reserve(mesh->num_tris * 3);
         std::vector<GLuint> indices;
-        indices.reserve(po->mesh.num_tris * 3);
-        for (uint32_t i = 0; i < po->mesh.num_tris; ++i) {
-            dTri* t = &po->mesh.tris[i];
+        indices.reserve(mesh->num_tris * 3);
+        for (uint32_t i = 0; i < mesh->num_tris; ++i) {
+            dTri* t = &mesh->tris[i];
             indices.insert(indices.end(), {t->verts[0], t->verts[1], t->verts[2]});
             glm::vec3 floatverts[3] = {
-                glm::vec3(po->mesh.verts[ t->verts[0] ]),
-                glm::vec3(po->mesh.verts[ t->verts[1] ]),
-                glm::vec3(po->mesh.verts[ t->verts[2] ])};
+                glm::vec3(mesh->verts[ t->verts[0] ]),
+                glm::vec3(mesh->verts[ t->verts[1] ]),
+                glm::vec3(mesh->verts[ t->verts[2] ])};
             glm::vec3 normal = glm::normalize(glm::cross(floatverts[1] - floatverts[0], floatverts[2] - floatverts[0]));
             float inclination = glm::angle(normal, glm::vec3(t->normal));
             float insolation = glm::dot(normal, glm::vec3(0.4, 0.4, 0.4));
@@ -262,13 +262,8 @@ struct RenderObject {
         // experiments have shown that on my computer the time it takes for the upload to complete is less than the
         // time it takes to prepare the mesh data. since opengl's glClientWaitSync sucks I just wait a while instead..
         usleep(std::chrono::duration_cast<std::chrono::microseconds>(begin_upload - begin).count());
-        data_uploaded = true;
     }
 };
-
-void upload_terrain_mesh(RenderObject *ro){
-    ro->upload_terrain_mesh();
-}
 
 void initializeGLFW() {
     if (!glfwInit()) {
@@ -308,6 +303,7 @@ int framerate_handicap = 1;
 int frames_rendered = 0;
 auto prevFrameTime = now();
 bool game_paused = false;
+
 
 glm::vec3 camera_target = vec3(0,0,0);
 glm::quat camera_rot;
@@ -510,6 +506,64 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
     camera_dirty = true;
 }
 
+enum terrain_upload_status_enum {
+    idle,
+    generating,
+    done_generating,
+    done_generating_first_time,
+    uploading,
+    done_uploading
+};
+
+GLFWwindow* window = nil;
+RenderObject *terrain0 = nil;
+RenderObject *terrain1 = nil;
+Celestial *glitch = nil;
+terrain_upload_status_enum terrain_upload_status = idle;
+dvec3 vantage;
+dMesh mesh_in_waiting;
+dMesh the_old_mesh;
+mutex terrain_lock;
+
+void terrain_thread_entry(int seed, double lod) {
+    double current_lod = 1.0;
+    terrain_lock.lock();
+    terrain_upload_status = generating;
+    glitch = new Celestial(seed, current_lod, "Glitch", 6.371e6, 0.2, nil); // initial terrain generation must block the main thread
+    terrain_upload_status = done_generating_first_time;
+    terrain_lock.unlock();
+    while(terrain_upload_status == done_generating_first_time) {
+        usleep(1000.0);
+    }
+    while(!glfwWindowShouldClose(window)) {
+        current_lod = min(current_lod + 1.0, lod);
+        std::cout << "generating terrain mesh with LOD " << current_lod << "\n";
+        TerrainTree terrain_copy = glitch->terrain.copy();
+        terrain_copy.LOD_DISTANCE_SCALE = current_lod;
+        terrain_lock.lock();
+        dvec3 vantage_copy = vantage;
+        terrain_lock.unlock();
+        the_old_mesh.destroy();
+        the_old_mesh = mesh_in_waiting;
+        mesh_in_waiting = terrain_copy.buildMesh(vantage_copy, 3);
+        terrain_lock.lock();
+        glitch->terrain.nodes.destroy();
+        glitch->terrain = terrain_copy;
+        terrain_lock.unlock();
+
+        terrain_upload_status = done_generating;
+        while(terrain_upload_status == done_generating) { // wait for main thread to create and map opengl buffers for us
+            usleep(1000.0);
+        }
+        terrain1->upload_terrain_mesh(&mesh_in_waiting);
+        terrain_upload_status = done_uploading;
+        while(terrain_upload_status == done_uploading) { // wait for main thread to consume the latest data
+            usleep(1000.0);
+        }
+        terrain_upload_status = generating;
+    }
+}
+
 int main(int argc, char** argv) {
     int seed = 52;
     int lod = 40;
@@ -521,16 +575,8 @@ int main(int argc, char** argv) {
         std::cout << "Usage: " << argv[0] << " seed LOD\n";
         std::cout << "Using default values " << seed << " and " << lod << "\n\n\n";
     }
-
-    // seed, name, radius, roughness, parent body
-    Celestial glitch(seed, (double)lod, "Glitch", 6.371e6, 0.2, nil);
-//    glitch.orbiting_bodies.emplace_back(seed + 1, (double)lod, "Jank", 1e6, 0.2, nil);
-//    glitch.orbiting_bodies.emplace_back(seed + 2, (double)lod, "Kludge", 1e6, 0.2, nil);
-//    glitch.orbiting_bodies.emplace_back(seed + 3, (double)lod, "Artifact", 1e6, 0.2, nil);
-//    glitch.orbiting_bodies.emplace_back(seed + 4, (double)lod, "Haxx", 1e6, 0.2, nil);
-
     initializeGLFW();
-    GLFWwindow* window = createWindow(screenwidth, screenheight, "Takeoff Sendario");
+    window = createWindow(screenwidth, screenheight, "Takeoff Sendario");
     glfwWindowHint(GLFW_AUTO_ICONIFY, GL_FALSE);
     glfwSetWindowSizeCallback(window, reshape);
     glfwSetKeyCallback(window, key_callback);
@@ -541,6 +587,8 @@ int main(int argc, char** argv) {
     glfwSetScrollCallback(window, scroll_callback);
     camera_rot = glm::quat(1, 0, 0, 0);
     initializeGLEW();
+
+    std::thread terrain_thread(terrain_thread_entry, seed, lod);
 
     initializeFramebuffer();
     resizeFramebuffer(screenwidth, screenheight);
@@ -574,34 +622,37 @@ int main(int argc, char** argv) {
 
     ros.emplace_back(&player_character->body);
     player_character->body.ro = &ros[0];
-
-
-    RenderObject terrain0 = RenderObject(&glitch.body);
-    glitch.body.ro = &terrain0;
-
-    RenderObject terrain1 = RenderObject(&glitch.body);
-
-//    ros.emplace_back(&glitch.body);
-//    glitch.body.ro = &ros[1];
-
     player_character->body.ro->upload_boxen_mesh();
     player_character->body.ro->shader = shaders["box"];
     player_character->body.ro->texture = textures["isqswjwki55a1.png"];
 
-    glitch.body.ro->prepare_buffers();
 
-    std::thread uploadThread(upload_terrain_mesh, glitch.body.ro);
-    uploadThread.detach();
 
-    glitch.body.ro->shader = shaders["terrain"];
-    glitch.body.ro->texture = textures["isqswjwki55a1.png"];
-
-    ttnode* zone_origo = glitch.terrain[0x2aaaaaaaa8];
+    ttnode* zone_origo = nil;
+    //ttnode* northpole = glitch.terrain[0x2aaaaaaaa8];
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
+
+        terrain_lock.lock(); // grab mutex
+
+        if(terrain_upload_status == done_generating_first_time) {
+            terrain0 = new RenderObject(&glitch->body);
+            terrain0->shader = shaders["terrain"];
+            terrain0->texture = textures["isqswjwki55a1.png"];
+            terrain0->prepare_buffers(&glitch->body.mesh);
+            terrain0->upload_terrain_mesh(&glitch->body.mesh);
+            glitch->body.ro = terrain0;
+            terrain_upload_status = idle;
+        }
+
+        zone_origo = glitch->terrain[0x2aaaaaaaa8];
+        dvec3 player_global_pos = zone_origo->verts[0] + player_character->body.pos;
+        local_gravity_normalized = -glm::normalize(player_global_pos);
+        ttnode* tile = glitch->terrain[player_global_pos];
+        vantage = tile->verts[0];
+
         if(!game_paused){
-            local_gravity_normalized = -glm::normalize(zone_origo->verts[0] + player_character->body.pos);
 
             if(glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS){
                 camera_rot = glm::angleAxis(-0.01f, glm::vec3(0.0, 0.0, 1.0)) * camera_rot;
@@ -610,19 +661,15 @@ int main(int argc, char** argv) {
             }
 
             player_character->body.rot = glm::conjugate(camera_rot * glm::angleAxis(glm::radians(0.0f), glm::vec3(0.0, 1.0, 0.0)));
-            //ttnode* northpole = glitch.terrain[0x2aaaaaaaa8];
-
             double dt = 0.008;
             player_character->body.pos += player_character->body.rot * input_vector(window) * dt * 10.0;
-            ttnode* tile = glitch.terrain[player_character->body.pos + zone_origo->verts[0]];
-
-            player_character->body.pos.y = 1.0 + tile->elevation_projected(player_character->body.pos, &glitch.body.mesh);
+            player_character->body.pos.y = 1.0 + tile->elevation_projected(player_character->body.pos, &glitch->body.mesh);
 
             // optimization: compute view matrix here instead of in render()
             camera_target = vec3(player_character->body.pos);
-
             //glitch.body.rot = glm::normalize(glm::angleAxis(0.0004, glm::dvec3(0.0, 0.0, 0.0)) * glitch.body.rot);
         }
+
 
         if(game_paused && !camera_dirty){
             usleep(8000.0);
@@ -636,11 +683,26 @@ int main(int argc, char** argv) {
 
 //        ground->body.rot = glm::angleAxis(0.01, glm::dvec3(0.0, 1.0, 0.0)) * ground->body.rot;
 
-        if(!glitch.body.ro->data_uploaded) {
-            std::cout << "mesh not ready\n";
-        } else {
-            render(glitch.body.ro);
+        if(terrain_upload_status == done_generating) {
+            terrain1 = new RenderObject(&glitch->body);
+            terrain1->shader = shaders["terrain"];
+            terrain1->texture = textures["isqswjwki55a1.png"];
+            terrain1->prepare_buffers(&mesh_in_waiting);
+            terrain_upload_status = uploading;
         }
+        if(terrain_upload_status == done_uploading) {
+            delete terrain0;
+            terrain0 = terrain1;
+            glitch->body.ro = terrain0;
+            glitch->body.mesh = mesh_in_waiting;
+            terrain_upload_status = idle;
+        }
+
+        render(terrain0);
+
+        terrain_lock.unlock(); // release mutex
+
+
         ctleaf l = ctleaf(&player_character->body);
         CollisionTree t = CollisionTree(dvec3(0.0), &l, 1);
 
@@ -731,6 +793,7 @@ int main(int argc, char** argv) {
     glDeleteTextures(1, &velocityTex);
 
     glfwTerminate();
+    delete glitch;
     return 0;
 }
 

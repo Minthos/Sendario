@@ -5,6 +5,7 @@
 #include <chrono>
 #include <deque>
 #include <iostream>
+#include <mutex>
 #include <vector>
 
 #include <cassert>
@@ -18,6 +19,7 @@
 
 #define nil nullptr
 
+using std::mutex;
 using std::string;
 auto now = std::chrono::high_resolution_clock::now;
 using glm::dvec3;
@@ -42,12 +44,22 @@ template <typename T> struct vector {
     size_t capacity;
 
     vector() { bzero(this, sizeof(vector<T>)); }
-    ~vector() {
+
+    void destroy() {
         for(size_t i = 0; i < count; ++i){
             data[i].~T();
         }
         free(data);
         bzero(this, sizeof(vector<T>));
+    }
+
+    vector<T> copy() {
+        vector<T> tmp;
+        tmp.data = (T*)malloc(sizeof(T) * count);
+        memcpy(tmp.data, data, sizeof(T) * count);
+        tmp.count = count;
+        tmp.capacity = count;
+        return tmp;
     }
 
     size_t size() { return count; }
@@ -105,6 +117,7 @@ struct mempool {
     nonstd::vector<cacheline*> recycler;
     uint64_t data_idx;
 
+    ~mempool() { data.destroy(); recycler.destroy(); }
     cacheline* alloc();
     void free(cacheline *line);
 };
@@ -284,7 +297,7 @@ struct dMesh {
     uint32_t num_verts;
     uint32_t num_tris;
 
-    dMesh() {}
+    dMesh() { bzero(this, sizeof(dMesh)); }
 
     dMesh(dvec3* pverts, uint32_t pnumVerts, dTri* ptris, uint32_t pnumTris) {
         verts = pverts;
@@ -748,14 +761,17 @@ struct TerrainTree {
     nonstd::vector<ttnode> nodes;
 
     ~TerrainTree() {
-        if(generator){
-            delete generator;
-            generator = 0;
-        }
     }
 
     TerrainTree() {
         bzero(this, sizeof(TerrainTree));
+    }
+
+    TerrainTree copy() {
+        TerrainTree tmp;
+        memcpy(&tmp, this, sizeof(TerrainTree));
+        tmp.nodes = nodes.copy();
+        return tmp;
     }
 
     // MAX_LOD should be no more than 18 for an Earth-sized planet because of precision artifacts in the fractal
@@ -814,6 +830,7 @@ struct TerrainTree {
 
     void generate(dvec3 location, uint32_t node_idx, nonstd::vector<glm::dvec3> *verts, nonstd::vector<dTri> *tris,
             uint64_t level, int min_level, uint64_t path) {
+
         nodes[node_idx].path = path;
         double noise_xzscaling = 0.0001;
         double noise_xzscaling2 = -0.00001;
@@ -824,7 +841,7 @@ struct TerrainTree {
             double nodeWidth = glm::length(nodes[node_idx].verts[0] - nodes[node_idx].verts[1]);
             double ratio = distance / nodeWidth;
 
-           if(ratio > LOD_DISTANCE_SCALE || level > MAX_LOD) {
+            if(ratio > LOD_DISTANCE_SCALE || level > MAX_LOD) {
                 dTri t;
                 dvec3 center = {0, 0, 0};
                 for(int i = 0; i < 3; i++) {
@@ -1003,6 +1020,7 @@ struct TerrainTree {
     }
 
     dMesh buildMesh(dvec3 location, int min_subdivisions) {
+        std::cout << "building mesh from vantage point (" << location.x << ", " << location.y << ", " << location.z << ")\n";
         nonstd::vector<uint32_t> node_indices;
         nonstd::vector<glm::dvec3> verts;
         nonstd::vector<dTri> tris;
@@ -1014,7 +1032,9 @@ struct TerrainTree {
 
         memcpy(vertices, &verts[0], verts.size() * sizeof(dvec3));
         memcpy(triangles, &tris[0], tris.size() * sizeof(dTri));
-
+        std::cout << tris.size() << " triangles generated\n";
+//        verts.destroy();
+//        tris.destroy();
         return dMesh(vertices, verts.size(), triangles, tris.size());
     }
 };
@@ -1051,10 +1071,6 @@ struct Celestial {
         surface_temp_max = 331.0;
         nearest_star = pnearest_star;
     }
-
-//    void redrawMesh(dvec3 vantage_point) {
-//        body.mesh = terrain.buildMesh(vantage_point, 5);
-//    }
 };
 
 struct Zone {
