@@ -145,7 +145,7 @@ struct RenderObject {
         glDeleteBuffers(1, &ebo);
         glDeleteVertexArrays(1, &vao);
     }
-/*
+
     void prepare_buffers(dMesh *mesh) {
         glGenVertexArrays(1, &vao);
         glBindVertexArray(vao);
@@ -174,7 +174,7 @@ struct RenderObject {
         glEnableVertexAttribArray(1);
 
         glBindVertexArray(0);
-    }*/
+    }
 
     // uploads a mesh composed of one or more box meshes to the gpu
     // TODO: find a better way to set texture coordinates.
@@ -233,46 +233,45 @@ struct RenderObject {
     }
 
 
-void upload_terrain_mesh_blocking(dMesh *mesh) {
-    auto begin = now();
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-    std::vector<texvert> vertices;
-    std::vector<GLuint> indices;
-    for (uint32_t i = 0; i < mesh->num_tris; ++i) {
-        dTri* t = &mesh->tris[i];
-        indices.insert(indices.end(), {t->verts[0], t->verts[1], t->verts[2]});
-        glm::vec3 floatverts[3] = {
-            glm::vec3(mesh->verts[ t->verts[0] ]),
-            glm::vec3(mesh->verts[ t->verts[1] ]),
-            glm::vec3(mesh->verts[ t->verts[2] ])};
-        glm::vec3 normal = glm::normalize(glm::cross(floatverts[1] - floatverts[0], floatverts[2] - floatverts[0]));
-        float inclination = glm::angle(normal, glm::vec3(t->normal));
-        float insolation = glm::dot(normal, glm::vec3(0.4, 0.4, 0.4));
-        for(int j = 0; j < 3; j++){
-            vertices.insert(vertices.end(), {floatverts[j], glm::vec3(inclination, insolation, t->elevations[j])});
+    void upload_terrain_mesh_blocking(dMesh *mesh) {
+        auto begin = now();
+        glGenVertexArrays(1, &vao);
+        glBindVertexArray(vao);
+        std::vector<texvert> vertices;
+        std::vector<GLuint> indices;
+        for (uint32_t i = 0; i < mesh->num_tris; ++i) {
+            dTri* t = &mesh->tris[i];
+            indices.insert(indices.end(), {t->verts[0], t->verts[1], t->verts[2]});
+            glm::vec3 floatverts[3] = {
+                glm::vec3(mesh->verts[ t->verts[0] ]),
+                glm::vec3(mesh->verts[ t->verts[1] ]),
+                glm::vec3(mesh->verts[ t->verts[2] ])};
+            glm::vec3 normal = glm::normalize(glm::cross(floatverts[1] - floatverts[0], floatverts[2] - floatverts[0]));
+            float inclination = glm::angle(normal, glm::vec3(t->normal));
+            float insolation = glm::dot(normal, glm::vec3(0.4, 0.4, 0.4));
+            for(int j = 0; j < 3; j++){
+                vertices.insert(vertices.end(), {floatverts[j], glm::vec3(inclination, insolation, t->elevations[j])});
+            }
         }
+        auto begin_upload = now();
+        glGenBuffers(1, &vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(texvert), vertices.data(), GL_STATIC_DRAW);
+        glGenBuffers(1, &ebo);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
+        // Position attribute
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0);
+        glEnableVertexAttribArray(0);
+        // Texture coordinate attribute
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+        glEnableVertexAttribArray(1);
+        glBindVertexArray(0);
+        auto end = now();
+        std::cout << "prepared mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(begin_upload - begin).count() / 1000.0 << " ms\n";
+        std::cout << "uploaded mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin_upload).count() / 1000.0 << " ms\n";
     }
-    auto begin_upload = now();
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(texvert), vertices.data(), GL_STATIC_DRAW);
-    glGenBuffers(1, &ebo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
-    // Position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0);
-    glEnableVertexAttribArray(0);
-    // Texture coordinate attribute
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
-    glEnableVertexAttribArray(1);
-    glBindVertexArray(0);
-    auto end = now();
-    std::cout << "prepared mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(begin_upload - begin).count() / 1000.0 << " ms\n";
-    std::cout << "uploaded mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin_upload).count() / 1000.0 << " ms\n";
-}
 
-    /*
     void upload_terrain_mesh(dMesh *mesh) {
         auto begin = now();
         for (uint32_t i = 0; i < mesh->num_tris; ++i) {
@@ -292,7 +291,7 @@ void upload_terrain_mesh_blocking(dMesh *mesh) {
         }
         auto begin_upload = now();
         std::cout << "prepared mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(begin_upload - begin).count() / 1000.0 << " ms\n";
-    }*/
+    }
 };
 
 void initializeGLFW() {
@@ -556,6 +555,8 @@ TerrainTree terrain_in_waiting;
 TerrainTree the_old_terrain;
 mutex terrain_lock;
 
+bool async_mode = true;
+
 void terrain_thread_entry(int seed, double lod) {
     double current_lod = 1.0;
     terrain_lock.lock();
@@ -584,7 +585,10 @@ void terrain_thread_entry(int seed, double lod) {
             }
             usleep(1000.0);
         }
-  //      terrain_upload_status = done_uploading;
+        if(async_mode){
+            terrain1->upload_terrain_mesh(&mesh_in_waiting);
+            terrain_upload_status = done_uploading;
+        }
         while(terrain_upload_status == done_uploading) { // wait for main thread to consume the latest data
             if(glfwWindowShouldClose(window)){
                 return;
@@ -599,12 +603,22 @@ void terrain_thread_entry(int seed, double lod) {
 int main(int argc, char** argv) {
     int seed = 52;
     int lod = 140;
+    for(int i = 1; i < argc; i++){
+        if(strncmp(argv[i], "sync", 4) == 0){
+            async_mode = false;
+            std::cout << "sync: using glBufferData which gives higher framerate but stutters on every LOD update\n";
+        }
+        if(strncmp(argv[i], "async", 5) == 0){
+            async_mode = true;
+            std::cout << "async: using glMapBufferRange which reduces framerate but eliminates stuttering on LOD updates\n";
+        }
+    }
     if(argc > 2){
         seed = atol(argv[1]);
         lod = atol(argv[2]);
     } else {
         std::cout << "\n\nPlease specify prng seed and LOD distance\n";
-        std::cout << "Usage: " << argv[0] << " seed LOD\n";
+        std::cout << "Usage: " << argv[0] << " seed LOD [sync or async]\n";
         std::cout << "Using default values " << seed << " and " << lod << "\n\n\n";
     }
     initializeGLFW();
@@ -664,8 +678,12 @@ int main(int argc, char** argv) {
             terrain0 = new RenderObject(&glitch->body);
             terrain0->shader = shaders["terrain"];
             terrain0->texture = textures["isqswjwki55a1.png"];
-      //      terrain0->prepare_buffers(&glitch->body.mesh);
-            terrain0->upload_terrain_mesh_blocking(&glitch->body.mesh);
+            if(async_mode){
+                terrain0->prepare_buffers(&glitch->body.mesh);
+                terrain0->upload_terrain_mesh(&glitch->body.mesh);
+            } else {
+                terrain0->upload_terrain_mesh_blocking(&glitch->body.mesh);
+            }
             glitch->body.ro = terrain0;
             northpole = glitch->terrain[0x2aaaaaaaa8]->verts[0];
             vantage = northpole;// + player_character->body.pos;
@@ -679,22 +697,27 @@ int main(int argc, char** argv) {
             terrain1 = new RenderObject(&glitch->body);
             terrain1->shader = shaders["terrain"];
             terrain1->texture = textures["isqswjwki55a1.png"];
-            terrain1->upload_terrain_mesh_blocking(&mesh_in_waiting);
-        //    terrain1->prepare_buffers(&mesh_in_waiting);
-        //    terrain_upload_status = uploading;
-            terrain_upload_status = done_uploading;
+            if(async_mode){
+                terrain1->prepare_buffers(&mesh_in_waiting);
+                terrain_upload_status = uploading;
+            } else {
+                terrain1->upload_terrain_mesh_blocking(&mesh_in_waiting);
+                terrain_upload_status = done_uploading;
+            }
         }
         if(terrain_upload_status == done_uploading) {
             delete terrain0;
             terrain0 = terrain1;
             glitch->body.ro = terrain0;
 
-//            glBindBuffer(GL_ARRAY_BUFFER, terrain0->vbo);
-//            glFlushMappedBufferRange(GL_ARRAY_BUFFER, 0, mesh_in_waiting.num_verts * sizeof(texvert));
-//            glUnmapBuffer(GL_ARRAY_BUFFER);
-//            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, terrain0->ebo);
-//            glFlushMappedBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, mesh_in_waiting.num_verts * sizeof(GLuint));
-//            glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+            if(async_mode){
+                glBindBuffer(GL_ARRAY_BUFFER, terrain0->vbo);
+                glFlushMappedBufferRange(GL_ARRAY_BUFFER, 0, mesh_in_waiting.num_verts * sizeof(texvert));
+                glUnmapBuffer(GL_ARRAY_BUFFER);
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, terrain0->ebo);
+                glFlushMappedBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, mesh_in_waiting.num_verts * sizeof(GLuint));
+                glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+            }
 
             glitch->body.mesh = mesh_in_waiting;
             the_old_mesh.destroy();
