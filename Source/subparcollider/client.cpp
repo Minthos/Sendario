@@ -523,6 +523,8 @@ terrain_upload_status_enum terrain_upload_status = idle;
 dvec3 vantage;
 dMesh mesh_in_waiting;
 dMesh the_old_mesh;
+TerrainTree terrain_in_waiting;
+TerrainTree the_old_terrain;
 mutex terrain_lock;
 
 void terrain_thread_entry(int seed, double lod) {
@@ -539,19 +541,10 @@ void terrain_thread_entry(int seed, double lod) {
     while(!glfwWindowShouldClose(window)) {
         current_lod = min(current_lod + 1.0, lod);
         std::cout << "generating terrain mesh with LOD " << current_lod << "\n";
-        TerrainTree terrain_copy = glitch->terrain.copy();
-        terrain_copy.LOD_DISTANCE_SCALE = current_lod;
-        terrain_lock.lock();
         dvec3 vantage_copy = vantage;
-        terrain_lock.unlock();
-        the_old_mesh.destroy();
-        the_old_mesh = mesh_in_waiting;
-        mesh_in_waiting = terrain_copy.buildMesh(vantage_copy, 3);
-        terrain_lock.lock();
-        glitch->terrain.nodes.destroy();
-        glitch->terrain = terrain_copy;
-        terrain_lock.unlock();
-
+        terrain_in_waiting = glitch->terrain.copy();
+        terrain_in_waiting.LOD_DISTANCE_SCALE = current_lod;
+        mesh_in_waiting = terrain_in_waiting.buildMesh(vantage_copy, 3);
         terrain_upload_status = done_generating;
         while(terrain_upload_status == done_generating) { // wait for main thread to create and map opengl buffers for us
             usleep(1000.0);
@@ -638,7 +631,11 @@ int main(int argc, char** argv) {
             northpole = glitch->terrain[0x2aaaaaaaa8]->verts[0];
             vantage = northpole + player_character->body.pos;
             terrain_upload_status = idle;
+            player_character->body.pos.y = 2686.57;
         }
+
+//        terrain_in_waiting = glitch->terrain.copy();
+//        mesh_in_waiting = terrain_in_waiting.buildMesh(vantage_copy, 3);
         if(terrain_upload_status == done_generating) {
             terrain1 = new RenderObject(&glitch->body);
             terrain1->shader = shaders["terrain"];
@@ -651,16 +648,27 @@ int main(int argc, char** argv) {
             terrain0 = terrain1;
             glitch->body.ro = terrain0;
             glitch->body.mesh = mesh_in_waiting;
+            the_old_mesh.destroy();
+            the_old_mesh = glitch->body.mesh;
+            the_old_terrain.nodes.destroy();
+            the_old_terrain = glitch->terrain;
+            glitch->terrain = terrain_in_waiting;
             terrain_upload_status = idle;
         }
+//        terrain1->upload_terrain_mesh(&mesh_in_waiting);
+//        terrain_upload_status = done_uploading;
         
-        vantage = northpole + player_character->body.pos;
+        vantage = northpole;// + player_character->body.pos;
 
 //        zone_origo = glitch->terrain[0x2aaaaaaaa8];
 
-//        dvec3 player_global_pos = vantage;
+        dvec3 player_global_pos = vantage + player_character->body.pos;
         local_gravity_normalized = -glm::normalize(vantage);
-        ttnode* tile = glitch->terrain[vantage];
+        ttnode* tile = glitch->terrain[player_global_pos];
+        std::cout << "tile at (" << tile->verts[0].x << ", " << tile->verts[0].y << ", " << tile->verts[0].z << ")\n";
+        std::cout << "player at (" << player_global_pos.x << ", " << player_global_pos.y << ", " << player_global_pos.z << ")\n";
+        std::cout << "elevation: " << tile->elevation_projected(player_character->body.pos, &glitch->body.mesh) << "\n";
+
         
 //        dvec3 player_global_pos = zone_origo->verts[0] + player_character->body.pos;
 //        local_gravity_normalized = -glm::normalize(player_global_pos);
@@ -668,6 +676,16 @@ int main(int argc, char** argv) {
 
 
         if(!game_paused){
+            if(abs(tile->elevation_projected(player_character->body.pos, &glitch->body.mesh) - player_character->body.pos.y) > 100.0) {
+                std::cout << "this is weird\n";
+
+                terrain_lock.unlock(); // release mutex
+                usleep(8000.0);
+                glfwPollEvents();
+                continue;
+
+            }
+
             if(glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS){
                 camera_rot = glm::angleAxis(-0.01f, glm::vec3(0.0, 0.0, 1.0)) * camera_rot;
             } if(glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS){
@@ -677,11 +695,13 @@ int main(int argc, char** argv) {
             double dt = 0.008;
             player_character->body.pos += player_character->body.rot * input_vector(window) * dt * 10.0;
             player_character->body.pos.y = 1.0 + tile->elevation_projected(player_character->body.pos, &glitch->body.mesh);
+            std::cout << "setting player_character->body.pos.y to " << player_character->body.pos.y << "\n";
             // optimization: compute view matrix here instead of in render()
             camera_target = vec3(player_character->body.pos);
             //glitch.body.rot = glm::normalize(glm::angleAxis(0.0004, glm::dvec3(0.0, 0.0, 0.0)) * glitch.body.rot);
         }
         if(game_paused && !camera_dirty){
+            terrain_lock.unlock(); // release mutex
             usleep(8000.0);
             glfwPollEvents();
             continue;
