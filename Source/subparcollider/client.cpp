@@ -146,36 +146,6 @@ struct RenderObject {
         glDeleteVertexArrays(1, &vao);
     }
 
-    void prepare_buffers(dMesh *mesh) {
-        glGenVertexArrays(1, &vao);
-        glBindVertexArray(vao);
-
-        uint64_t num_verts = mesh->num_tris * 3;
-
-        glGenBuffers(1, &vbo);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        //glBufferStorage(GL_ARRAY_BUFFER, num_verts * sizeof(texvert), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
-        glBufferStorage(GL_ARRAY_BUFFER, num_verts * sizeof(texvert), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
-        //vbo_mapped = glMapBufferRange(GL_ARRAY_BUFFER, 0, num_verts * sizeof(texvert), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-        vbo_mapped = glMapBufferRange(GL_ARRAY_BUFFER, 0, num_verts * sizeof(texvert), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-
-        glGenBuffers(1, &ebo);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-        //glBufferStorage(GL_ELEMENT_ARRAY_BUFFER, num_verts * sizeof(GLuint), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
-        glBufferStorage(GL_ELEMENT_ARRAY_BUFFER, num_verts * sizeof(GLuint), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
-        //ebo_mapped = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, num_verts * sizeof(GLuint), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-        ebo_mapped = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, num_verts * sizeof(GLuint), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-
-        // Position attribute
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0);
-        glEnableVertexAttribArray(0);
-        // Texture coordinate attribute
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
-        glEnableVertexAttribArray(1);
-
-        glBindVertexArray(0);
-    }
-
     // uploads a mesh composed of one or more box meshes to the gpu
     // TODO: find a better way to set texture coordinates.
     void upload_boxen_mesh() {
@@ -232,11 +202,9 @@ struct RenderObject {
         glBindVertexArray(0);
     }
 
-
+    // TODO: split this into chunks of 100k triangles for stutter-free uploading
     void upload_terrain_mesh_blocking(dMesh *mesh) {
         auto begin = now();
-        glGenVertexArrays(1, &vao);
-        glBindVertexArray(vao);
         std::vector<texvert> vertices;
         std::vector<GLuint> indices;
         for (uint32_t i = 0; i < mesh->num_tris; ++i) {
@@ -254,6 +222,8 @@ struct RenderObject {
             }
         }
         auto begin_upload = now();
+        glGenVertexArrays(1, &vao);
+        glBindVertexArray(vao);
         glGenBuffers(1, &vbo);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
         glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(texvert), vertices.data(), GL_STATIC_DRAW);
@@ -270,6 +240,36 @@ struct RenderObject {
         auto end = now();
         std::cout << "prepared mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(begin_upload - begin).count() / 1000.0 << " ms\n";
         std::cout << "uploaded mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin_upload).count() / 1000.0 << " ms\n";
+    }
+
+    void prepare_buffers(dMesh *mesh) {
+        glGenVertexArrays(1, &vao);
+        glBindVertexArray(vao);
+
+        uint64_t num_verts = mesh->num_tris * 3;
+
+        glGenBuffers(1, &vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        //glBufferStorage(GL_ARRAY_BUFFER, num_verts * sizeof(texvert), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
+        glBufferStorage(GL_ARRAY_BUFFER, num_verts * sizeof(texvert), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+        //vbo_mapped = glMapBufferRange(GL_ARRAY_BUFFER, 0, num_verts * sizeof(texvert), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+        vbo_mapped = glMapBufferRange(GL_ARRAY_BUFFER, 0, num_verts * sizeof(texvert), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+
+        glGenBuffers(1, &ebo);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+        //glBufferStorage(GL_ELEMENT_ARRAY_BUFFER, num_verts * sizeof(GLuint), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
+        glBufferStorage(GL_ELEMENT_ARRAY_BUFFER, num_verts * sizeof(GLuint), nullptr, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+        //ebo_mapped = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, num_verts * sizeof(GLuint), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+        ebo_mapped = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, num_verts * sizeof(GLuint), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+
+        // Position attribute
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0);
+        glEnableVertexAttribArray(0);
+        // Texture coordinate attribute
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+        glEnableVertexAttribArray(1);
+
+        glBindVertexArray(0);
     }
 
     void upload_terrain_mesh(dMesh *mesh) {
@@ -625,7 +625,7 @@ int main(int argc, char** argv) {
     }
     initializeGLFW();
     window = createWindow(screenwidth, screenheight, "Takeoff Sendario");
-//    glfwSwapInterval(0); // disabling vsync didn't help
+    glfwSwapInterval(0); // disabling vsync didn't help but makes performance tuning easier
     glfwWindowHint(GLFW_AUTO_ICONIFY, GL_FALSE);
     glfwSetWindowSizeCallback(window, reshape);
     glfwSetKeyCallback(window, key_callback);
