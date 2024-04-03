@@ -718,12 +718,13 @@ int main(int argc, char** argv) {
             player_character->body.pos += player_character->body.rot * input_vector(window) * dt * 10.0;
             player_global_pos += player_character->body.rot * input_vector(window) * dt * 10.0;
             //double elevation = tile->elevation_kludgehammer(player_character->body.pos, &glitch->body.mesh);
-/*            double elevation = tile->elevation();
-            if(elevation > glm::length(player_character->body.pos)){
+            double elevation = tile->elevation_projected(player_character->body.pos, &glitch->body.mesh);
+            //double elevation = tile->elevation();
+//            if(elevation > glm::length(player_character->body.pos)){
                 player_character->body.pos -= local_gravity_normalized * (elevation - glm::length(player_character->body.pos));
                 player_global_pos -= local_gravity_normalized * (elevation - glm::length(player_character->body.pos));
-            }
-*/
+//            }
+
             // optimization: compute view matrix here instead of in render()
             camera_target = vec3(player_character->body.pos);
             //glitch.body.rot = glm::normalize(glm::angleAxis(0.0004, glm::dvec3(0.0, 0.0, 0.0)) * glitch.body.rot);

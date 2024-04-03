@@ -772,8 +772,8 @@ struct ttnode {
             std::cout << "max deviation: " << max_deviation << "\n";
         }
         return candidates[best];
-    }*/
-
+    }
+*/
     double elevation_projected(dvec3 pos, dMesh* mesh) {
         dTri *tri = &mesh->tris[triangle];
         dvec3 &a = mesh->verts[tri->verts[0]];
@@ -785,7 +785,7 @@ struct ttnode {
         dvec3 gravity_dir = normalize(verts[0]);
         double d = dot(norm, (a - pos)) / dot(norm, gravity_dir);
         dvec3 intersection = pos + gravity_dir * d;
-        return intersection.y;
+        return glm::length(intersection);
     }
     // this one consistently overestimates elevation by a few meters
     double elevation_barycentric(dvec3 pos, dMesh* mesh) {
