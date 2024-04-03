@@ -44,11 +44,6 @@ char* readShaderSource(const char* filePath) {
     long length = ftell(file);
     fseek(file, 0, SEEK_SET);
     char* buffer = (char*)malloc(length + 1);
-    if (buffer == nil) {
-        fprintf(stderr, "Memory allocation failed\n");
-        fclose(file);
-        exit(EXIT_FAILURE);
-    }
     size_t bytesRead = fread(buffer, 1, length, file);
     if (bytesRead != (size_t)length) {
         fprintf(stderr, "Error reading file\n");
@@ -125,7 +120,6 @@ GLuint loadTexture(const char* filename, bool smooth) {
 struct texvert {
     glm::vec3 xyz;
     glm::vec3 uv;
-
     texvert(glm::vec3 a, glm::vec3 b) { xyz = a; uv = b; }
 };
 
@@ -497,6 +491,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 
 enum terrain_upload_status_enum {
     idle,
+    should_exit,
     generating,
     done_generating,
     done_generating_first_time,
@@ -507,7 +502,7 @@ enum terrain_upload_status_enum {
 RenderObject *terrain0 = nil;
 RenderObject *terrain1 = nil;
 Celestial *glitch = nil;
-terrain_upload_status_enum terrain_upload_status = idle;
+volatile terrain_upload_status_enum terrain_upload_status = idle;
 dvec3 vantage;
 dMesh mesh_in_waiting;
 dMesh the_old_mesh;
@@ -526,43 +521,45 @@ void terrain_thread_entry(int seed, double lod) {
     while(terrain_upload_status == done_generating_first_time) {
         usleep(1000.0);
     }
-    while(!glfwWindowShouldClose(window)) {
-        current_lod = min(current_lod + 1.0, lod);
-        if(current_lod >= lod){
-            usleep(5000000.0);
-        }
+    while(terrain_upload_status != should_exit) {
+        terrain_upload_status = generating;
+        current_lod = min(current_lod * 1.2 + 1.0, lod);
         std::cout << "generating terrain mesh with LOD " << current_lod << "\n";
         auto begin = now();
         dvec3 vantage_copy = vantage;
         terrain_in_waiting = glitch->terrain.copy();
         terrain_in_waiting.LOD_DISTANCE_SCALE = current_lod;
         mesh_in_waiting = terrain_in_waiting.buildMesh(vantage_copy, 3);
+        if(terrain_upload_status == should_exit){
+            return;
+        }
         terrain_upload_status = done_generating;
         auto end = now();
         double duration = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
-        if(duration > 1000000.0){
-            current_lod *= (1000000.0 / duration);
+        if(duration > 10000.0 * lod) {
+            // uncomment to see something broken
+            //current_lod *= (1000000.0 / duration);
         }
-        while(terrain_upload_status == done_generating) { // wait for main thread to create and map opengl buffers for us
-            if(glfwWindowShouldClose(window)){
+        while(terrain_upload_status != idle) { // wait for main thread to upload data to gpu
+            if(terrain_upload_status == should_exit){
                 return;
             }
             usleep(1000.0);
         }
-        while(terrain_upload_status == done_uploading) { // wait for main thread to consume the latest data
-            if(glfwWindowShouldClose(window)){
-                return;
+        if(current_lod >= lod && duration < 10000.0 * lod) {
+            for(double i = 0.0; i < 20.0; i += 0.01) {
+                if(terrain_upload_status == should_exit){
+                    return;
+                }
+                usleep(10000.0);
             }
-            usleep(1000.0);
         }
-//        usleep(5000000.0);
-        terrain_upload_status = generating;
     }
 }
 
 int main(int argc, char** argv) {
     int seed = 52;
-    int lod = 500;
+    int lod = 200;
     if(argc > 2){
         seed = atol(argv[1]);
         lod = atol(argv[2]);
@@ -662,7 +659,6 @@ int main(int argc, char** argv) {
             glitch->terrain = terrain_in_waiting;
             terrain_upload_status = idle;
         }
-        
 
         zone_origo = glitch->terrain[0x2aaaaaaaa8];
 
@@ -810,25 +806,23 @@ int main(int argc, char** argv) {
 //        usleep(40000);
 
     }
-
-    terrain_upload_status = idle;
-    terrain_thread.join();
-
-    delete the_old_terrain.generator;
-    delete terrain0;
-//    delete terrain1;
-    delete glitch;
-
-
-    for(int i = 0; i < ros.size(); i++) {
-        ros[i].po->mesh.destroy();
-    }
-
     glDeleteFramebuffers(1, &framebuffer);
     glDeleteTextures(1, &colorTex);
     glDeleteTextures(1, &velocityTex);
 
     glfwTerminate();
+
+    terrain_upload_status = should_exit;
+    terrain_thread.join();
+
+    delete the_old_terrain.generator;
+    delete terrain0;
+    delete glitch;
+
+    for(int i = 0; i < ros.size(); i++) {
+        ros[i].po->mesh.destroy();
+    }
+
     return 0;
 }
 
