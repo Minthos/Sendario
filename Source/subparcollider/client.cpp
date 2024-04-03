@@ -540,7 +540,7 @@ void terrain_thread_entry(int seed, double lod) {
             // uncomment to see something broken
             //current_lod *= (1000000.0 / duration);
         }
-        while(terrain_upload_status != idle) { // wait for main thread to upload data to gpu
+        while(terrain_upload_status != idle) { // wait for main thread to finish shoveling
             if(terrain_upload_status == should_exit){
                 return;
             }
@@ -565,7 +565,7 @@ int main(int argc, char** argv) {
         lod = atol(argv[2]);
     } else {
         std::cout << "\n\nPlease specify prng seed and LOD distance\n";
-        std::cout << "Usage: " << argv[0] << " seed LOD [sync or async]\n";
+        std::cout << "Usage: " << argv[0] << " seed LOD\n";
         std::cout << "Using default values " << seed << " and " << lod << "\n\n\n";
     }
     initializeGLFW();
@@ -806,23 +806,20 @@ int main(int argc, char** argv) {
 //        usleep(40000);
 
     }
+    
+    std::cout << "Exiting, please wait..\n";
+    terrain_upload_status = should_exit;
     glDeleteFramebuffers(1, &framebuffer);
     glDeleteTextures(1, &colorTex);
     glDeleteTextures(1, &velocityTex);
-
     glfwTerminate();
-
-    terrain_upload_status = should_exit;
     terrain_thread.join();
-
     delete the_old_terrain.generator;
     delete terrain0;
     delete glitch;
-
     for(int i = 0; i < ros.size(); i++) {
         ros[i].po->mesh.destroy();
     }
-
     return 0;
 }
 
