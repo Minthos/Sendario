@@ -28,6 +28,17 @@ using glm::dmat4;
 using glm::dmat3;
 using glm::dquat;
 
+enum terrain_upload_status_enum {
+    idle,
+    should_exit,
+    generating,
+    done_generating,
+    done_generating_first_time,
+    uploading,
+    done_uploading
+};
+
+
 size_t min(size_t a, size_t b) {
     return a > b ? b : a;
 }
@@ -889,8 +900,10 @@ struct TerrainTree {
     }
 
     void generate(dvec3 location, uint32_t node_idx, nonstd::vector<glm::dvec3> *verts, nonstd::vector<dTri> *tris,
-            uint64_t level, int min_level, uint64_t path) {
-
+            uint64_t level, int min_level, uint64_t path, terrain_upload_status_enum *status) {
+        if(status && *status == should_exit){
+            return;
+        }
         nodes[node_idx].path = path;
         double noise_xzscaling = 0.0001;
         double noise_xzscaling2 = -0.00001;
@@ -982,8 +995,7 @@ struct TerrainTree {
         // we need to go deeper
         for(uint64_t i = 0; i < 4; i++) {
             generate(location, nodes[node_idx].first_child + i, verts, tris, level + 1, min_level,
-                    path | (i << (1 + 2 * level))
-                    );
+                    path | (i << (1 + 2 * level)), status);
         }
     }
 
@@ -1079,13 +1091,13 @@ struct TerrainTree {
         }
     }
 
-    dMesh buildMesh(dvec3 location, int min_subdivisions) {
+    dMesh buildMesh(dvec3 location, int min_subdivisions, terrain_upload_status_enum *status) {
         std::cout << "building mesh from vantage point (" << location.x << ", " << location.y << ", " << location.z << ")\n";
         nonstd::vector<uint32_t> node_indices;
         nonstd::vector<glm::dvec3> verts;
         nonstd::vector<dTri> tris;
         for(int i = 0; i < 8; i++) {
-            generate(location, i, &verts, &tris, 1, min_subdivisions, i);
+            generate(location * radius / glm::length(location), i, &verts, &tris, 1, min_subdivisions, i, status);
         }
         uint64_t num_verts = verts.size();
         uint64_t num_tris = tris.size();
@@ -1125,7 +1137,7 @@ struct Celestial {
         new(&terrain) TerrainTree(pseed, pLOD, pradius, proughness);
         auto time_begin = now();
         std::cout << "Generating mesh..\n";
-        new(&body) PhysicsObject(terrain.buildMesh(dvec3(0, 6.37101e6, 0), 3), nil);
+        new(&body) PhysicsObject(terrain.buildMesh(dvec3(0, 6.37101e6, 0), 3, nil), nil);
         auto time_used = std::chrono::duration_cast<std::chrono::microseconds>(now() - time_begin).count();
         std::cout << "Celestial " << name << ": " << body.mesh.num_tris << " triangles procedurally generated in " << time_used/1000.0 << "ms\n";
         std::cout << "Lowest point: " << terrain.lowest_point << ", highest point: " << terrain.highest_point << "\n";

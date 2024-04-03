@@ -489,20 +489,10 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
     camera_dirty = true;
 }
 
-enum terrain_upload_status_enum {
-    idle,
-    should_exit,
-    generating,
-    done_generating,
-    done_generating_first_time,
-    uploading,
-    done_uploading
-};
-
 RenderObject *terrain0 = nil;
 RenderObject *terrain1 = nil;
 Celestial *glitch = nil;
-volatile terrain_upload_status_enum terrain_upload_status = idle;
+terrain_upload_status_enum terrain_upload_status = idle;
 dvec3 vantage;
 dMesh mesh_in_waiting;
 dMesh the_old_mesh;
@@ -529,7 +519,7 @@ void terrain_thread_entry(int seed, double lod) {
         dvec3 vantage_copy = vantage;
         terrain_in_waiting = glitch->terrain.copy();
         terrain_in_waiting.LOD_DISTANCE_SCALE = current_lod;
-        mesh_in_waiting = terrain_in_waiting.buildMesh(vantage_copy, 3);
+        mesh_in_waiting = terrain_in_waiting.buildMesh(vantage_copy, 3, &terrain_upload_status);
         if(terrain_upload_status == should_exit){
             return;
         }
@@ -674,7 +664,7 @@ int main(int argc, char** argv) {
         terrain_lock.unlock(); // release mutex
 
         // TODO: make this work
-        //vantage = northpole + player_character->body.pos - elevation;
+        vantage = northpole + player_character->body.pos;// - elevation;
 
 /*
         std::cout << "    zone at (" << zone_origo->verts[0].x << ", " << zone_origo->verts[0].y << ", " << zone_origo->verts[0].z << ")\n";
@@ -807,7 +797,7 @@ int main(int argc, char** argv) {
 
     }
     
-    std::cout << "Exiting, please wait..\n";
+    std::cout << "Exiting..\n";
     terrain_upload_status = should_exit;
     glDeleteFramebuffers(1, &framebuffer);
     glDeleteTextures(1, &colorTex);
