@@ -242,6 +242,56 @@ struct RenderObject {
         std::cout << "uploaded mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin_upload).count() / 1000.0 << " ms\n";
     }
 
+    void prepare_buffers_chunked(dMesh *mesh) {
+        glGenVertexArrays(1, &vao);
+        glBindVertexArray(vao);
+        glGenBuffers(1, &vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, mesh->num_tris * 3 * sizeof(texvert), nil, GL_STATIC_DRAW);
+        glGenBuffers(1, &ebo);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh->num_tris * 3 * sizeof(GLuint), nil, GL_STATIC_DRAW);
+        // Position attribute
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0);
+        glEnableVertexAttribArray(0);
+        // Texture coordinate attribute
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+        glEnableVertexAttribArray(1);
+        glBindVertexArray(0);
+    }
+
+    uint32_t upload_terrain_mesh_chunked(dMesh *mesh, uint32_t progress) {
+        auto begin = now();
+        std::vector<texvert> vertices;
+        vertices.reserve(300000);
+        std::vector<GLuint> indices;
+        indices.reserve(300000);
+        uint32_t limit = min(mesh->num_tris, progress + 100000);
+        for (uint32_t i = progress; i < limit; ++i) {
+            dTri* t = &mesh->tris[i];
+            indices.insert(indices.end(), {t->verts[0], t->verts[1], t->verts[2]});
+            glm::vec3 floatverts[3] = {
+                glm::vec3(mesh->verts[ t->verts[0] ]),
+                glm::vec3(mesh->verts[ t->verts[1] ]),
+                glm::vec3(mesh->verts[ t->verts[2] ])};
+            glm::vec3 normal = glm::normalize(glm::cross(floatverts[1] - floatverts[0], floatverts[2] - floatverts[0]));
+            float inclination = glm::angle(normal, glm::vec3(t->normal));
+            float insolation = glm::dot(normal, glm::vec3(0.4, 0.4, 0.4));
+            for(int j = 0; j < 3; j++){
+                vertices.insert(vertices.end(), {floatverts[j], glm::vec3(inclination, insolation, t->elevations[j])});
+            }
+        }
+        auto begin_upload = now();
+        glBindVertexArray(vao);
+        glBufferSubData(GL_ARRAY_BUFFER, progress * 3 * sizeof(texvert), vertices.size() * sizeof(texvert), vertices.data());
+        glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, progress * 3 * sizeof(GLuint), indices.size() * sizeof(GLuint), indices.data());
+        glBindVertexArray(0);
+        auto end = now();
+        std::cout << "prepared mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(begin_upload - begin).count() / 1000.0 << " ms\n";
+        std::cout << "uploaded mesh in: " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin_upload).count() / 1000.0 << " ms\n";
+        return limit;
+    }
+
     void prepare_buffers(dMesh *mesh) {
         glGenVertexArrays(1, &vao);
         glBindVertexArray(vao);
@@ -555,7 +605,7 @@ TerrainTree terrain_in_waiting;
 TerrainTree the_old_terrain;
 mutex terrain_lock;
 
-bool async_mode = true;
+bool async_mode = false;
 
 void terrain_thread_entry(int seed, double lod) {
     double current_lod = 1.0;
@@ -595,7 +645,7 @@ void terrain_thread_entry(int seed, double lod) {
             }
             usleep(1000.0);
         }
-        usleep(5000000.0);
+//        usleep(5000000.0);
         terrain_upload_status = generating;
     }
 }
@@ -673,6 +723,7 @@ int main(int argc, char** argv) {
 
     ttnode* zone_origo = nil;
     dvec3 northpole;
+    uint32_t terrain_upload_progress = 0;
     // Main loop
     while (!glfwWindowShouldClose(window)) {
         terrain_lock.lock(); // grab mutex
@@ -684,7 +735,9 @@ int main(int argc, char** argv) {
                 terrain0->prepare_buffers(&glitch->body.mesh);
                 terrain0->upload_terrain_mesh(&glitch->body.mesh);
             } else {
-                terrain0->upload_terrain_mesh_blocking(&glitch->body.mesh);
+//                terrain0->upload_terrain_mesh_blocking(&glitch->body.mesh);
+                terrain0->prepare_buffers_chunked(&glitch->body.mesh);
+                terrain0->upload_terrain_mesh_chunked(&glitch->body.mesh, 0);
             }
             glitch->body.ro = terrain0;
             northpole = glitch->terrain[0x2aaaaaaaa8]->verts[0];
@@ -696,15 +749,27 @@ int main(int argc, char** argv) {
 //        terrain_in_waiting = glitch->terrain.copy();
 //        mesh_in_waiting = terrain_in_waiting.buildMesh(vantage_copy, 3);
         if(terrain_upload_status == done_generating) {
-            terrain1 = new RenderObject(&glitch->body);
-            terrain1->shader = shaders["terrain"];
-            terrain1->texture = textures["isqswjwki55a1.png"];
+            //terrain1 = new RenderObject(&glitch->body);
+            //terrain1->shader = shaders["terrain"];
+            //terrain1->texture = textures["isqswjwki55a1.png"];
+            
             if(async_mode){
                 terrain1->prepare_buffers(&mesh_in_waiting);
                 terrain_upload_status = uploading;
             } else {
-                terrain1->upload_terrain_mesh_blocking(&mesh_in_waiting);
-                terrain_upload_status = done_uploading;
+                //terrain1->upload_terrain_mesh_blocking(&mesh_in_waiting);
+//                terrain_upload_status = done_uploading;
+                if(terrain_upload_progress == 0){
+                    terrain1 = new RenderObject(&glitch->body);
+                    terrain1->shader = shaders["terrain"];
+                    terrain1->texture = textures["isqswjwki55a1.png"];
+                    terrain1->prepare_buffers_chunked(&glitch->body.mesh);
+                }
+                terrain_upload_progress = terrain1->upload_terrain_mesh_chunked(&glitch->body.mesh, terrain_upload_progress);
+                if(terrain_upload_progress == glitch->body.mesh.num_tris){
+                    terrain_upload_status = done_uploading;
+                    terrain_upload_progress = 0;
+                }
             }
         }
         if(terrain_upload_status == done_uploading) {
