@@ -116,6 +116,10 @@ std::string fstr(const char* format, ...) {
     return std::string(buf.data());
 }
 
+std::string str(dvec3 in) {
+    return fstr("(%f, %f, %f)", in.x, in.y, in.z);
+}
+
 
 // right now (2024) Intel and AMD cpus have 64 byte cache lines and Apple's M series have 128 bytes.
 // Apple can suck a dick because opengl is deprecated on macos and their ios app store policies are anticompetitive.
@@ -720,9 +724,9 @@ struct ttnode {
     vec3 LODspacePosition(dvec3 location, double radius, int i) {
         glm::vec3 point = verts[i];
         double length = glm::length(point);
-        point = point * (radius / length);
-        point = point - location + (elevations[i] * (point / length));
-        return point;
+        point = point * (radius / length); // scaled from node space to spheroid
+        point = point - location + (elevations[i] * (point / length)); // subtracting location.. adding -gravnorm * elevations
+        return point; // sounds about right, yeah?
     }
 
     // node space center
@@ -743,7 +747,7 @@ struct ttnode {
         elevation /= 3.0;
         return elevation;
     }
-
+/*
     double elevation_kludgehammer(dvec3 pos, dMesh* mesh) {
         double expected = pos.y;
         double candidates[3] = {
@@ -768,7 +772,7 @@ struct ttnode {
             std::cout << "max deviation: " << max_deviation << "\n";
         }
         return candidates[best];
-    }
+    }*/
 
     double elevation_projected(dvec3 pos, dMesh* mesh) {
         dTri *tri = &mesh->tris[triangle];
@@ -899,6 +903,7 @@ struct TerrainTree {
         }
     }
 
+    // no rotation, only translation so the mesh is centered at location with spheroid = radius
     void generate(dvec3 location, uint32_t node_idx, nonstd::vector<glm::dvec3> *verts, nonstd::vector<dTri> *tris,
             uint64_t level, int min_level, uint64_t path, terrain_upload_status_enum *status) {
         if(status && *status == should_exit){
@@ -910,7 +915,7 @@ struct TerrainTree {
         // a LOD going on here
         if(level > min_level) {
             //double distance = glm::length(location - nodes[node_idx].verts[0]);
-            double distance = glm::length(location - nodes[node_idx].center());
+            double distance = glm::length(location - (nodes[node_idx].center() * radius / glm::length(nodes[node_idx].center())));
             double nodeWidth = glm::length(nodes[node_idx].verts[0] - nodes[node_idx].verts[1]);
             double ratio = distance / nodeWidth;
 
@@ -919,7 +924,7 @@ struct TerrainTree {
                 dvec3 center = {0, 0, 0};
                 for(int i = 0; i < 3; i++) {
                     t.verts[i] = verts->size();
-                    // scaling each point to the surface of the spheroid and adding the elevation value
+                    // scaling each point to the surface of the spheroid, subtracting location and adding the elevation value
                     glm::vec3 point = nodes[node_idx].LODspacePosition(location, radius, i);
                     verts->push_back(point);
                     center += point;
@@ -1145,13 +1150,6 @@ struct Celestial {
         surface_temp_max = 331.0;
         nearest_star = pnearest_star;
     }
-};
-
-struct Zone {
-    Zone *neighbors[6]; // +x, -x, +y, -y, +z, -z
-
-    CollisionTree tree;
-    Celestial *frame_of_reference;
 };
 
 enum state_update_type {

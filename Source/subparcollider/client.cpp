@@ -286,7 +286,7 @@ int framerate_handicap = 1;
 int frames_rendered = 0;
 auto prevFrameTime = now();
 bool game_paused = false;
-
+bool verbose = false;
 
 glm::vec3 camera_target = vec3(0,0,0);
 glm::quat camera_rot;
@@ -513,7 +513,8 @@ void terrain_thread_entry(int seed, double lod) {
     }
     while(terrain_upload_status != should_exit) {
         terrain_upload_status = generating;
-        current_lod = min(current_lod * 1.2 + 1.0, lod);
+        //current_lod = min(current_lod * 1.2 + 1.0, lod);
+        current_lod = min(current_lod + 1.0, lod);
         std::cout << "generating terrain mesh with LOD " << current_lod << "\n";
         auto begin = now();
         dvec3 vantage_copy = vantage;
@@ -536,27 +537,37 @@ void terrain_thread_entry(int seed, double lod) {
             }
             usleep(1000.0);
         }
-        if(current_lod >= lod && duration < 10000.0 * lod) {
+/*        if(current_lod >= lod && duration < 10000.0 * lod) {
             for(double i = 0.0; i < 20.0; i += 0.01) {
                 if(terrain_upload_status == should_exit){
                     return;
                 }
                 usleep(10000.0);
             }
-        }
+        }*/
     }
 }
 
 int main(int argc, char** argv) {
+    auto start_time = now();
     int seed = 52;
-    int lod = 200;
-    if(argc > 2){
-        seed = atol(argv[1]);
-        lod = atol(argv[2]);
-    } else {
-        std::cout << "\n\nPlease specify prng seed and LOD distance\n";
-        std::cout << "Usage: " << argv[0] << " seed LOD\n";
-        std::cout << "Using default values " << seed << " and " << lod << "\n\n\n";
+    int lod = 50;
+    for(int i = 1; i < argc; i++){
+        if(!strncmp(argv[i], "-v", min(2, strlen(argv[i])))){
+            verbose = true;
+        }
+        if(!strncmp(argv[i], "seed", min(4, strlen(argv[i])))){
+            seed = atol(argv[i] + 5);
+        }
+        if(!strncmp(argv[i], "lod", min(3, strlen(argv[i])))){
+            lod = atol(argv[i] + 4);
+        }
+    }
+    if(argc < 2 || verbose){
+        std::cout << "\n\n";
+        std::cout << "Usage: " << argv[0] << " [seed=n] [lod=n] [-v]\n";
+        std::cout << "where seed is the random seed, lod is the target level of detail and -v increases verbosity\n";
+        std::cout << "Using values " << seed << " and " << lod << (verbose? ". Verbose mode enabled." : "") << "\n\n\n";
     }
     initializeGLFW();
     window = createWindow(screenwidth, screenheight, "Takeoff Sendario");
@@ -606,8 +617,11 @@ int main(int argc, char** argv) {
     player_character->body.ro->shader = shaders["box"];
     player_character->body.ro->texture = textures["isqswjwki55a1.png"];
 
-    ttnode* zone_origo = nil;
+    ttnode* zone = nil;
     dvec3 northpole;
+    dvec3 player_global_pos;
+    dvec3 delta;
+
     uint32_t terrain_upload_progress = 0;
     // Main loop
     while (!glfwWindowShouldClose(window)) {
@@ -619,20 +633,25 @@ int main(int argc, char** argv) {
             terrain0->prepare_buffers_chunked(&glitch->body.mesh);
             terrain0->upload_terrain_mesh_chunked(&glitch->body.mesh, 0);
             glitch->body.ro = terrain0;
-            northpole = glitch->terrain[0x2aaaaaaaa8]->verts[0];
-            vantage = northpole;// + player_character->body.pos;
+            player_character->body.zone = 0x2aaaaaaaa8;
+            zone = glitch->terrain[0x2aaaaaaaa8];
+            vantage = dvec3(0, glitch->terrain.radius + zone->elevation(), 0);
+            std::cout << "vantage: " << str(vantage) << " glitch->terrain.radius:" << glitch->terrain.radius << " zone->elevation(): " << zone->elevation() << "\n";
+            northpole = vantage;
+            player_global_pos = vantage;
             terrain_upload_status = idle;
-            player_character->body.pos.y = 2686.57;
+            player_character->body.pos = dvec3(0, zone->elevation(), 0);
+            delta = dvec3(0,0,0);
         }
         if(terrain_upload_status == done_generating) {
             if(terrain_upload_progress == 0){
                 terrain1 = new RenderObject(&glitch->body);
                 terrain1->shader = shaders["terrain"];
                 terrain1->texture = textures["isqswjwki55a1.png"];
-                terrain1->prepare_buffers_chunked(&glitch->body.mesh);
+                terrain1->prepare_buffers_chunked(&mesh_in_waiting);
             }
-            terrain_upload_progress = terrain1->upload_terrain_mesh_chunked(&glitch->body.mesh, terrain_upload_progress);
-            if(terrain_upload_progress == glitch->body.mesh.num_tris){
+            terrain_upload_progress = terrain1->upload_terrain_mesh_chunked(&mesh_in_waiting, terrain_upload_progress);
+            if(terrain_upload_progress == mesh_in_waiting.num_tris){
                 terrain_upload_status = done_uploading;
                 terrain_upload_progress = 0;
             }
@@ -641,40 +660,38 @@ int main(int argc, char** argv) {
             delete terrain0;
             terrain0 = terrain1;
             glitch->body.ro = terrain0;
-            glitch->body.mesh = mesh_in_waiting;
             the_old_mesh.destroy();
             the_old_mesh = glitch->body.mesh;
+            glitch->body.mesh = mesh_in_waiting;
             the_old_terrain.nodes.destroy();
             the_old_terrain = glitch->terrain;
             glitch->terrain = terrain_in_waiting;
+
+            
+            zone = glitch->terrain[player_global_pos];
+            player_character->body.pos -= delta;
+            delta = player_global_pos - vantage;
+            vantage = player_global_pos;
+
+
+            player_character->body.zone = zone->path;
+            local_gravity_normalized = -glm::normalize(vantage);
+
             terrain_upload_status = idle;
         }
-
-        zone_origo = glitch->terrain[0x2aaaaaaaa8];
-
-//        dvec3 player_global_pos = northpole + player_character->body.pos;
-
-        dvec3 player_global_pos = zone_origo->verts[0] + player_character->body.pos;
-
-
-        local_gravity_normalized = -glm::normalize(zone_origo->verts[0]);
-        ttnode* tile = glitch->terrain[player_global_pos];
-        double elevation = tile->elevation_kludgehammer(player_character->body.pos, &glitch->body.mesh);
-        vantage = northpole;
         terrain_lock.unlock(); // release mutex
 
-        // TODO: make this work
-        vantage = northpole + player_character->body.pos;// - elevation;
 
+        ttnode* tile = glitch->terrain[player_global_pos];
 /*
-        std::cout << "    zone at (" << zone_origo->verts[0].x << ", " << zone_origo->verts[0].y << ", " << zone_origo->verts[0].z << ")\n";
+        std::cout << "    zone at (" << zone->verts[0].x << ", " << zone->verts[0].y << ", " << zone->verts[0].z << ")\n";
         std::cout << "    tile at (" << tile->verts[0].x << ", " << tile->verts[0].y << ", " << tile->verts[0].z << ")\n";
-        std::cout << "player at (" << player_global_pos.x << ", " << player_global_pos.y << ", " << player_global_pos.z << ")\n";
-        std::cout << "elevation: " << tile->elevation_kludgehammer(player_character->body.pos, &glitch->body.mesh) << "\n";
-  */      
+        std::cout << "player local (" << player_character->body.pos.x << ", " << player_character->body.pos.y << ", " << player_character->body.pos.z << ")\n";
+        std::cout << "player global (" << player_global_pos.x << ", " << player_global_pos.y << ", " << player_global_pos.z << ")\n";
+        std::cout << "elevation: " << tile->elevation() << "\n";//_kludgehammer(player_character->body.pos, &glitch->body.mesh) << "\n";
+*/
 //        local_gravity_normalized = -glm::normalize(player_global_pos);
 //        ttnode* tile = glitch->terrain[player_global_pos];
-
 
         if(!game_paused){
             /*
@@ -689,19 +706,24 @@ int main(int argc, char** argv) {
                 usleep(8000.0);
                 glfwPollEvents();
                 continue;
-
             }
 */
+            double dt = 0.008;
             if(glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS){
                 camera_rot = glm::angleAxis(-0.01f, glm::vec3(0.0, 0.0, 1.0)) * camera_rot;
             } if(glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS){
                 camera_rot = glm::angleAxis(0.01f, glm::vec3(0.0, 0.0, 1.0)) * camera_rot;                              
             }
             player_character->body.rot = glm::conjugate(camera_rot * glm::angleAxis(glm::radians(0.0f), glm::vec3(0.0, 1.0, 0.0)));
-            double dt = 0.008;
             player_character->body.pos += player_character->body.rot * input_vector(window) * dt * 10.0;
-            player_character->body.pos.y = 1.0 + tile->elevation_kludgehammer(player_character->body.pos, &glitch->body.mesh);
-            //std::cout << "setting player_character->body.pos.y to " << player_character->body.pos.y << "\n";
+            player_global_pos += player_character->body.rot * input_vector(window) * dt * 10.0;
+            //double elevation = tile->elevation_kludgehammer(player_character->body.pos, &glitch->body.mesh);
+/*            double elevation = tile->elevation();
+            if(elevation > glm::length(player_character->body.pos)){
+                player_character->body.pos -= local_gravity_normalized * (elevation - glm::length(player_character->body.pos));
+                player_global_pos -= local_gravity_normalized * (elevation - glm::length(player_character->body.pos));
+            }
+*/
             // optimization: compute view matrix here instead of in render()
             camera_target = vec3(player_character->body.pos);
             //glitch.body.rot = glm::normalize(glm::angleAxis(0.0004, glm::dvec3(0.0, 0.0, 0.0)) * glitch.body.rot);
@@ -731,7 +753,6 @@ int main(int argc, char** argv) {
             } else {
                 ctleaf *leaf = &t.leaves[node->first_leaf];
                 render(leaf->object->ro);
-              
 #ifdef DEBUG
                 dvec3 hi = node->hi.todvec3();
                 dvec3 lo = node->lo.todvec3();
@@ -748,26 +769,21 @@ int main(int argc, char** argv) {
 #endif
             }
         }
-
         t.destroy();
 
         // Bind back to the default framebuffer
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear the default framebuffer
-
         glUseProgram(ppshader);
         glActiveTexture(GL_TEXTURE0); // Activate the first texture unit for the color texture
         glBindTexture(GL_TEXTURE_2D, colorTex);
         glUniform1i(glGetUniformLocation(ppshader, "screenTexture"), 0); // Pass texture unit 0 to the shader
-
         glActiveTexture(GL_TEXTURE1); // Activate the second texture unit for the velocity texture
         glBindTexture(GL_TEXTURE_2D, velocityTex);
         glUniform1i(glGetUniformLocation(ppshader, "velocityTexture"), 1); // Pass texture unit 1 to the shader
-
         glUniform1i(glGetUniformLocation(ppshader, "mode"), motion_blur_mode);
         glUniform1f(glGetUniformLocation(ppshader, "inv_strength"), motion_blur_invstr);
         glUniform1f(glGetUniformLocation(ppshader, "antialiasing"), antialiasing);
-
         // render the color+velocity buffer to the screen buffer with a quad and apply post-processing
         glBindVertexArray(quadVAO);
         glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -778,7 +794,6 @@ int main(int argc, char** argv) {
         if(frames_rendered % framerate_handicap == 0) {
             glfwSwapBuffers(window);
             glfwPollEvents();
-
             auto frameDuration = std::chrono::duration_cast<std::chrono::microseconds>(now() - prevFrameTime).count();
             if(frames_rendered % (240 * framerate_handicap) == 0){
                 std::cout << frameDuration / 1000.0 << " ms (" << 1000000.0 / frameDuration <<" fps)";
@@ -792,12 +807,7 @@ int main(int argc, char** argv) {
             }
             prevFrameTime = now();
         }
-
-//        usleep(40000);
-
     }
-    
-    std::cout << "Exiting..\n";
     terrain_upload_status = should_exit;
     glDeleteFramebuffers(1, &framebuffer);
     glDeleteTextures(1, &colorTex);
@@ -810,7 +820,9 @@ int main(int argc, char** argv) {
     for(int i = 0; i < ros.size(); i++) {
         ros[i].po->mesh.destroy();
     }
+    std::cout << "\n" << std::chrono::duration_cast<std::chrono::seconds>(now() - start_time).count() <<
+        " seconds closer to the singularity.\n";
+    std::cout << "Learn C, Python, English, math and physics. Stack sats. Lift something heavy. Go for a walk.\n";
     return 0;
 }
-
 
