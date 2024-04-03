@@ -922,8 +922,8 @@ struct TerrainTree {
                     
                 } else if(distance < 30.0) {
                     center /= 3.0;
-                    std::cout << "tile " << fstr("%llx", path) << " at (" << center.x << ", " << center.y << ", " << center.z << ") zone space, (";
-                    std::cout << nodes[node_idx].verts[0].x << ", " << nodes[node_idx].verts[0].y << ", " << nodes[node_idx].verts[0].z << ") node space\n";
+//                    std::cout << "tile " << fstr("%llx", path) << " at (" << center.x << ", " << center.y << ", " << center.z << ") zone space, (";
+//                    std::cout << nodes[node_idx].verts[0].x << ", " << nodes[node_idx].verts[0].y << ", " << nodes[node_idx].verts[0].z << ") node space\n";
                 }
                 return;
             }
