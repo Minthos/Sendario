@@ -757,7 +757,7 @@ struct ttnode {
         glm::vec3 point = verts[i];
         double length = glm::length(point);
         point = point * (radius / length); // scaled from node space to spheroid
-        point = point - location + (elevations[i] * (point / length)); // subtracting location.. adding -gravnorm * elevations
+        point = point + (elevations[i] * (point / length)) - location; // subtracting location.. adding -gravnorm * elevations
         return point; // sounds about right, yeah?
     }
 
@@ -932,7 +932,7 @@ struct TerrainTree {
                     center += point;
                     t.elevations[i] = nodes[node_idx].elevations[i];
                 }
-                t.normal = normalize(location);
+                t.normal = normalize(nodes[node_idx].verts[0]);
                 
                 nodes[node_idx].triangle = tris->size();
                 tris->push_back(t);
@@ -940,10 +940,6 @@ struct TerrainTree {
                 if(level <= MAX_LOD){
                     // TODO: add a billboard for distant vegetation and buildings
                     
-                } else if(distance < 30.0) {
-                    center /= 3.0;
-//                    std::cout << "tile " << fstr("%llx", path) << " at (" << center.x << ", " << center.y << ", " << center.z << ") zone space, (";
-//                    std::cout << nodes[node_idx].verts[0].x << ", " << nodes[node_idx].verts[0].y << ", " << nodes[node_idx].verts[0].z << ") node space\n";
                 }
                 return;
             }
