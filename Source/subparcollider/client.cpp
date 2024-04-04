@@ -24,7 +24,7 @@
 float anisotropy = 16.0f; // should be 4 with no upscaling, 16 with upscaling
 int antialiasing = 2; // 1 (no upscaling) and 2 (4 samples per pixel) are good values
 int motion_blur_mode = 1; // 0 = off, 1 = nonlinear (sharp), 2 = linear (blurry)
-float motion_blur_invstr = 5.0f; // motion blur amount. 1.0 = very high. 5.0 = low.
+float motion_blur_invstr = 1.0f; // motion blur amount. 1.0 = very high. 5.0 = low.
 
 GLFWwindow* window = nil;
 Unit *player_character = nil;
@@ -56,6 +56,25 @@ char* readShaderSource(const char* filePath) {
     return buffer;
 }
 
+void checkGLerror() {
+    GLenum err;
+    while((err = glGetError()) != GL_NO_ERROR) { 
+        std::cout << "OpenGL Error: ";
+        switch (err) {
+            case GL_INVALID_ENUM: std::cout << "GL_INVALID_ENUM"; break;
+            case GL_INVALID_VALUE: std::cout << "GL_INVALID_VALUE"; break;
+            case GL_INVALID_OPERATION: std::cout << "GL_INVALID_OPERATION"; break;
+            case GL_STACK_OVERFLOW: std::cout << "GL_STACK_OVERFLOW"; break;
+            case GL_STACK_UNDERFLOW: std::cout << "GL_STACK_UNDERFLOW"; break;
+            case GL_OUT_OF_MEMORY: std::cout << "GL_OUT_OF_MEMORY"; break;
+            case GL_INVALID_FRAMEBUFFER_OPERATION: std::cout << "GL_INVALID_FRAMEBUFFER_OPERATION"; break;
+            default: std::cout << "Unknown Error"; break;
+        }
+        std::cout << std::endl;
+        assert(0);
+    }
+}
+
 void checkShader(GLenum status_enum, GLuint shader, const char* name) {
     GLint success = 1;
     GLchar infoLog[512] = {0};
@@ -63,6 +82,17 @@ void checkShader(GLenum status_enum, GLuint shader, const char* name) {
     if (!success) {
         glGetShaderInfoLog(shader, 512, nil, infoLog);
         fprintf(stderr, "Shader compilation error: %s\n%s\n", name, infoLog);
+    }
+}
+
+void checkProgram(GLenum status_enum, GLuint program, const char* name) {
+    GLint success = 1;
+    GLchar infoLog[512] = {0};
+    glGetProgramiv(program, status_enum, &success);
+    if(!success) {
+        GLchar infoLog[512];
+        glGetProgramInfoLog(program, 512, nil, infoLog);
+        std::cout << "Shader Program Validation Failed: " << infoLog << std::endl;
     }
 }
 
@@ -79,16 +109,28 @@ GLuint mkShader(string name) {
     string frag_path = name + "frag.glsl";
     char *vert_src = readShaderSource(vert_path.c_str());
     char *frag_src = readShaderSource(frag_path.c_str());
+    checkGLerror();
 
     GLuint vert = compileShader(GL_VERTEX_SHADER, vert_src, vert_path.c_str());
+    checkGLerror();
     GLuint frag = compileShader(GL_FRAGMENT_SHADER, frag_src, frag_path.c_str());
+    checkGLerror();
     free(vert_src);
     free(frag_src);
     GLuint program = glCreateProgram();
+    checkGLerror();
     glAttachShader(program, vert);
+    checkGLerror();
     glAttachShader(program, frag);
+    checkGLerror();
     glLinkProgram(program);
-    checkShader(GL_LINK_STATUS, program, name.c_str());
+    checkGLerror();
+    checkProgram(GL_LINK_STATUS, program, name.c_str());
+    checkGLerror();
+    glValidateProgram(program);
+    checkGLerror();
+    checkProgram(GL_VALIDATE_STATUS, program, name.c_str());
+    checkGLerror();
     return program;
 }
 
@@ -102,7 +144,7 @@ GLuint loadTexture(const char* filename, bool smooth) {
     GLuint texture;
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
-    if (glewIsSupported("GL_EXT_texture_filter_anisotropic")) {
+    if (glewIsSupported("GL_EXT_texture_filter_anisotropic") && anisotropy > 0) {
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, anisotropy);
     }
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -254,7 +296,7 @@ void initializeGLFW() {
         exit(EXIT_FAILURE);
     }
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 }
 
@@ -340,15 +382,15 @@ void initializeFramebuffer() {
 void setupTextures(int width, int height) {
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTex, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+/*    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);*/
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, velocityTex, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+/*    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);*/
     GLenum drawBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
     glDrawBuffers(2, drawBuffers);
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
@@ -384,17 +426,12 @@ void reshape(GLFWwindow* window, int width, int height) {
 }
 
 void render(RenderObject *obj) {
+
     glm::mat4 translation = glm::translate(glm::mat4(1.0f), obj->po->zoneSpacePosition());
     glm::mat4 rotation = glm::mat4(glm::quat(obj->po->rot));
     glm::mat4 view = glm::lookAt(camera_target,
             camera_target + (camera_rot * glm::vec3(0,0,1) * glm::max(1.0f, (float)camera_zoom)),
              glm::vec3(0,1,0));
-
-
-//            - (camera_rot * vec3(1.0f, 0.0f, 0.0f)) * glm::max(1.0f, (float)camera_zoom),
-//            camera_target, glm::vec3(0,1,0));
-//    view = glm::mat4(camera_rot) * view;
-
     glm::mat4 camera_offset = glm::translate(glm::mat4(1.0f), (glm::quat(player_character->body.rot) * vec3(0.0f, 0.0f, -1.0f)) * glm::max(1.0f, (float)camera_zoom));
     view = glm::mat4(camera_rot) * camera_offset * glm::translate(glm::mat4(1.0f), -camera_target);
     glm::mat4 projection = glm::perspective(glm::radians(90.0f * glm::min(1.0f, (float)camera_zoom)),
@@ -428,21 +465,7 @@ void render(RenderObject *obj) {
     glDrawElements(GL_TRIANGLES, obj->po->mesh.num_tris * 3, GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
 
-    GLenum err;
-    while((err = glGetError()) != GL_NO_ERROR) {
-        std::cout << "OpenGL Error: ";
-        switch (err) {
-            case GL_INVALID_ENUM: std::cout << "GL_INVALID_ENUM"; break;
-            case GL_INVALID_VALUE: std::cout << "GL_INVALID_VALUE"; break;
-            case GL_INVALID_OPERATION: std::cout << "GL_INVALID_OPERATION"; break;
-            case GL_STACK_OVERFLOW: std::cout << "GL_STACK_OVERFLOW"; break;
-            case GL_STACK_UNDERFLOW: std::cout << "GL_STACK_UNDERFLOW"; break;
-            case GL_OUT_OF_MEMORY: std::cout << "GL_OUT_OF_MEMORY"; break;
-            case GL_INVALID_FRAMEBUFFER_OPERATION: std::cout << "GL_INVALID_FRAMEBUFFER_OPERATION"; break;
-            default: std::cout << "Unknown Error"; break;
-        }
-        std::cout << std::endl;
-    }
+    checkGLerror();
 }
 
 dvec3 input_vector(GLFWwindow* window) {
@@ -576,16 +599,18 @@ terrain_lock.lock();
 terrain_lock.unlock();
         terrain_in_waiting = glitch->terrain.copy();
         terrain_in_waiting.LOD_DISTANCE_SCALE = current_lod;
-        mesh_in_waiting = terrain_in_waiting.buildMesh(vantage, 3, &terrain_upload_status);
+        dMesh tmp = terrain_in_waiting.buildMesh(vantage, 3, &terrain_upload_status);
+
+terrain_lock.lock();
+        mesh_in_waiting = tmp;
 ///////
-
-
         if(terrain_upload_status == should_exit){
             return;
         }
         terrain_upload_status = done_generating;
         auto end = now();
         double time_taken = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
+terrain_lock.unlock();
         if(time_taken > 10000.0 * lod) {
             // uncomment to see something broken
             //current_lod *= (1000000.0 / duration);
@@ -645,26 +670,41 @@ int main(int argc, char** argv) {
     glfwSetScrollCallback(window, scroll_callback);
     camera_rot = glm::quat(1, 0, 0, 0);
     initializeGLEW();
+    checkGLerror();
 
     std::thread terrain_thread(terrain_thread_entry, seed, lod);
 
     initializeFramebuffer();
+    checkGLerror();
     resizeFramebuffer(screenwidth, screenheight);
+    checkGLerror();
     ppshader = mkShader("pp_motionblur");
+    checkGLerror();
     glUseProgram(ppshader);
+    checkGLerror();
     glUniform1i(glGetUniformLocation(ppshader, "screenTexture"), 0);
+    checkGLerror();
     glEnable(GL_DEPTH_TEST);
+    checkGLerror();
     glEnable(GL_CULL_FACE);
+    checkGLerror();
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    checkGLerror();
     glEnable(GL_BLEND);
+    checkGLerror();
     shaders["box"] = mkShader("box");
     shaders["terrain"] = mkShader("terrain");
+    checkGLerror();
     textures["isqswjwki55a1.png"] = loadTexture("textures/isqswjwki55a1.png", true);
     textures["green_transparent_wireframe_box_64x64.png"] = loadTexture("textures/green_transparent_wireframe_box_64x64.png", false);
     textures["tree00.png"] = loadTexture("textures/tree00.png", true);
+    checkGLerror();
     glActiveTexture(GL_TEXTURE0);
+    checkGLerror();
     glBindTexture(GL_TEXTURE_2D, textures["isqswjwki55a1.png"]);
+    checkGLerror();
     glUniform1i(glGetUniformLocation(shaders["box"], "tex"), 0);
+    checkGLerror();
 
     nonstd::vector<Unit> units;
     nonstd::vector<RenderObject> ros;
@@ -707,9 +747,9 @@ terrain_lock.lock(); // grab mutex
             std::cout << "origo: " << str(origo) << " glitch->terrain.radius:" << glitch->terrain.radius << " zone->elevation(): " << zone->elevation() << "\n";
             player_global_pos = origo + zone->elevation();
             local_gravity_normalized = -normalize(origo);
-            terrain_upload_status = idle;
             player_character->body.pos = dvec3(0, zone->elevation(), 0);
             delta = dvec3(0,0,0);
+            terrain_upload_status = idle;
         }
         if(terrain_upload_status == done_generating) {
             if(terrain_upload_progress == 0){
@@ -761,6 +801,7 @@ terrain_lock.lock(); // grab mutex
 terrain_lock.unlock(); // release mutex
 
 //        ttnode* tile = glitch->terrain[player_global_pos];
+        checkGLerror();
 
         if(!game_paused){
             local_gravity_normalized = -glm::normalize(player_global_pos);
@@ -808,6 +849,7 @@ terrain_lock.unlock(); // release mutex
 
         ctleaf l = ctleaf(&player_character->body);
         CollisionTree t = CollisionTree(dvec3(0.0), &l, 1);
+        checkGLerror();
 
         nonstd::vector<ctnode*> stack;
         stack.push_back(t.root);
@@ -841,6 +883,7 @@ terrain_lock.unlock(); // release mutex
             }
         }
         t.destroy();
+        checkGLerror();
 
         // Bind back to the default framebuffer
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -857,12 +900,20 @@ terrain_lock.unlock(); // release mutex
         glUniform1f(glGetUniformLocation(ppshader, "antialiasing"), antialiasing);
         // render the color+velocity buffer to the screen buffer with a quad and apply post-processing
         glBindVertexArray(quadVAO);
+
+        glValidateProgram(ppshader);
+        checkGLerror();
+        checkProgram(GL_VALIDATE_STATUS, ppshader, "ppshader");
+
         glDrawArrays(GL_TRIANGLES, 0, 6);
+        checkGLerror();
         glBindTexture(GL_TEXTURE_2D, 0); // Unbind velocity texture
         glBindFramebuffer(GL_FRAMEBUFFER, 0); // Bind back to the default framebuffer
         glBindVertexArray(0);
         glFlush();
+        checkGLerror();
         ++frames_rendered;
+//        usleep(100000.0);
         if(frames_rendered % framerate_handicap == 0) {
             glfwSwapBuffers(window);
             glfwPollEvents();

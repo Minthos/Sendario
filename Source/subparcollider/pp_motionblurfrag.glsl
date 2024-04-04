@@ -11,15 +11,19 @@ uniform int mode;
 
 void main() {
     vec2 coords = TexCoords * antialiasing;
-    
+   
+    if(mode == 5){
+        FragColor = texture(velocityTexture, coords);
+        return;
+    } 
     if(mode == 0){
         FragColor = texture(screenTexture, coords);
         return;
     }
 
-
     int iterations = 16;
-    vec2 velocity = texture(velocityTexture, coords).xy;
+//    vec2 velocity = texture(velocityTexture, coords).xy;
+    vec2 velocity = texture(screenTexture, coords).xy;
     velocity /= (0.5 * iterations * (1 + inv_strength));
 
     // suppress motion blur for slow-moving pixels
@@ -48,7 +52,7 @@ void main() {
         color = texture(screenTexture, coords);
         sum_weight = 1.0;
     }
-    FragColor = color / sum_weight;
+    FragColor = vec4(color.b, color.b, color.b, color.a) / sum_weight;
 }
 
 
