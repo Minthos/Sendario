@@ -49,6 +49,24 @@ size_t max(size_t a, size_t b) {
 }
 
 
+uint32_t min(uint32_t a, uint32_t b) {
+    return a > b ? b : a;
+}
+
+uint32_t max(uint32_t a, uint32_t b) {
+    return a < b ? b : a;
+}
+
+
+double min(double a, double b) {
+    return a > b ? b : a;
+}
+
+double max(double a, double b) {
+    return a < b ? b : a;
+}
+
+
 namespace nonstd {
 
 template <typename T> struct vector {
@@ -795,16 +813,28 @@ struct ttnode {
         }
     }
 
-    double elevation_projected(dvec3 pos, dMesh* mesh, dvec3 gravity_dir) {
+    double player_altitude(dvec3 pos, dMesh* mesh, dvec3 gravity_dir) {
         dTri *tri = &mesh->tris[triangle];
-        dvec3 &a = mesh->verts[tri->verts[0]];
-        dvec3 &b = mesh->verts[tri->verts[1]];
-        dvec3 &c = mesh->verts[tri->verts[2]];
+        dvec3 a = mesh->verts[tri->verts[0]];
+        dvec3 b = mesh->verts[tri->verts[1]];
+        dvec3 c = mesh->verts[tri->verts[2]];
         dvec3 ab = b - a;
         dvec3 ac = c - a;
-        dvec3 norm = normalize(cross(ab, ac));
+        dvec3 norm = normalize(glm::cross(ab, ac));
         double d = dot(norm, (a - pos)) / dot(norm, gravity_dir);
-        dvec3 intersection = pos + gravity_dir * d;
+        return d;
+    }
+
+    double elevation_projected(dvec3 pos, dMesh* mesh, dvec3 gravity_dir) {
+        dTri *tri = &mesh->tris[triangle];
+        dvec3 a = mesh->verts[tri->verts[0]];
+        dvec3 b = mesh->verts[tri->verts[1]];
+        dvec3 c = mesh->verts[tri->verts[2]];
+        dvec3 ab = b - a;
+        dvec3 ac = c - a;
+        dvec3 norm = normalize(glm::cross(ab, ac));
+        double d = dot(norm, (a - pos)) / dot(norm, gravity_dir);
+        dvec3 intersection = pos + (gravity_dir * d);
         return glm::length(intersection);
     }
    
@@ -911,6 +941,11 @@ struct TerrainTree {
         if(status && *status == should_exit){
             return;
         }
+#ifdef DEBUG
+        if(node_idx % 10 == 0){
+            usleep(1000);
+        }
+#endif
         nodes[node_idx].path = path;
         double noise_xzscaling = 0.0001;
         double noise_xzscaling2 = -0.00001;
@@ -1100,7 +1135,7 @@ struct TerrainTree {
         nonstd::vector<glm::dvec3> verts;
         nonstd::vector<dTri> tris;
         for(int i = 0; i < 8; i++) {
-            generate(location * radius / glm::length(location), i, &verts, &tris, 1, min_subdivisions, i, status);
+            generate(location * radius / length(location), i, &verts, &tris, 1, min_subdivisions, i, status);
         }
         uint64_t num_verts = verts.size();
         uint64_t num_tris = tris.size();

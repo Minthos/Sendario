@@ -507,36 +507,52 @@ mutex terrain_lock;
 void terrain_thread_entry(int seed, double lod) {
     double current_lod = 1.0;
     double time_taken = 500000.0;
-    terrain_lock.lock();
+terrain_lock.lock();
     terrain_upload_status = generating;
     glitch = new Celestial(seed, current_lod, "Glitch", 6.371e6, 0.2, nil); // initial terrain generation must block the main thread
+    vantage = dvec3(0, glitch->terrain.radius, 0);
+    origo = vantage;
     mesh_in_waiting = glitch->body.mesh;
     terrain_upload_status = done_generating_first_time;
-    terrain_lock.unlock();
+terrain_lock.unlock();
     while(terrain_upload_status == done_generating_first_time) {
         usleep(1000.0);
     }
     while(terrain_upload_status != should_exit) {
         #ifdef DEBUG
-        for(double i = 0.0; i < 5.0; i += 0.01) {
+        for(double i = 0.0; i < 3.0; i += 0.01) {
             if(terrain_upload_status == should_exit){
                 return;
             }
-            usleep(10000.0);
+//            usleep(10000.0);
         }
         #endif
         terrain_upload_status = generating;
+
+
         dvec3 estimated_vantage = zone->spheroidPosition(player_global_pos, glitch->terrain.radius);
         double lod_increase = 10000000.0 / (time_taken + 1000000.0);
+#ifdef DEBUG
+        lod_increase = 0.5;
         current_lod = min(current_lod + lod_increase, lod);
-// for some reason the LOD algorithm goes to 10 LOD when the player is at 0 elevation... divide by zero?
+        current_lod = min(current_lod, max(1.0, (current_lod * 100) / (1.0 + glm::length(origo - estimated_vantage))));
+#else
+        current_lod = min(current_lod + lod_increase, lod);
         current_lod = min(current_lod, max(10.0, (current_lod * 1000) / (1.0 + glm::length(origo - estimated_vantage))));
+#endif
         std::cout << "generating terrain mesh with LOD " << current_lod << "\n";
         auto begin = now();
-        dvec3 vantage_copy = vantage;
+
+/////// the real stuff
+terrain_lock.lock();
+        vantage = zone->spheroidPosition(player_global_pos, glitch->terrain.radius);
+terrain_lock.unlock();
         terrain_in_waiting = glitch->terrain.copy();
         terrain_in_waiting.LOD_DISTANCE_SCALE = current_lod;
-        mesh_in_waiting = terrain_in_waiting.buildMesh(vantage_copy, 3, &terrain_upload_status);
+        mesh_in_waiting = terrain_in_waiting.buildMesh(vantage, 3, &terrain_upload_status);
+///////
+
+
         if(terrain_upload_status == should_exit){
             return;
         }
@@ -642,11 +658,14 @@ int main(int argc, char** argv) {
     // 0x506283d088 has a very steep mountain peak
     // 0x4b20532488 nearby has over 8000 elevation
     // 0x27c917dc88 also in that area could be a nice location for a ski resort (player global (741646, 5.94832e+06, 2.17329e+06))
+    //
+    // 0x5263c2aaad has a cool beach with a flat area with furrows in a checkerboard-like pattern, nice place to have a music festival
+    // or maybe a resort town. I got there by glitching through the planet, which was also interesting.
 
     uint32_t terrain_upload_progress = 0;
     // Main loop
     while (!glfwWindowShouldClose(window)) {
-        terrain_lock.lock(); // grab mutex
+terrain_lock.lock(); // grab mutex
         if(terrain_upload_status == done_generating_first_time) {
             terrain0 = new RenderObject(&glitch->body);
             terrain0->shader = shaders["terrain"];
@@ -656,8 +675,6 @@ int main(int argc, char** argv) {
             glitch->body.ro = terrain0;
             player_character->body.zone = 0x2aaaaaaaa8;
             zone = glitch->terrain[0x2aaaaaaaa8];
-            vantage = dvec3(0, glitch->terrain.radius, 0);
-            origo = vantage;
             std::cout << "origo: " << str(origo) << " glitch->terrain.radius:" << glitch->terrain.radius << " zone->elevation(): " << zone->elevation() << "\n";
             player_global_pos = origo + zone->elevation();
             local_gravity_normalized = -normalize(origo);
@@ -690,25 +707,18 @@ int main(int argc, char** argv) {
             glitch->terrain = terrain_in_waiting;
 
 
-
-
-            // easy but wrong: origo - vantage
-            // correct: (origo + normalized origo * elevation) - (vantage + normalized vantage * elevation)
-            // rearrange that a bit.. origo - vantage + (normalized origo * elevation) - (normalized vantage * elevation)
-            // but which elevation? average the two?
             ttnode* ozone = glitch->terrain[origo]; // the old zone
-            ttnode* vzone = glitch->terrain[vantage]; // the new zone (because vantage is the old vantage)
+            ttnode* vzone = glitch->terrain[vantage]; // the new zone
             double avgElevation = (ozone->elevations[0] + vzone->elevations[0]) / 2.0;
             delta = (vantage + glm::normalize(vantage) * avgElevation) - (origo + (glm::normalize(origo) * avgElevation));
-            
-//            delta = vantage - origo;
+            // delta seems to be correct now
+
             zone = glitch->terrain[vantage];
             local_gravity_normalized = -normalize(vantage);
             player_character->body.pos -= delta;
             player_character->body.zone = zone->path;
-            player_global_pos = vantage + player_character->body.pos;
             origo = vantage;
-            vantage = zone->spheroidPosition(player_global_pos, glitch->terrain.radius);
+            player_global_pos = origo + player_character->body.pos;
 
             if(verbose) {
                 std::cout << "zone: " << zone->str() << "\n";
@@ -719,7 +729,7 @@ int main(int argc, char** argv) {
 
             terrain_upload_status = idle;
         }
-        terrain_lock.unlock(); // release mutex
+terrain_lock.unlock(); // release mutex
 
 //        ttnode* tile = glitch->terrain[player_global_pos];
 
@@ -738,16 +748,18 @@ int main(int argc, char** argv) {
             ttnode* tile = glitch->terrain[player_global_pos];
 
 //            double terrain_elevation = zone->elevation();
-            double terrain_elevation = tile->elevation();
-            //double terrain_elevation = tile->elevation_naive(player_character->body.pos, &glitch->body.mesh);
+//            double terrain_elevation = tile->elevation();
+//            double terrain_elevation = tile->elevation_naive(player_character->body.pos, &glitch->body.mesh);
+            double altitude = tile->player_altitude(player_character->body.pos, &glitch->body.mesh, local_gravity_normalized);
 //            double terrain_elevation = tile->elevation_projected(player_character->body.pos, &glitch->body.mesh, local_gravity_normalized);
 //            dvec3 player_elevation_3d = player_global_pos - tile->spheroidPosition(player_global_pos, glitch->terrain.radius);
             // this player_elevation is always positive, even when terrain_elevation is negative..
 //            double player_elevation = glm::length(player_elevation_3d);
 
-            double player_elevation = glm::length(player_global_pos) - glitch->terrain.radius;
+//            double player_elevation = glm::length(player_global_pos) - glitch->terrain.radius;
 
-            player_character->body.pos += local_gravity_normalized * (player_elevation - terrain_elevation);
+//            player_character->body.pos += local_gravity_normalized * (player_elevation - terrain_elevation);
+            player_character->body.pos += altitude * local_gravity_normalized;
             player_global_pos = origo + player_character->body.pos;
 
             // optimization: compute view matrix here instead of in render()
