@@ -294,7 +294,7 @@ double camera_initial_x;
 double camera_initial_y;
 double camera_zoom = 3.0;
 bool camera_dirty = true;
-glm::vec3 local_gravity_normalized;
+glm::dvec3 local_gravity_normalized;
 
 GLuint framebuffer, colorTex, velocityTex;
 GLuint ppshader;
@@ -461,7 +461,7 @@ static void mouselook_callback_gimbal_locked(GLFWwindow* window, double xpos, do
     if (!((camera_initial_x == 0 && camera_initial_y == 0) ||
           abs(xpos - camera_initial_x) > 200.0 || abs(ypos - camera_initial_y) > 200.0)) {
 
-        camera_rot = camera_rot * glm::angleAxis((float)(xpos - camera_initial_x) / -1000.0f, local_gravity_normalized);
+        camera_rot = camera_rot * glm::angleAxis((float)(xpos - camera_initial_x) / -1000.0f, vec3(local_gravity_normalized));
         camera_rot = glm::angleAxis((float)(ypos - camera_initial_y) / 1000.0f, glm::vec3(1.0, 0.0, 0.0)) * camera_rot;
         camera_rot = glm::normalize(camera_rot);
     }
@@ -512,6 +512,14 @@ void terrain_thread_entry(int seed, double lod) {
         usleep(1000.0);
     }
     while(terrain_upload_status != should_exit) {
+        #ifdef DEBUG
+        for(double i = 0.0; i < 5.0; i += 0.01) {
+            if(terrain_upload_status == should_exit){
+                return;
+            }
+            usleep(10000.0);
+        }
+        #endif
         terrain_upload_status = generating;
         //current_lod = min(current_lod * 1.2 + 1.0, lod);
         current_lod = min(current_lod + 1.0, lod);
@@ -537,14 +545,14 @@ void terrain_thread_entry(int seed, double lod) {
             }
             usleep(1000.0);
         }
-/*        if(current_lod >= lod && duration < 10000.0 * lod) {
-            for(double i = 0.0; i < 20.0; i += 0.01) {
+        if(current_lod >= lod && duration < 10000.0 * lod) {
+            for(double i = 0.0; i < 1.0; i += 0.01) {
                 if(terrain_upload_status == should_exit){
                     return;
                 }
                 usleep(10000.0);
             }
-        }*/
+        }
     }
 }
 
@@ -618,7 +626,7 @@ int main(int argc, char** argv) {
     player_character->body.ro->texture = textures["isqswjwki55a1.png"];
 
     ttnode* zone = nil;
-    dvec3 northpole;
+    dvec3 origo;
     dvec3 player_global_pos;
     dvec3 delta;
 
@@ -635,10 +643,11 @@ int main(int argc, char** argv) {
             glitch->body.ro = terrain0;
             player_character->body.zone = 0x2aaaaaaaa8;
             zone = glitch->terrain[0x2aaaaaaaa8];
-            vantage = dvec3(0, glitch->terrain.radius + zone->elevation(), 0);
-            std::cout << "vantage: " << str(vantage) << " glitch->terrain.radius:" << glitch->terrain.radius << " zone->elevation(): " << zone->elevation() << "\n";
-            northpole = vantage;
-            player_global_pos = vantage;
+            vantage = dvec3(0, glitch->terrain.radius, 0);
+            origo = vantage;
+            std::cout << "origo: " << str(origo) << " glitch->terrain.radius:" << glitch->terrain.radius << " zone->elevation(): " << zone->elevation() << "\n";
+            player_global_pos = origo + zone->elevation();
+            local_gravity_normalized = -normalize(origo);
             terrain_upload_status = idle;
             player_character->body.pos = dvec3(0, zone->elevation(), 0);
             delta = dvec3(0,0,0);
@@ -667,29 +676,35 @@ int main(int argc, char** argv) {
             the_old_terrain = glitch->terrain;
             glitch->terrain = terrain_in_waiting;
 
+            // easy but wrong: origo - vantage
+            // correct: (origo + normalized origo * elevation) - (vantage + normalized vantage * elevation)
+            // rearrange that a bit.. origo - vantage + (normalized origo * elevation) - (normalized vantage * elevation)
+            // but which elevation? average the two?
+//            ttnode* ozone = glitch->terrain[origo]; // the old zone
+//            ttnode* vzone = glitch->terrain[vantage]; // the new zone (because vantage is the old vantage)
+//            double avgElevation = (ozone->elevations[0] + vzone->elevations[0]) / 2.0;
+//            delta = (vantage + glm::normalize(vantage) * avgElevation)) - (origo + (glm::normalize(origo) * avgElevation);
             
-            zone = glitch->terrain[player_global_pos];
+            delta = vantage - origo;
+            zone = glitch->terrain[vantage];
+            local_gravity_normalized = -normalize(vantage);
             player_character->body.pos -= delta;
-            delta = player_global_pos - vantage;
-            vantage = player_global_pos;
-
-
             player_character->body.zone = zone->path;
-            local_gravity_normalized = -glm::normalize(vantage);
+            player_global_pos = vantage + player_character->body.pos;
+            origo = vantage;
+            vantage = zone->spheroidPosition(player_global_pos, glitch->terrain.radius);
+
+            if(verbose) {
+                std::cout << zone->str() << "\n";
+                std::cout << "player local (" << player_character->body.pos.x << ", " << player_character->body.pos.y << ", " << player_character->body.pos.z << ")\n";
+                std::cout << "player global (" << player_global_pos.x << ", " << player_global_pos.y << ", " << player_global_pos.z << ")\n";
+//                std::cout << "elevation: " << tile->elevation() << "\n";//_kludgehammer(player_character->body.pos, &glitch->body.mesh) << "\n";
+            }
 
             terrain_upload_status = idle;
         }
         terrain_lock.unlock(); // release mutex
 
-
-        ttnode* tile = glitch->terrain[player_global_pos];
-/*
-        std::cout << "    zone at (" << zone->verts[0].x << ", " << zone->verts[0].y << ", " << zone->verts[0].z << ")\n";
-        std::cout << "    tile at (" << tile->verts[0].x << ", " << tile->verts[0].y << ", " << tile->verts[0].z << ")\n";
-        std::cout << "player local (" << player_character->body.pos.x << ", " << player_character->body.pos.y << ", " << player_character->body.pos.z << ")\n";
-        std::cout << "player global (" << player_global_pos.x << ", " << player_global_pos.y << ", " << player_global_pos.z << ")\n";
-        std::cout << "elevation: " << tile->elevation() << "\n";//_kludgehammer(player_character->body.pos, &glitch->body.mesh) << "\n";
-*/
 //        local_gravity_normalized = -glm::normalize(player_global_pos);
 //        ttnode* tile = glitch->terrain[player_global_pos];
 
@@ -716,13 +731,23 @@ int main(int argc, char** argv) {
             }
             player_character->body.rot = glm::conjugate(camera_rot * glm::angleAxis(glm::radians(0.0f), glm::vec3(0.0, 1.0, 0.0)));
             player_character->body.pos += player_character->body.rot * input_vector(window) * dt * 10.0;
-            player_global_pos += player_character->body.rot * input_vector(window) * dt * 10.0;
+            player_global_pos = origo + player_character->body.pos;
+
+            ttnode* tile = glitch->terrain[player_global_pos];
+
             //double elevation = tile->elevation_kludgehammer(player_character->body.pos, &glitch->body.mesh);
-            double elevation = tile->elevation_projected(player_character->body.pos, &glitch->body.mesh);
+ //           if(verbose)
+//                std::cout << tile->str() << "\n";
+            //double elevation = tile->elevation_kludgehammer(player_character->body.pos, &glitch->body.mesh, local_gravity_normalized);
+            double elevation = tile->elevation_projected(player_character->body.pos, &glitch->body.mesh, local_gravity_normalized);
             //double elevation = tile->elevation();
+            double altitude = length(player_global_pos) - (glitch->terrain.radius + elevation);
+//            player_character->body.pos += altitude * local_gravity_normalized;
+//            player_global_pos = origo + player_character->body.pos;
+            
 //            if(elevation > glm::length(player_character->body.pos)){
-                player_character->body.pos -= local_gravity_normalized * (elevation - glm::length(player_character->body.pos));
-                player_global_pos -= local_gravity_normalized * (elevation - glm::length(player_character->body.pos));
+//                player_character->body.pos -= local_gravity_normalized * (elevation - glm::length(player_character->body.pos));
+//                player_global_pos -= local_gravity_normalized * (elevation - glm::length(player_character->body.pos));
 //            }
 
             // optimization: compute view matrix here instead of in render()
@@ -759,14 +784,18 @@ int main(int argc, char** argv) {
                 dvec3 lo = node->lo.todvec3();
                 dvec3 center = (hi + lo) * 0.5;
                 dvec3 size = (hi - lo);
-                PhysicsObject greencube = PhysicsObject(dMesh::createBox(center, size.x, size.y, size.z), nil);
-                RenderObject ro = RenderObject(&greencube);
-                ro.upload_boxen_mesh();
-                ro.shader = shaders["box"];
-                ro.texture = textures["green_transparent_wireframe_box_64x64.png"];
-                glDisable(GL_CULL_FACE);
-                render(&ro);
-                glEnable(GL_CULL_FACE);
+                // it's really fucking weird that size has a 0 component
+                if( ! (size.x == 0 || size.y == 0 || size.z == 0) ){
+
+                    PhysicsObject greencube = PhysicsObject(dMesh::createBox(center, size.x, size.y, size.z), nil);
+                    RenderObject ro = RenderObject(&greencube);
+                    ro.upload_boxen_mesh();
+                    ro.shader = shaders["box"];
+                    ro.texture = textures["green_transparent_wireframe_box_64x64.png"];
+                    glDisable(GL_CULL_FACE);
+                    render(&ro);
+                    glEnable(GL_CULL_FACE);
+                }
 #endif
             }
         }

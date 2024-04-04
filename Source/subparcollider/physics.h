@@ -19,6 +19,7 @@
 
 #define nil nullptr
 
+using std::isnan;
 using std::mutex;
 using std::string;
 auto now = std::chrono::high_resolution_clock::now;
@@ -46,6 +47,7 @@ size_t min(size_t a, size_t b) {
 size_t max(size_t a, size_t b) {
     return a < b ? b : a;
 }
+
 
 namespace nonstd {
 
@@ -287,6 +289,21 @@ constexpr dvec3 operator-(const dvec3 lhs, const vec3 rhs) {
     return dvec3(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z);
 }
 
+double length(dvec3 a) {
+    dvec3 s = a * a;
+    return sqrt(s.x + s.y + s.z);
+}
+
+dvec3 normalize(dvec3 a) {
+    return glm::normalize(a);
+/*    double length = ::length(a);
+    assert(length != 0);
+    if(length == 0){
+        return a * length;
+    }
+    return a / length;*/
+}
+
 struct dTri {
     uint32_t verts[3];
     float elevations[3];
@@ -298,7 +315,7 @@ struct dTri {
         verts[0] = pverts[0];
         verts[1] = pverts[1];
         verts[2] = pverts[2];
-        normal = glm::normalize(glm::cross((vertData[verts[0]] - vertData[verts[1]]), (vertData[verts[0]] - vertData[verts[2]])));
+        normal = normalize(glm::cross((vertData[verts[0]] - vertData[verts[1]]), (vertData[verts[0]] - vertData[verts[2]])));
         double dotProduct = glm::dot(normal, vertData[verts[0]] - center);
         if(dotProduct < 0.0){
             normal = -normal;
@@ -334,6 +351,9 @@ struct dMesh {
     // the mesh upload function
 
     static dMesh createBox(dvec3 center, double width, double height, double depth) {
+        assert(width > 0);
+        assert(height > 0);
+        assert(depth > 0);
         const int numVertices = 8;
         const int numTriangles = 12;
         dvec3 *vertices = (dvec3*)malloc(numVertices * sizeof(dvec3) + numTriangles * sizeof(dTri));
@@ -718,8 +738,20 @@ struct ttnode {
     dvec3 verts[3]; // vertices (node space (octahedron with manhattan distance to center = r everywhere on the surface))
 
     // add more stuff like temperature, moisture, vegetation
+    std::string str(){
+        return fstr("node: %llx elevation: %f verts: %s, %s, %s", path, elevation(), ::str(verts[0]).c_str(), ::str(verts[1]).c_str(), ::str(verts[2]).c_str());
+    }
+   
+    dvec3 spheroidPosition(dvec3 vert, double radius) {
+        double length = glm::length(vert);
+        return vert * (radius / length);
+    }
 
-    
+    dvec3 globalPosition(double radius, int i) {     
+        double length = glm::length(verts[i]);
+        return verts[i] * ((radius + elevations[i]) / length);
+    }
+
     // position of 0th vertex transformed to zone space (LOD space)
     vec3 LODspacePosition(dvec3 location, double radius, int i) {
         glm::vec3 point = verts[i];
@@ -747,34 +779,23 @@ struct ttnode {
         elevation /= 3.0;
         return elevation;
     }
-/*
-    double elevation_kludgehammer(dvec3 pos, dMesh* mesh) {
-        double expected = pos.y;
-        double candidates[3] = {
-            elevation_projected(pos, mesh),
-            elevation_barycentric(pos, mesh),
-            elevation_naive(pos, mesh)
-        };
-        int best = 0;
-        double min_deviation = 1e38;
-        double max_deviation = 0;
-        for(int i = 0; i < 3; i++) {
-            double deviation = abs(candidates[i] - expected);
-            if(deviation < min_deviation) {
-                min_deviation = deviation;
-                best = i;
-            }
-            if(deviation > min_deviation) {
-                max_deviation = deviation;
-            }
+
+    double elevation_kludgehammer(dvec3 pos, dMesh* mesh, dvec3 gravity_dir) {
+        double p = elevation_projected(pos, mesh, gravity_dir);
+        double n = elevation_naive(pos, mesh);
+        if(isnan(p) && isnan(n)) assert(0);
+        if(isnan(p)) return n;
+        if(isnan(n)) return p;
+        if(n < 0 && abs(p + n) < 100.0){
+            return -p;
+        } else if(abs(p - n) > 100.0){
+            return n;
+        } else {
+            return p;
         }
-        if(max_deviation > 100.0){
-            std::cout << "max deviation: " << max_deviation << "\n";
-        }
-        return candidates[best];
     }
-*/
-    double elevation_projected(dvec3 pos, dMesh* mesh) {
+
+    double elevation_projected(dvec3 pos, dMesh* mesh, dvec3 gravity_dir) {
         dTri *tri = &mesh->tris[triangle];
         dvec3 &a = mesh->verts[tri->verts[0]];
         dvec3 &b = mesh->verts[tri->verts[1]];
@@ -782,30 +803,11 @@ struct ttnode {
         dvec3 ab = b - a;
         dvec3 ac = c - a;
         dvec3 norm = normalize(cross(ab, ac));
-        dvec3 gravity_dir = normalize(verts[0]);
         double d = dot(norm, (a - pos)) / dot(norm, gravity_dir);
         dvec3 intersection = pos + gravity_dir * d;
         return glm::length(intersection);
     }
-    // this one consistently overestimates elevation by a few meters
-    double elevation_barycentric(dvec3 pos, dMesh* mesh) {
-        dTri *tri = &mesh->tris[triangle];
-        dvec3 &a = mesh->verts[tri->verts[0]];
-        dvec3 &b = mesh->verts[tri->verts[1]];
-        dvec3 &c = mesh->verts[tri->verts[2]];
-        dvec3 v0 = b - a, v1 = c - a, v2 = pos - a;
-        double d00 = glm::dot(v0, v0);
-        double d01 = glm::dot(v0, v1);
-        double d11 = glm::dot(v1, v1);
-        double d20 = glm::dot(v2, v0);
-        double d21 = glm::dot(v2, v1);
-        double denom = d00 * d11 - d01 * d01;
-        double v = (d11 * d20 - d01 * d21) / denom;
-        double w = (d00 * d21 - d01 * d20) / denom;
-        double u = 1.0 - v - w;
-        return (u * elevations[0] + v * elevations[1] + w * elevations[2]) / (u + v + w);
-    }
-    
+   
     // this one is wrong in both directions
     double elevation_naive(dvec3 pos, dMesh* mesh) {
         dTri *tri = &mesh->tris[triangle];
@@ -930,7 +932,7 @@ struct TerrainTree {
                     center += point;
                     t.elevations[i] = nodes[node_idx].elevations[i];
                 }
-                t.normal = glm::normalize(nodes[node_idx].verts[0]);
+                t.normal = normalize(location);
                 
                 nodes[node_idx].triangle = tris->size();
                 tris->push_back(t);
