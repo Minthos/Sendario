@@ -739,7 +739,7 @@ struct ttnode {
 
     // add more stuff like temperature, moisture, vegetation
     std::string str(){
-        return fstr("node: %llx elevation: %f verts: %s, %s, %s", path, elevation(), ::str(verts[0]).c_str(), ::str(verts[1]).c_str(), ::str(verts[2]).c_str());
+        return fstr("node: 0x%llx elevation: %f verts: %s, %s, %s", path, elevation(), ::str(verts[0]).c_str(), ::str(verts[1]).c_str(), ::str(verts[2]).c_str());
     }
    
     dvec3 spheroidPosition(dvec3 vert, double radius) {

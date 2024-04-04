@@ -493,7 +493,11 @@ RenderObject *terrain0 = nil;
 RenderObject *terrain1 = nil;
 Celestial *glitch = nil;
 terrain_upload_status_enum terrain_upload_status = idle;
+dvec3 origo;
 dvec3 vantage;
+ttnode* zone;
+dvec3 player_global_pos;
+dvec3 delta;
 dMesh mesh_in_waiting;
 dMesh the_old_mesh;
 TerrainTree terrain_in_waiting;
@@ -502,6 +506,7 @@ mutex terrain_lock;
 
 void terrain_thread_entry(int seed, double lod) {
     double current_lod = 1.0;
+    double time_taken = 500000.0;
     terrain_lock.lock();
     terrain_upload_status = generating;
     glitch = new Celestial(seed, current_lod, "Glitch", 6.371e6, 0.2, nil); // initial terrain generation must block the main thread
@@ -521,8 +526,11 @@ void terrain_thread_entry(int seed, double lod) {
         }
         #endif
         terrain_upload_status = generating;
-        //current_lod = min(current_lod * 1.2 + 1.0, lod);
-        current_lod = min(current_lod + 1.0, lod);
+        dvec3 estimated_vantage = zone->spheroidPosition(player_global_pos, glitch->terrain.radius);
+        double lod_increase = 10000000.0 / (time_taken + 1000000.0);
+        current_lod = min(current_lod + lod_increase, lod);
+// for some reason the LOD algorithm goes to 10 LOD when the player is at 0 elevation... divide by zero?
+        current_lod = min(current_lod, max(10.0, (current_lod * 1000) / (1.0 + glm::length(origo - estimated_vantage))));
         std::cout << "generating terrain mesh with LOD " << current_lod << "\n";
         auto begin = now();
         dvec3 vantage_copy = vantage;
@@ -534,8 +542,8 @@ void terrain_thread_entry(int seed, double lod) {
         }
         terrain_upload_status = done_generating;
         auto end = now();
-        double duration = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
-        if(duration > 10000.0 * lod) {
+        double time_taken = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
+        if(time_taken > 10000.0 * lod) {
             // uncomment to see something broken
             //current_lod *= (1000000.0 / duration);
         }
@@ -545,13 +553,17 @@ void terrain_thread_entry(int seed, double lod) {
             }
             usleep(1000.0);
         }
-        if(current_lod >= lod && duration < 10000.0 * lod) {
-            for(double i = 0.0; i < 1.0; i += 0.01) {
-                if(terrain_upload_status == should_exit){
-                    return;
+        if(current_lod >= lod) {
+            do{
+                estimated_vantage = zone->spheroidPosition(player_global_pos, glitch->terrain.radius);
+                for(double i = 0.0; i < 0.1; i += 0.01) {
+                    if(terrain_upload_status == should_exit){
+                        return;
+                    }
+                    usleep(10000.0);
                 }
-                usleep(10000.0);
-            }
+            } while(glm::length(origo - estimated_vantage) < 20.0);
+            std::cout << "origo: " << str(origo) << " estimated vantage: " << str(estimated_vantage) << " estimated delta: " << str(origo - estimated_vantage) << "\n";
         }
     }
 }
@@ -625,10 +637,11 @@ int main(int argc, char** argv) {
     player_character->body.ro->shader = shaders["box"];
     player_character->body.ro->texture = textures["isqswjwki55a1.png"];
 
-    ttnode* zone = nil;
-    dvec3 origo;
-    dvec3 player_global_pos;
-    dvec3 delta;
+
+    // seed 52 destinations:
+    // 0x506283d088 has a very steep mountain peak
+    // 0x4b20532488 nearby has over 8000 elevation
+    // 0x27c917dc88 also in that area could be a nice location for a ski resort (player global (741646, 5.94832e+06, 2.17329e+06))
 
     uint32_t terrain_upload_progress = 0;
     // Main loop
@@ -676,16 +689,19 @@ int main(int argc, char** argv) {
             the_old_terrain = glitch->terrain;
             glitch->terrain = terrain_in_waiting;
 
+
+
+
             // easy but wrong: origo - vantage
             // correct: (origo + normalized origo * elevation) - (vantage + normalized vantage * elevation)
             // rearrange that a bit.. origo - vantage + (normalized origo * elevation) - (normalized vantage * elevation)
             // but which elevation? average the two?
-//            ttnode* ozone = glitch->terrain[origo]; // the old zone
-//            ttnode* vzone = glitch->terrain[vantage]; // the new zone (because vantage is the old vantage)
-//            double avgElevation = (ozone->elevations[0] + vzone->elevations[0]) / 2.0;
-//            delta = (vantage + glm::normalize(vantage) * avgElevation)) - (origo + (glm::normalize(origo) * avgElevation);
+            ttnode* ozone = glitch->terrain[origo]; // the old zone
+            ttnode* vzone = glitch->terrain[vantage]; // the new zone (because vantage is the old vantage)
+            double avgElevation = (ozone->elevations[0] + vzone->elevations[0]) / 2.0;
+            delta = (vantage + glm::normalize(vantage) * avgElevation) - (origo + (glm::normalize(origo) * avgElevation));
             
-            delta = vantage - origo;
+//            delta = vantage - origo;
             zone = glitch->terrain[vantage];
             local_gravity_normalized = -normalize(vantage);
             player_character->body.pos -= delta;
