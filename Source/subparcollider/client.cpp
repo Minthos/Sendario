@@ -24,7 +24,7 @@
 float anisotropy = 16.0f; // should be 4 with no upscaling, 16 with upscaling
 int antialiasing = 2; // 1 (no upscaling) and 2 (4 samples per pixel) are good values
 int motion_blur_mode = 1; // 0 = off, 1 = nonlinear (sharp), 2 = linear (blurry)
-float motion_blur_invstr = 1.0f; // motion blur amount. 1.0 = very high. 5.0 = low.
+float motion_blur_invstr = 5.0f; // motion blur amount. 1.0 = very high. 5.0 = low.
 
 GLFWwindow* window = nil;
 Unit *player_character = nil;
@@ -382,15 +382,7 @@ void initializeFramebuffer() {
 void setupTextures(int width, int height) {
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTex, 0);
-/*    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);*/
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, velocityTex, 0);
-/*    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);*/
     GLenum drawBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
     glDrawBuffers(2, drawBuffers);
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
@@ -402,9 +394,9 @@ void resizeFramebuffer(int w, int h) {
     int height = h * antialiasing;
     glViewport(0, 0, width, height);
     glBindTexture(GL_TEXTURE_2D, colorTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, nil);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, nil);
     glBindTexture(GL_TEXTURE_2D, velocityTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, width, height, 0, GL_RG, GL_FLOAT, nil);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, nil);
     GLuint depthRBO;
     glGenRenderbuffers(1, &depthRBO);
     glBindRenderbuffer(GL_RENDERBUFFER, depthRBO);
@@ -681,9 +673,19 @@ int main(int argc, char** argv) {
     ppshader = mkShader("pp_motionblur");
     checkGLerror();
     glUseProgram(ppshader);
-    checkGLerror();
-    glUniform1i(glGetUniformLocation(ppshader, "screenTexture"), 0);
-    checkGLerror();
+        glActiveTexture(GL_TEXTURE0); // Activate the first texture unit for the color texture
+        glBindTexture(GL_TEXTURE_2D, colorTex);
+        glUniform1i(glGetUniformLocation(ppshader, "screenTexture"), 0); // Pass texture unit 0 to the shader
+        glActiveTexture(GL_TEXTURE1); // Activate the second texture unit for the velocity texture
+        glBindTexture(GL_TEXTURE_2D, velocityTex);
+        glUniform1i(glGetUniformLocation(ppshader, "velocityTexture"), 1); // Pass texture unit 1 to the shader
+        glUniform1i(glGetUniformLocation(ppshader, "mode"), motion_blur_mode);
+        glUniform1f(glGetUniformLocation(ppshader, "inv_strength"), motion_blur_invstr);
+        glUniform1f(glGetUniformLocation(ppshader, "antialiasing"), antialiasing);
+//    checkGLerror();
+//    glUniform1i(glGetUniformLocation(ppshader, "screenTexture"), 0);
+//    glUniform1i(glGetUniformLocation(ppshader, "velocityTexture"), 1);
+//    checkGLerror();
     glEnable(GL_DEPTH_TEST);
     checkGLerror();
     glEnable(GL_CULL_FACE);
@@ -843,6 +845,7 @@ terrain_lock.unlock(); // release mutex
         }
         camera_dirty = false;
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+        setupTextures(screenwidth * antialiasing, screenheight * antialiasing); // shouldn't be necessary
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         render(terrain0);
@@ -887,7 +890,7 @@ terrain_lock.unlock(); // release mutex
 
         // Bind back to the default framebuffer
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear the default framebuffer
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear the default framebuffer, actually we don't need to clear the color buffer
         glUseProgram(ppshader);
         glActiveTexture(GL_TEXTURE0); // Activate the first texture unit for the color texture
         glBindTexture(GL_TEXTURE_2D, colorTex);

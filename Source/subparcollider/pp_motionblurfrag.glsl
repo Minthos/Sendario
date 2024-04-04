@@ -22,8 +22,7 @@ void main() {
     }
 
     int iterations = 16;
-//    vec2 velocity = texture(velocityTexture, coords).xy;
-    vec2 velocity = texture(screenTexture, coords).xy;
+    vec2 velocity = texture(velocityTexture, coords).xy;
     velocity /= (0.5 * iterations * (1 + inv_strength));
 
     // suppress motion blur for slow-moving pixels
@@ -52,7 +51,7 @@ void main() {
         color = texture(screenTexture, coords);
         sum_weight = 1.0;
     }
-    FragColor = vec4(color.b, color.b, color.b, color.a) / sum_weight;
+    FragColor = color / sum_weight;
 }
 
 
