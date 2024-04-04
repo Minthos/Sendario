@@ -414,8 +414,35 @@ void render(RenderObject *obj) {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, obj->texture);
     glBindVertexArray(obj->vao);
+
+    // Before drawing, validate the program
+    glValidateProgram(obj->shader);
+    GLint validationStatus;
+    glGetProgramiv(obj->shader, GL_VALIDATE_STATUS, &validationStatus);
+    if(validationStatus == GL_FALSE) {
+        GLchar infoLog[512];
+        glGetProgramInfoLog(obj->shader, 512, NULL, infoLog);
+        std::cout << "Shader Program Validation Failed: " << infoLog << std::endl;
+    }
+
     glDrawElements(GL_TRIANGLES, obj->po->mesh.num_tris * 3, GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
+
+    GLenum err;
+    while((err = glGetError()) != GL_NO_ERROR) {
+        std::cout << "OpenGL Error: ";
+        switch (err) {
+            case GL_INVALID_ENUM: std::cout << "GL_INVALID_ENUM"; break;
+            case GL_INVALID_VALUE: std::cout << "GL_INVALID_VALUE"; break;
+            case GL_INVALID_OPERATION: std::cout << "GL_INVALID_OPERATION"; break;
+            case GL_STACK_OVERFLOW: std::cout << "GL_STACK_OVERFLOW"; break;
+            case GL_STACK_UNDERFLOW: std::cout << "GL_STACK_UNDERFLOW"; break;
+            case GL_OUT_OF_MEMORY: std::cout << "GL_OUT_OF_MEMORY"; break;
+            case GL_INVALID_FRAMEBUFFER_OPERATION: std::cout << "GL_INVALID_FRAMEBUFFER_OPERATION"; break;
+            default: std::cout << "Unknown Error"; break;
+        }
+        std::cout << std::endl;
+    }
 }
 
 dvec3 input_vector(GLFWwindow* window) {
@@ -661,6 +688,8 @@ int main(int argc, char** argv) {
     //
     // 0x5263c2aaad has a cool beach with a flat area with furrows in a checkerboard-like pattern, nice place to have a music festival
     // or maybe a resort town. I got there by glitching through the planet, which was also interesting.
+    //
+    // The beach at 0x519d196b69 is enormous and the area has lots of beautiful scenery
 
     uint32_t terrain_upload_progress = 0;
     // Main loop
@@ -831,6 +860,7 @@ terrain_lock.unlock(); // release mutex
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindTexture(GL_TEXTURE_2D, 0); // Unbind velocity texture
         glBindFramebuffer(GL_FRAMEBUFFER, 0); // Bind back to the default framebuffer
+        glBindVertexArray(0);
         glFlush();
         ++frames_rendered;
         if(frames_rendered % framerate_handicap == 0) {

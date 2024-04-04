@@ -821,7 +821,12 @@ struct ttnode {
         dvec3 ab = b - a;
         dvec3 ac = c - a;
         dvec3 norm = normalize(glm::cross(ab, ac));
-        double d = dot(norm, (a - pos)) / dot(norm, gravity_dir);
+        double divisor = dot(norm, gravity_dir);
+        for(int i = 0; i < 9; i++){
+            assert(!isnan(((double*)(&mesh->verts[tri->verts[i/3]]))[i % 3])); // fight me
+        }
+        assert(divisor != 0.0);
+        double d = dot(norm, (a - pos)) / divisor;
         return d;
     }
 
