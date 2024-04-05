@@ -548,6 +548,7 @@ mutex terrain_lock;
 void terrain_thread_entry(int seed, double lod) {
     double current_lod = 1.0;
     double time_taken = 500000.0;
+    uint32_t last_eviction = 0;
 terrain_lock.lock();
     terrain_upload_status = generating;
     glitch = new Celestial(seed, current_lod, "Glitch", 6.371e6, 0.2, nil); // initial terrain generation must block the main thread
@@ -582,8 +583,9 @@ terrain_lock.unlock();
 
         // this is just a "hardcoded heuristic" that should work fine on my computer. a more intelligent way to do this
         // would be to evict nodes based on how much free RAM the computer has.
-        if(glitch->terrain.nodes.count > 100000000){
-            terrain_in_waiting = glitch->terrain.omitting_copy(frame_counter - min(frame_counter, 1800 * 120));
+        if(glitch->terrain.nodes.count > 100000 * lod){
+            last_eviction += ((frame_counter - last_eviction) / 2);
+            terrain_in_waiting = glitch->terrain.omitting_copy(last_eviction);
             std::cout << "evicted " << glitch->terrain.nodes.count - terrain_in_waiting.nodes.count << " terrain nodes. " << terrain_in_waiting.nodes.count << " nodes in the new tree.\n";
         } else {
             terrain_in_waiting = glitch->terrain.copy();
