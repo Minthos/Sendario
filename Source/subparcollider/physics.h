@@ -29,6 +29,8 @@ using glm::dmat4;
 using glm::dmat3;
 using glm::dquat;
 
+bool POTATO_MODE = false;
+
 enum terrain_upload_status_enum {
     idle,
     should_exit,
@@ -946,11 +948,9 @@ struct TerrainTree {
         if(status && *status == should_exit){
             return;
         }
-#ifdef DEBUG
-        if(node_idx % 10 == 0){
+        if(POTATO_MODE && node_idx % 10 == 0){
             usleep(1000);
         }
-#endif
         nodes[node_idx].path = path;
         double noise_xzscaling = 0.0001;
         double noise_xzscaling2 = -0.00001;

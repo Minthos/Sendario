@@ -4,7 +4,7 @@ out vec4 FragColor;
 in vec2 TexCoords;
 
 uniform sampler2D screenTexture;
-uniform usampler2D velocityTexture;
+uniform isampler2D velocityTexture;
 uniform float antialiasing;
 uniform float inv_strength;
 uniform int mode;
@@ -12,18 +12,16 @@ uniform int mode;
 void main() {
     vec2 coords = TexCoords * antialiasing;
    
-    if(mode == 5){
-        FragColor = texture(velocityTexture, coords);
-        return;
-    } 
     if(mode == 0){
         FragColor = texture(screenTexture, coords);
         return;
     }
 
     int iterations = 16;
-    vec2 velocity = texture(velocityTexture, coords).xy / 256.0;
-    uvec2 metadata = texture(velocityTexture, coords).za;
+    vec2 velocity = texture(velocityTexture, coords).xy / 4096.0;
+    ivec2 metadata = texture(velocityTexture, coords).za;
+
+    // disabling motion blur for the player character (well.. every box mesh actually..)
     if(metadata.y == 2){
         FragColor = texture(screenTexture, coords);
         return;
@@ -42,6 +40,7 @@ void main() {
 
     if(mode == 1) { // weighted mode makes the blur weaker further from the object, sharpening the image
         for(int i = -iterations; i < iterations; i++){
+            // this test prevents the terrain motion from blurring boxes, but I should find a better way to solve this
             if(texture(velocityTexture, coords + i * velocity).a == metadata.y){
                 float weight = 1.0 / (2 + abs(i));
                 color += weight * texture(screenTexture, coords + i * velocity);

@@ -396,7 +396,7 @@ void resizeFramebuffer(int w, int h) {
     glBindTexture(GL_TEXTURE_2D, colorTex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nil);
     glBindTexture(GL_TEXTURE_2D, velocityTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16UI, width, height, 0, GL_RGBA_INTEGER, GL_UNSIGNED_INT, nil);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16I, width, height, 0, GL_RGBA_INTEGER, GL_INT, nil);
     GLuint depthRBO;
     glGenRenderbuffers(1, &depthRBO);
     glBindRenderbuffer(GL_RENDERBUFFER, depthRBO);
@@ -478,6 +478,7 @@ dvec3 input_vector(GLFWwindow* window) {
     if(glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS){
         vel *= 10000.0;
     }
+    vel.z -= 10.0;
     return vel;
 }
 
@@ -561,27 +562,18 @@ terrain_lock.unlock();
         usleep(1000.0);
     }
     while(terrain_upload_status != should_exit) {
-        #ifdef DEBUG
-        for(double i = 0.0; i < 3.0; i += 0.01) {
-            if(terrain_upload_status == should_exit){
-                return;
-            }
-//            usleep(10000.0);
-        }
-        #endif
         terrain_upload_status = generating;
-
 
         dvec3 estimated_vantage = zone->spheroidPosition(player_global_pos, glitch->terrain.radius);
         double lod_increase = 10000000.0 / (time_taken + 1000000.0);
-#ifdef DEBUG
-        lod_increase = 0.5;
-        current_lod = min(current_lod + lod_increase, lod);
-        current_lod = min(current_lod, max(1.0, (current_lod * 100) / (1.0 + glm::length(origo - estimated_vantage))));
-#else
-        current_lod = min(current_lod + lod_increase, lod);
-        current_lod = min(current_lod, max(10.0, (current_lod * 1000) / (1.0 + glm::length(origo - estimated_vantage))));
-#endif
+        if(POTATO_MODE){
+            lod_increase = 0.5;
+            current_lod = min(current_lod + lod_increase, lod);
+            current_lod = min(current_lod, max(1.0, (current_lod * 100) / (1.0 + glm::length(origo - estimated_vantage))));
+        } else {
+            current_lod = min(current_lod + lod_increase, lod);
+            current_lod = min(current_lod, max(10.0, (current_lod * 1000) / (1.0 + glm::length(origo - estimated_vantage))));
+        }
         std::cout << "generating terrain mesh with LOD " << current_lod << "\n";
         auto begin = now();
 
@@ -636,22 +628,50 @@ int main(int argc, char** argv) {
         if(!strncmp(argv[i], "-v", min(2, strlen(argv[i])))){
             verbose = true;
         }
-        if(!strncmp(argv[i], "seed", min(4, strlen(argv[i])))){
+        if(!strncmp(argv[i], "--potato", min(8, strlen(argv[i])))){
+            POTATO_MODE = true;
+        }
+        if(!strncmp(argv[i], "seed=", min(5, strlen(argv[i])))){
             seed = atol(argv[i] + 5);
         }
-        if(!strncmp(argv[i], "lod", min(3, strlen(argv[i])))){
-            lod = atol(argv[i] + 4);
+        if(!strncmp(argv[i], "lod=", min(4, strlen(argv[i])))){
+            lod = (double)atol(argv[i] + 4);
+            assert(lod > 0);
+        }
+        if(!strncmp(argv[i], "aa=", min(3, strlen(argv[i])))){
+            antialiasing = atol(argv[i] + 3);
+            assert(antialiasing >= 1 && antialiasing <= 4);
+        }
+        if(!strncmp(argv[i], "af=", min(3, strlen(argv[i])))){ 
+            int anisotropic_filtering = atol(argv[i] + 3);
+            assert(anisotropic_filtering == 0 || anisotropic_filtering == 4 || anisotropic_filtering == 16);
+            anisotropy = (float)anisotropic_filtering;
+        }
+        if(!strncmp(argv[i], "blur=", min(5, strlen(argv[i])))){ 
+            int motion_blur = atol(argv[i] + 5);
+            motion_blur_invstr = (20.0f / ((float)motion_blur + 0.1f)) - 1.0f;
+            assert(motion_blur >= 0 && motion_blur <= 50);
+            if(motion_blur == 0){
+                motion_blur_mode = 0;
+            }
+            std::cout << "using motion blur " << motion_blur << " (invstr " << motion_blur_invstr << ")\n";
         }
     }
     if(argc < 2 || verbose){
         std::cout << "\n\n";
-        std::cout << "Usage: " << argv[0] << " [seed=n] [lod=n] [-v]\n";
-        std::cout << "where seed is the random seed, lod is the target level of detail and -v increases verbosity\n";
-        std::cout << "Using values " << seed << " and " << lod << (verbose? ". Verbose mode enabled." : "") << "\n\n\n";
+        std::cout << "Usage: " << argv[0] << " [-v] [-potato] [seed=n] [lod=n] [aa=n] [af=n] [blur=n] [blurmode=n]\n";
+        std::cout << "-v: print debug information to console.\n";
+        std::cout << "--potato: compatibility mode for single-core CPUs and debugging with valgrind.\n";
+        std::cout << "seed: the random seed used to generate the world. 52 is default.\n";
+        std::cout << "lod: the target level of detail for terrain rendering. 1 or higher.\n";
+        std::cout << "aa: antialiasing. 1 to 4. 2 is recommended (4x multisampling).\n";
+        std::cout << "af: anisotropic filtering. 0, 4 or 16.\n";
+        std::cout << "blur: the amount of motion blur. 0 to 50. Higher than 10 is not recommended.\n";
+        std::cout << "\naa=1 af=0 blur=0 lod=10 is potato mode\n\n";
     }
     initializeGLFW();
     window = createWindow(screenwidth, screenheight, "Takeoff Sendario");
-//    glfwSwapInterval(0); // disabling vsync can reveal performance issues earlier
+    glfwSwapInterval(0); // disabling vsync can reveal performance issues earlier
     glfwWindowHint(GLFW_AUTO_ICONIFY, GL_FALSE);
     glfwSetWindowSizeCallback(window, reshape);
     glfwSetKeyCallback(window, key_callback);
@@ -920,6 +940,9 @@ terrain_lock.unlock(); // release mutex
         if(frames_rendered % framerate_handicap == 0) {
             glfwSwapBuffers(window);
             glfwPollEvents();
+            if(POTATO_MODE){
+                usleep(1000.0);
+            }
             auto frameDuration = std::chrono::duration_cast<std::chrono::microseconds>(now() - prevFrameTime).count();
             if(frames_rendered % (240 * framerate_handicap) == 0){
                 std::cout << frameDuration / 1000.0 << " ms (" << 1000000.0 / frameDuration <<" fps)";
@@ -928,8 +951,11 @@ terrain_lock.unlock(); // release mutex
                 }
                 std::cout << "\n";
             }
-            if(frameDuration < 1000.0){ // limit the game to 1000 fps if the system/libraries don't limit it for us
-    			usleep(1000.0 - frameDuration);
+            // limit the game to 120 fps if the system/libraries don't limit it for us
+            if(frameDuration < 1000000.0 / 120.0 && !
+                    (terrain_upload_status == done_generating &&
+                    terrain_upload_progress + 100000 >= mesh_in_waiting.num_tris)){
+    			usleep(1000000.0 / 120.0 - frameDuration);
             }
             prevFrameTime = now();
         }
