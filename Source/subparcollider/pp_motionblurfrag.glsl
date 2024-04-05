@@ -23,6 +23,12 @@ void main() {
 
     int iterations = 16;
     vec2 velocity = texture(velocityTexture, coords).xy;
+    vec2 metadata = texture(velocityTexture, coords).za;
+    if(metadata.y > 0.985 && metadata.y < 0.995){
+        FragColor = texture(screenTexture, coords);
+        return;
+    }
+
     velocity /= (0.5 * iterations * (1 + inv_strength));
 
     // suppress motion blur for slow-moving pixels
@@ -36,9 +42,11 @@ void main() {
 
     if(mode == 1) { // weighted mode makes the blur weaker further from the object, sharpening the image
         for(int i = -iterations; i < iterations; i++){
-            float weight = 1.0 / (2 + abs(i));
-            color += weight * texture(screenTexture, coords + i * velocity);
-            sum_weight += weight;
+            if(texture(velocityTexture, coords + i * velocity).a == metadata.y){
+                float weight = 1.0 / (2 + abs(i));
+                color += weight * texture(screenTexture, coords + i * velocity);
+                sum_weight += weight;
+            }
         }
     }
     else if(mode == 2) { // linear mode gives a stronger, smoother blur

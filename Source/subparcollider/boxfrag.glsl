@@ -12,7 +12,8 @@ layout(location = 1) out vec4 velocityOut;
 void main() {
     //fragColor = vec4(1.0);
     fragColor = texture(tex, texCoord);
-    velocityOut = vec4(velocity, 1.0, 1.0);
-    gl_FragDepth = log2(z + 2.0) * 0.03;
+    float depth = log2(z + 2.0) * 0.03;
+    velocityOut = vec4(velocity, depth, 0.99);
+    gl_FragDepth = depth;
 }
 

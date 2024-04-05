@@ -26,7 +26,8 @@ void main() {
     } else {
         fragColor = vec4(color * insolation, 1.0);
     }
-    velocityOut = vec4(velocity, 1.0, 1.0);
-    gl_FragDepth = log2(z + 2.0) * 0.03;
+    float depth = log2(z + 2.0) * 0.03;
+    velocityOut = vec4(velocity, depth, 1.0);
+    gl_FragDepth = depth;
 }
 
