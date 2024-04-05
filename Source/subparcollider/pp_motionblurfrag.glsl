@@ -19,6 +19,8 @@ void main() {
 
     int iterations = 16;
     vec2 velocity = texture(velocityTexture, coords).xy / 4096.0;
+    // metadata.x: z value before log2 conversion
+    // metadata.y: which shader produced the pixel (terrainfrag = 1, boxfrag = 2)
     ivec2 metadata = texture(velocityTexture, coords).za;
 
     // disabling motion blur for the player character (well.. every box mesh actually..)
@@ -26,11 +28,10 @@ void main() {
         FragColor = texture(screenTexture, coords);
         return;
     }
-    // this works to reduce stuttering when rendering terrain close to the camera at high AA levels but
-    // I should probably clamp velocity instead to something reasonable
-    if(metadata.x < 500){
-        FragColor = texture(screenTexture, coords);
-        return;
+    // this works to reduce stuttering when rendering terrain close to the camera at high AA levels
+    if(metadata.x < 50){
+        velocity *= metadata.x;
+        velocity /= 50;
     }
 
     velocity /= (0.5 * iterations * (1 + inv_strength));
