@@ -26,6 +26,12 @@ void main() {
         FragColor = texture(screenTexture, coords);
         return;
     }
+    // this works to reduce stuttering when rendering terrain close to the camera at high AA levels but
+    // I should probably clamp velocity instead to something reasonable
+    if(metadata.x < 500){
+        FragColor = texture(screenTexture, coords);
+        return;
+    }
 
     velocity /= (0.5 * iterations * (1 + inv_strength));
 

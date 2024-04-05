@@ -667,7 +667,9 @@ int main(int argc, char** argv) {
         std::cout << "aa: antialiasing. 1 to 4. 2 is recommended (4x multisampling).\n";
         std::cout << "af: anisotropic filtering. 0, 4 or 16.\n";
         std::cout << "blur: the amount of motion blur. 0 to 50. Higher than 10 is not recommended.\n";
-        std::cout << "\naa=1 af=0 blur=0 lod=10 is potato mode\n\n";
+        std::cout << "\nexamples:\nlow: aa=1 af=0 blur=0 lod=10\n";
+        std::cout << "recommended: aa=2 af=16 blur=3 lod=50\n";
+        std::cout << "ultra: aa=4 af=16 blur=3 lod=200\n\n";
     }
     initializeGLFW();
     window = createWindow(screenwidth, screenheight, "Takeoff Sendario");
