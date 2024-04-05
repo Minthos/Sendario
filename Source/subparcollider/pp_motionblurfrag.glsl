@@ -14,21 +14,22 @@ uniform int screen_height;
 void main() {
     vec2 coords = TexCoords * antialiasing;
    
-    if(mode == 0){
+    if(mode == 0 && antialiasing == 1){
         FragColor = texture(screenTexture, coords);
         return;
     }
 
     int iterations = 16;
+    int aa_stride = 4;
     vec2 velocity = texture(velocityTexture, coords).xy / 4096.0;
     // metadata.x: z value before log2 conversion
     // metadata.y: which shader produced the pixel (terrainfrag = 1, boxfrag = 2)
     ivec2 metadata = texture(velocityTexture, coords).za;
 
     // disabling motion blur for the player character (well.. every box mesh actually..)
-    if(metadata.y == 2){
-        FragColor = texture(screenTexture, coords);
-        return;
+    // also disabling motion blur but leaving antialiasing
+    if(metadata.y == 2 || mode == 0){
+        velocity = vec2(0);
     }
     // this works to reduce stuttering when rendering terrain close to the camera at high AA levels
     if(metadata.x < 50){
@@ -46,41 +47,18 @@ void main() {
 
     vec4 color = vec4(0);
     float sum_weight = 0.0;
+    vec2 aa_size = vec2(0.25 / screen_width, 0.25 / screen_height);
 
-    if(antialiasing > 1){
-        float aax_range = 0.5 / screen_width;
-        float aay_range = 0.5 / screen_height;
-        float aay_increment = aax_range / antialiasing;
-        float aax_increment = aay_range / antialiasing;
-        float aa_weight = 0.05 / (antialiasing * antialiasing);
-        for(float aax = -aax_range; aax < aax_range + 0.000001; aax += aax_increment){
-            for(float aay = -aay_range; aay < aay_range + 0.000001; aay += aay_increment){
-                color += aa_weight * texture(screenTexture, coords + vec2(aax, aay));
-                sum_weight += aa_weight;
-            }
-        }
-    } else {
-        color = texture(screenTexture, coords);
-        sum_weight = 0.05;
-    }
-
-    color /= (length(velocity) + 0.1);
-    sum_weight /= (length(velocity) + 0.1);
-
-    if(mode == 1) { // weighted mode makes the blur weaker further from the object, sharpening the image
-        for(int i = -iterations; i < iterations; i++){
-            // this test prevents the terrain motion from blurring boxes, but I should find a better way to solve this
-            if(texture(velocityTexture, coords + i * velocity).a == metadata.y){
-                float weight = 1.0 / (2 + abs(i));
-                color += weight * texture(screenTexture, coords + i * velocity);
-                sum_weight += weight;
-            }
-        }
-    }
-    else if(mode == 2) { // linear mode gives a stronger, smoother blur
-        for(int i = -iterations; i < iterations; i++){
+    for(int i = -iterations; i < iterations; i++){
+        vec2 aa_offset = vec2((((i / aa_stride) - 1.5) * aa_size.x), (((i % aa_stride) - 1.5) * aa_size.y));
+        vec2 adjusted_coords = aa_offset + coords + i * velocity;
+        // this test prevents the terrain motion from blurring boxes, but I should find a better way to solve this
+        if(texture(velocityTexture, adjusted_coords).a == metadata.y){
             float weight = 1.0;
-            color += weight * texture(screenTexture, coords + i * velocity);
+            if(mode == 1) { // weighted mode makes the blur weaker further from the object, sharpening the image
+                weight = 1.0 / (2 + abs(i));
+            }
+            color += weight * texture(screenTexture, adjusted_coords);
             sum_weight += weight;
         }
     }

@@ -640,11 +640,11 @@ int main(int argc, char** argv) {
         }
         if(!strncmp(argv[i], "aa=", min(3, strlen(argv[i])))){
             antialiasing = atol(argv[i] + 3);
-            assert(antialiasing >= 1 && antialiasing <= 4);
+            assert(antialiasing >= 1 && antialiasing <= 8);
         }
         if(!strncmp(argv[i], "af=", min(3, strlen(argv[i])))){ 
             int anisotropic_filtering = atol(argv[i] + 3);
-            assert(anisotropic_filtering == 0 || anisotropic_filtering == 4 || anisotropic_filtering == 16);
+            assert(anisotropic_filtering >= 0 && anisotropic_filtering <= 16);
             anisotropy = (float)anisotropic_filtering;
         }
         if(!strncmp(argv[i], "blur=", min(5, strlen(argv[i])))){ 
@@ -659,17 +659,18 @@ int main(int argc, char** argv) {
     }
     if(argc < 2 || verbose){
         std::cout << "\n\n";
-        std::cout << "Usage: " << argv[0] << " [-v] [-potato] [seed=n] [lod=n] [aa=n] [af=n] [blur=n] [blurmode=n]\n";
+        std::cout << "Usage: " << argv[0] << " [-v] [--potato] [seed=n] [lod=n] [aa=n] [af=n] [blur=n] [blurmode=n]\n";
         std::cout << "-v: print debug information to console.\n";
         std::cout << "--potato: compatibility mode for single-core CPUs and debugging with valgrind.\n";
         std::cout << "seed: the random seed used to generate the world. 52 is default.\n";
         std::cout << "lod: the target level of detail for terrain rendering. 1 or higher.\n";
-        std::cout << "aa: antialiasing. 1 to 4. 2 is recommended (4x multisampling).\n";
-        std::cout << "af: anisotropic filtering. 0, 4 or 16.\n";
-        std::cout << "blur: the amount of motion blur. 0 to 50. Higher than 10 is not recommended.\n";
+        std::cout << "aa: antialiasing. 1 to 8. Number of samples per pixel is the square of this number so 2 is 4x, 4 is 16x.\n";
+        std::cout << "af: anisotropic filtering. 0, to 16.\n";
+        std::cout << "blur: the amount of motion blur. 0 to 50.\n";
         std::cout << "\nexamples:\nlow: aa=1 af=0 blur=0 lod=10\n";
         std::cout << "recommended: aa=2 af=16 blur=3 lod=50\n";
         std::cout << "ultra: aa=4 af=16 blur=3 lod=200\n\n";
+        if(!verbose) std::cout << "No options have been specified. Using recommended settings.\n\n";
     }
     initializeGLFW();
     window = createWindow(screenwidth, screenheight, "Takeoff Sendario");
