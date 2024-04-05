@@ -923,6 +923,8 @@ terrain_lock.unlock(); // release mutex
         glUniform1i(glGetUniformLocation(ppshader, "mode"), motion_blur_mode);
         glUniform1f(glGetUniformLocation(ppshader, "inv_strength"), motion_blur_invstr);
         glUniform1f(glGetUniformLocation(ppshader, "antialiasing"), antialiasing);
+        glUniform1i(glGetUniformLocation(ppshader, "screen_width"), screenwidth);
+        glUniform1i(glGetUniformLocation(ppshader, "screen_height"), screenheight);
         // render the color+velocity buffer to the screen buffer with a quad and apply post-processing
         glBindVertexArray(quadVAO);
 

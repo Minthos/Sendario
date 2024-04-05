@@ -8,6 +8,8 @@ uniform isampler2D velocityTexture;
 uniform float antialiasing;
 uniform float inv_strength;
 uniform int mode;
+uniform int screen_width;
+uniform int screen_height;
 
 void main() {
     vec2 coords = TexCoords * antialiasing;
@@ -45,6 +47,26 @@ void main() {
     vec4 color = vec4(0);
     float sum_weight = 0.0;
 
+    if(antialiasing > 1){
+        float aax_range = 0.5 / screen_width;
+        float aay_range = 0.5 / screen_height;
+        float aay_increment = aax_range / antialiasing;
+        float aax_increment = aay_range / antialiasing;
+        float aa_weight = 0.05 / (antialiasing * antialiasing);
+        for(float aax = -aax_range; aax < aax_range + 0.000001; aax += aax_increment){
+            for(float aay = -aay_range; aay < aay_range + 0.000001; aay += aay_increment){
+                color += aa_weight * texture(screenTexture, coords + vec2(aax, aay));
+                sum_weight += aa_weight;
+            }
+        }
+    } else {
+        color = texture(screenTexture, coords);
+        sum_weight = 0.05;
+    }
+
+    color /= (length(velocity) + 0.1);
+    sum_weight /= (length(velocity) + 0.1);
+
     if(mode == 1) { // weighted mode makes the blur weaker further from the object, sharpening the image
         for(int i = -iterations; i < iterations; i++){
             // this test prevents the terrain motion from blurring boxes, but I should find a better way to solve this
@@ -61,9 +83,6 @@ void main() {
             color += weight * texture(screenTexture, coords + i * velocity);
             sum_weight += weight;
         }
-    } else {
-        color = texture(screenTexture, coords);
-        sum_weight = 1.0;
     }
     FragColor = color / sum_weight;
 }
