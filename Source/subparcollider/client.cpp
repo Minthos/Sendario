@@ -325,10 +325,8 @@ int framerate_handicap = 1;
 //int screenheight = 80;
 //int screenwidth = 120;
 //int framerate_handicap = 10000;
-int frames_rendered = 0;
 auto prevFrameTime = now();
 bool game_paused = false;
-bool verbose = false;
 
 glm::vec3 camera_target = vec3(0,0,0);
 glm::quat camera_rot;
@@ -574,14 +572,23 @@ terrain_lock.unlock();
             current_lod = min(current_lod + lod_increase, lod);
             current_lod = min(current_lod, max(10.0, (current_lod * 1000) / (1.0 + glm::length(origo - estimated_vantage))));
         }
-        std::cout << "generating terrain mesh with LOD " << current_lod << "\n";
+        if(verbose) std::cout << "generating terrain mesh with LOD " << current_lod << "\n";
         auto begin = now();
 
 /////// the real stuff
 terrain_lock.lock();
         vantage = zone->spheroidPosition(player_global_pos, glitch->terrain.radius);
 terrain_lock.unlock();
-        terrain_in_waiting = glitch->terrain.copy();
+
+        // this is just a "hardcoded heuristic" that should work fine on my computer. a more intelligent way to do this
+        // would be to evict nodes based on how much free RAM the computer has.
+        if(glitch->terrain.nodes.count > 100000000){
+            terrain_in_waiting = glitch->terrain.omitting_copy(frame_counter - min(frame_counter, 1800 * 120));
+            std::cout << "evicted " << glitch->terrain.nodes.count - terrain_in_waiting.nodes.count << " terrain nodes. " << terrain_in_waiting.nodes.count << " nodes in the new tree.\n";
+        } else {
+            terrain_in_waiting = glitch->terrain.copy();
+        }
+
         terrain_in_waiting.LOD_DISTANCE_SCALE = current_lod;
         dMesh tmp = terrain_in_waiting.buildMesh(vantage, 3, &terrain_upload_status);
 
@@ -615,7 +622,7 @@ terrain_lock.unlock();
                     usleep(10000.0);
                 }
             } while(glm::length(origo - estimated_vantage) < 20.0);
-            std::cout << "origo: " << str(origo) << " estimated vantage: " << str(estimated_vantage) << " estimated delta: " << str(origo - estimated_vantage) << "\n";
+            if(verbose) std::cout << "origo: " << str(origo) << " estimated vantage: " << str(estimated_vantage) << " estimated delta: " << str(origo - estimated_vantage) << "\n";
         }
     }
 }
@@ -940,21 +947,21 @@ terrain_lock.unlock(); // release mutex
         glBindVertexArray(0);
         glFlush();
         checkGLerror();
-        ++frames_rendered;
+        ++frame_counter;
 //        usleep(100000.0);
-        if(frames_rendered % framerate_handicap == 0) {
+        if(frame_counter % framerate_handicap == 0) {
             glfwSwapBuffers(window);
             glfwPollEvents();
             if(POTATO_MODE){
                 usleep(1000.0);
             }
             auto frameDuration = std::chrono::duration_cast<std::chrono::microseconds>(now() - prevFrameTime).count();
-            if(frames_rendered % (240 * framerate_handicap) == 0){
-                std::cout << frameDuration / 1000.0 << " ms (" << 1000000.0 / frameDuration <<" fps)";
+            if(frame_counter % (240 * framerate_handicap) == 0){
+                if(verbose) std::cout << frameDuration / 1000.0 << " ms (" << 1000000.0 / frameDuration <<" fps)";
                 if(framerate_handicap > 1){
                     std::cout << " " << framerate_handicap * (1000000.0 / frameDuration) << " theoretically";
                 }
-                std::cout << "\n";
+                if(verbose) std::cout << "\n";
             }
             // limit the game to 120 fps if the system/libraries don't limit it for us
             if(frameDuration < 1000000.0 / 120.0 && !

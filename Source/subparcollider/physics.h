@@ -29,7 +29,9 @@ using glm::dmat4;
 using glm::dmat3;
 using glm::dquat;
 
+bool verbose = false;
 bool POTATO_MODE = false;
+uint32_t frame_counter = 0;
 
 enum terrain_upload_status_enum {
     idle,
@@ -167,11 +169,11 @@ cacheline* mempool::alloc() {
             data.push_back((cacheline *)calloc(4096, sizeof(cacheline)));
             uint64_t misalignment = (uint64_t)data.back() % sizeof(cacheline);
             if(misalignment != 0){
-                std::cout << "pool allocator adjusted misaligned memory: off by " << misalignment <<" bytes\n";
+                if(verbose) std::cout << "pool allocator adjusted misaligned memory: off by " << misalignment <<" bytes\n";
                 data[data.size()-1] -= misalignment;
                 ++data_idx;
             } else {
-                std::cout << "pool allocator got memory that was already aligned, nothing to adjust\n";
+                if(verbose) std::cout << "pool allocator got memory that was already aligned, nothing to adjust\n";
             }
         }
         cacheline* rax = &data.back()[data_idx];
@@ -756,6 +758,8 @@ struct ttnode {
     uint32_t rendered_at_level; // number of subdivisions to reach this node, if it was rendered. otherwise 0.
     double elevations[3]; // elevation of the node's 3 corners above the planet's spheroid
     dvec3 verts[3]; // vertices (node space (octahedron with manhattan distance to center = r everywhere on the surface))
+    uint32_t last_used_at_frame;
+
 
     // add more stuff like temperature, moisture, vegetation
     std::string str(){
@@ -888,6 +892,39 @@ struct TerrainTree {
         return tmp;
     }
 
+    void descend_and_omit(TerrainTree *tmp, ttnode* node, uint32_t cutoff) {
+        if(node->last_used_at_frame < cutoff){
+            node->first_child = 0;
+            return;
+        }
+        if( ! node->first_child){
+            return;
+        }
+        uint32_t first_child = node->first_child;
+        node->first_child = tmp->nodes.count;
+        for(uint32_t i = 0; i < 4; ++i){
+            tmp->nodes.push_back(nodes[first_child + i]);
+        }
+        for(uint32_t i = 0; i < 4; ++i){
+            descend_and_omit(tmp, &tmp->nodes[node->first_child + i], cutoff);
+        }
+    }
+
+    // omit nodes that haven't been used since the cutoff
+    TerrainTree omitting_copy(uint32_t cutoff) {
+        TerrainTree tmp;
+        memcpy(&tmp, this, sizeof(TerrainTree));
+        bzero(&tmp.nodes, sizeof(tmp.nodes));
+        tmp.nodes.reserve(nodes.count);
+        for(int i = 0; i < 8; i++) {
+            tmp.nodes.push_back(nodes[i]);
+        }
+        for(int i = 0; i < 8; i++) {
+            descend_and_omit(&tmp, &tmp.nodes[i], cutoff);
+        }
+        return tmp;
+    }
+
     // MAX_LOD should be no more than 18 for an Earth-sized planet because of precision artifacts in the fractal
     // noise generator.
     // LOD_DISTANCE_SCALE should be roughly on the order of 10 to 100 for decent performance. The gpu can handle more
@@ -938,7 +975,8 @@ struct TerrainTree {
                     generator->getElevation(initial_corners[indices[i][2]]),
                     initial_corners[indices[i][0]],
                     initial_corners[indices[i][1]],
-                    initial_corners[indices[i][2]]} );
+                    initial_corners[indices[i][2]],
+                    0 } );
         }
     }
 
@@ -952,6 +990,7 @@ struct TerrainTree {
             usleep(1000);
         }
         nodes[node_idx].path = path;
+        nodes[node_idx].last_used_at_frame = frame_counter;
         double noise_xzscaling = 0.0001;
         double noise_xzscaling2 = -0.00001;
         // a LOD going on here
@@ -1021,7 +1060,8 @@ struct TerrainTree {
                 elevations[2] * noise_yscaling,
                 new_verts[0],
                 new_verts[1],
-                new_verts[2] });
+                new_verts[2],
+                0 });
             // the other 3 triangles neighbor the center triangle and child trangles of the parent's neighbors
             // we can't know the parent's neighbors' children because they may not exist yet
             for(int i = 0; i < 3; i++) {
@@ -1032,7 +1072,8 @@ struct TerrainTree {
                     elevations[((i + 2) % 3)] * noise_yscaling,
                     nodes[node_idx].verts[i],
                     new_verts[i],
-                    new_verts[(i + 2) % 3] });
+                    new_verts[(i + 2) % 3],
+                    0 });
             }
         }
         // we need to go deeper
@@ -1135,7 +1176,7 @@ struct TerrainTree {
     }
 
     dMesh buildMesh(dvec3 location, int min_subdivisions, terrain_upload_status_enum *status) {
-        std::cout << "building mesh from vantage point (" << location.x << ", " << location.y << ", " << location.z << ")\n";
+        if(verbose) std::cout << "building mesh from vantage point (" << location.x << ", " << location.y << ", " << location.z << ")\n";
         nonstd::vector<uint32_t> node_indices;
         nonstd::vector<glm::dvec3> verts;
         nonstd::vector<dTri> tris;
@@ -1149,7 +1190,7 @@ struct TerrainTree {
 
         memcpy(vertices, &verts[0], verts.size() * sizeof(dvec3));
         memcpy(triangles, &tris[0], tris.size() * sizeof(dTri));
-        std::cout << tris.size() << " triangles generated\n";
+        if(verbose) std::cout << tris.size() << " triangles generated\n";
         verts.destroy();
         tris.destroy();
         return dMesh(vertices, num_verts, triangles, num_tris);
@@ -1179,11 +1220,11 @@ struct Celestial {
         name = pname;
         new(&terrain) TerrainTree(pseed, pLOD, pradius, proughness);
         auto time_begin = now();
-        std::cout << "Generating mesh..\n";
+        if(verbose) std::cout << "Generating mesh..\n";
         new(&body) PhysicsObject(terrain.buildMesh(dvec3(0, 6.37101e6, 0), 3, nil), nil);
         auto time_used = std::chrono::duration_cast<std::chrono::microseconds>(now() - time_begin).count();
-        std::cout << "Celestial " << name << ": " << body.mesh.num_tris << " triangles procedurally generated in " << time_used/1000.0 << "ms\n";
-        std::cout << "Lowest point: " << terrain.lowest_point << ", highest point: " << terrain.highest_point << "\n";
+        if(verbose) std::cout << "Celestial " << name << ": " << body.mesh.num_tris << " triangles procedurally generated in " << time_used/1000.0 << "ms\n";
+        if(verbose) std::cout << "Lowest point: " << terrain.lowest_point << ", highest point: " << terrain.highest_point << "\n";
         surface_temp_min = 183.0;
         surface_temp_max = 331.0;
         nearest_star = pnearest_star;
