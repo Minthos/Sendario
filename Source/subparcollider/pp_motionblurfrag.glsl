@@ -4,7 +4,7 @@ out vec4 FragColor;
 in vec2 TexCoords;
 
 uniform sampler2D screenTexture;
-uniform sampler2D velocityTexture;
+uniform usampler2D velocityTexture;
 uniform float antialiasing;
 uniform float inv_strength;
 uniform int mode;
@@ -22,9 +22,9 @@ void main() {
     }
 
     int iterations = 16;
-    vec2 velocity = texture(velocityTexture, coords).xy;
-    vec2 metadata = texture(velocityTexture, coords).za;
-    if(metadata.y > 0.985 && metadata.y < 0.995){
+    vec2 velocity = texture(velocityTexture, coords).xy / 256.0;
+    uvec2 metadata = texture(velocityTexture, coords).za;
+    if(metadata.y == 2){
         FragColor = texture(screenTexture, coords);
         return;
     }

@@ -8,7 +8,7 @@ in float elevation;
 uniform sampler2D tex;
 
 layout(location = 0) out vec4 fragColor;
-layout(location = 1) out vec4 velocityOut;
+layout(location = 1) out uvec4 velocityOut;
 
 void main() {
     const float pi = 3.1415926535897932384626433832795;
@@ -27,7 +27,7 @@ void main() {
         fragColor = vec4(color * insolation, 1.0);
     }
     float depth = log2(z + 2.0) * 0.03;
-    velocityOut = vec4(velocity, depth, 1.0);
+    velocityOut = uvec4(velocity * 256.0, depth, 1);
     gl_FragDepth = depth;
 }
 
