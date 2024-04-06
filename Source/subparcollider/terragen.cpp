@@ -3,6 +3,7 @@
 #include <vector>
 #include <cmath>
 #include <iostream>
+#include <cstring>
 /*
 
 
@@ -52,6 +53,49 @@ gas giant - crushing atmosphere, no surface (jupiter, saturn)
 
 */
 
+uint64_t hash(uint64_t seed_a, uint64_t seed_b) {
+    uint64_t message[8] = {0};
+    message[0] = seed_a;
+    message[1] = seed_b;
+    uint32_t state[8] = {
+        0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+        0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+    };
+    sha256_process_x86(state, (uint8_t*)message, sizeof(message));
+    return ((uint64_t*)state)[0];
+}
+
+void Prng::init(uint64_t seed_a, uint64_t seed_b) {
+    index = 0;
+    uint32_t grrstate[] = {
+        0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+        0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+    };
+    memcpy((void*)state, (void*)grrstate, sizeof(grrstate));
+    message[0] = seed_a ^ 0x8378df9d2b2cd3ae;
+    message[1] = seed_b ^ 0x170719c5c2783be5;
+    message[2] = 0xf958c6d70c69e6da;
+    message[3] = 0x26f15592ce812bf6;
+    message[4] = 0xe315b4238b4549e0;
+    message[5] = 0x1f4ab9e07033c8ea;
+    message[6] = 0x4d65c992c5759de0;
+    message[7] = 0x8d93f95dcaef97bd;
+//    sha256_process_x86(state, (uint8_t*)message, sizeof(message));
+}
+
+uint64_t Prng::get() {
+    if(index % 8 == 0)
+        sha256_process_x86(state, (uint8_t*)message, sizeof(message));
+    return ((uint64_t*)state)[index++];
+}
+
+double Prng::uniform() {
+    constexpr uint64_t mask1 = 0x3FF0000000000000ULL;
+    constexpr uint64_t mask2 = 0x3FFFFFFFFFFFFFFFULL;
+    const uint64_t to_12 = (get() | mask1) & mask2;
+    return (*(double*)(&to_12))-1.0;
+}
+
 TerrainGenerator::TerrainGenerator(int pseed, float proughness) {
     fnSimplex = FastNoise::New<FastNoise::Simplex>();
     fnFractal = FastNoise::New<FastNoise::FractalFBm>();
@@ -67,7 +111,7 @@ float TerrainGenerator::getElevation(dvec3 pos) {
     return elevation * (glm::max(local_roughness, -roughness) + roughness);
 }
 
-void TerrainGenerator::getMultiple(float *elevations, vec3 *scaled_verts, int num, float typeslider) {
+void TerrainGenerator::getMultiple(float *elevations, float *out_roughnesses, vec3 *scaled_verts, int num, float typeslider) {
     assert(num == 12);
     float xs[12] = {  
         scaled_verts[0].x, scaled_verts[1].x, scaled_verts[2].x,
@@ -91,6 +135,8 @@ void TerrainGenerator::getMultiple(float *elevations, vec3 *scaled_verts, int nu
     fnFractal->GenPositionArray3D(roughnesses, 6, zs, xs, ys, 0, 0, 0, seed ^ 0xF0F0F0F0F0F0);
     fnFractal->GenPositionArray3D(&roughnesses[6], 6, &zs[6], &xs[6], &ys[6], 0, 0, 0, ~seed ^ 0xF0F0F0F0F0F0);
     for(int i = 0; i < 12; i++) {
+        out_roughnesses[i] = (glm::max(roughnesses[i], -roughness) + roughness) * (1.0 - typeslider) +
+            + (glm::max(roughnesses[(i + 6) % 12], -roughness) + roughness) * typeslider;
         float elevationtype1 = elevations[i] * (glm::max(roughnesses[i], -roughness) + roughness);
         float elevationtype2 = elevations[i] * (glm::max(roughnesses[(i + 6) % 12], -roughness) + roughness);
         elevations[i] = elevationtype1 * (1.0 - typeslider) + elevationtype2 * typeslider;

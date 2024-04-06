@@ -757,6 +757,7 @@ struct ttnode {
     uint32_t neighbors[3];
     uint32_t rendered_at_level; // number of subdivisions to reach this node, if it was rendered. otherwise 0.
     double elevations[3]; // elevation of the node's 3 corners above the planet's spheroid
+    double roughnesses[3]; // terrain roughness at the node's 3 corners
     dvec3 verts[3]; // vertices (node space (octahedron with manhattan distance to center = r everywhere on the surface))
     uint32_t last_used_at_frame;
 
@@ -973,6 +974,7 @@ struct TerrainTree {
                     generator->getElevation(initial_corners[indices[i][0]]),
                     generator->getElevation(initial_corners[indices[i][1]]),
                     generator->getElevation(initial_corners[indices[i][2]]),
+                    0, 0, 0,
                     initial_corners[indices[i][0]],
                     initial_corners[indices[i][1]],
                     initial_corners[indices[i][2]],
@@ -1016,11 +1018,39 @@ struct TerrainTree {
                 nodes[node_idx].triangle = tris->size();
                 tris->push_back(t);
                 nodes[node_idx].rendered_at_level = level;
-                if(level <= MAX_LOD){
-                    // TODO: add a billboard for distant vegetation and buildings
-                    
+
+                // generate vegetation and shit
+                if(level >= 15) {
+                    Prng rng;
+                    rng.init(path & 0x7FFFFFFFUL, seed);
+                    // create a seed for this tile's level 15 parent
+                    // use seed to generate some vegetation, then discard vegetation that's not within this node if
+                    // the node is at a deeper level than 15
+                    //
+                    // elevation 20-2000: vegetation and rocks
+                    // low roughness: grass
+                    // medium roughness: trees
+                    // high roughness: rocks
+                    // high inclination: nothing
+                    uint64_t vegetation = rng.get();
+                    if(level <= MAX_LOD){
+                        // add a billboard for vegetation and buildings
+                    } else {
+                        // add a mesh for vegetation and buildings
+                        uint64_t local_address = (path & 0x1FF80000000UL) >> 31UL;
+                        uint64_t mask = local_address + (local_address << 12) + (local_address << 24) +
+                            (local_address << 36) + (local_address << 48);
+                        //uint64_t notrandom = vegetation ^ local_address;
+                        uint64_t notrandom = vegetation ^ mask;
+
+                        if((notrandom / 15) % 4 == 0) {
+                            printf("tree! %08lx\n", notrandom);
+                        } else {
+                            printf("no tree! %08lx\n", notrandom);
+                        }
+                    }
                 }
-                return;
+               return;
             }
         }
         // procedurally generate terrain height values on demand
@@ -1044,10 +1074,12 @@ struct TerrainTree {
                 glm::normalize(nodes[node_idx].verts[1]) * radius * noise_xzscaling2,
                 glm::normalize(nodes[node_idx].verts[2]) * radius * noise_xzscaling2};
             float elevations[12];
-            generator->getMultiple(elevations, scaled_verts, 12, 0.2);
+            float roughnesses[12];
+            generator->getMultiple(elevations, roughnesses, scaled_verts, 12, 0.2);
 
             for(int i = 0; i < 6; i++) {
                 elevations[i] += (elevations[i+6] * 5.0);
+                roughnesses[i] += (roughnesses[i+6]);
                 lowest_point = glm::min(elevations[i] * (float)noise_yscaling, lowest_point);
                 highest_point = glm::max(elevations[i] * (float)noise_yscaling, highest_point);
             }
@@ -1058,6 +1090,9 @@ struct TerrainTree {
                 elevations[0] * noise_yscaling,
                 elevations[1] * noise_yscaling,
                 elevations[2] * noise_yscaling,
+                roughnesses[0],
+                roughnesses[1],
+                roughnesses[2],
                 new_verts[0],
                 new_verts[1],
                 new_verts[2],
@@ -1070,6 +1105,9 @@ struct TerrainTree {
                     elevations[i + 3] * noise_yscaling,
                     elevations[i] * noise_yscaling,
                     elevations[((i + 2) % 3)] * noise_yscaling,
+                    roughnesses[i + 3],
+                    roughnesses[i],
+                    roughnesses[((i + 2) % 3)],
                     nodes[node_idx].verts[i],
                     new_verts[i],
                     new_verts[(i + 2) % 3],

@@ -31,6 +31,7 @@ air + water -> nitrates
 [plants, animals, nitrates] -> fertilizer
 fertilizer -> nitrates
 nitrates + [coal, oil] -> explosives
+nitric acid + sulfuric acid + cellulose -> guncotton
 limestone + sand + water -> concrete
 [copper, aluminium] + plastic -> electric wires
 [cobalt, neodymium] + iron -> magnets
