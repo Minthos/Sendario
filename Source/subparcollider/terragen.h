@@ -5,6 +5,9 @@
 // from SHA-Intrinsics/sha256-x86.c
 void sha256_process_x86(uint32_t state[8], const uint8_t data[], uint32_t length);
 
+// from SHA-Intrinsics/sha256.c
+void sha256_process(uint32_t state[8], const uint8_t data[], uint32_t length);
+
 using glm::dvec3;
 using glm::vec3;
 

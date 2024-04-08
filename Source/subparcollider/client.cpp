@@ -159,11 +159,6 @@ GLuint loadTexture(const char* filename, bool smooth) {
     return texture;
 }
 
-struct texvert {
-    glm::vec3 xyz;
-    glm::vec3 uv;
-    texvert(glm::vec3 a, glm::vec3 b) { xyz = a; uv = b; }
-};
 
 struct RenderObject {
     PhysicsObject *po;
@@ -720,7 +715,7 @@ int main(int argc, char** argv) {
 //    checkGLerror();
     glEnable(GL_DEPTH_TEST);
     checkGLerror();
-    glEnable(GL_CULL_FACE);
+//    glEnable(GL_CULL_FACE);
     checkGLerror();
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     checkGLerror();
@@ -805,7 +800,7 @@ terrain_lock.lock(); // grab mutex
             the_old_mesh.destroy();
             the_old_mesh = glitch->body.mesh;
             glitch->body.mesh = mesh_in_waiting;
-            the_old_terrain.nodes.destroy();
+            the_old_terrain.destroy();
             the_old_terrain = glitch->terrain;
             glitch->terrain = terrain_in_waiting;
 

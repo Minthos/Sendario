@@ -408,6 +408,21 @@ struct dMesh {
     
 };
 
+struct texvert {
+    glm::vec3 xyz;
+    glm::vec3 uvw;
+    texvert(glm::vec3 a, glm::vec3 b) { xyz = a; uvw = b; }
+};
+
+void mkquad(nonstd::vector<texvert> *dest, glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 uvw){
+    dest->push_back({a, uvw});
+    dest->push_back({b, uvw});
+    dest->push_back({c, uvw});
+    dest->push_back({c, uvw});
+    dest->push_back({b, uvw});
+    dest->push_back({d, uvw});
+}
+
 
 struct Motor {
     double max_force;
@@ -760,6 +775,7 @@ struct ttnode {
     double roughnesses[3]; // terrain roughness at the node's 3 corners
     dvec3 verts[3]; // vertices (node space (octahedron with manhattan distance to center = r everywhere on the surface))
     uint32_t last_used_at_frame;
+    nonstd::vector<texvert> vegetation;
 
 
     // add more stuff like temperature, moisture, vegetation
@@ -879,6 +895,13 @@ struct TerrainTree {
     TerrainGenerator *generator;
     nonstd::vector<ttnode> nodes;
 
+    void destroy() {
+        for(int i = 0; i > nodes.count; i++){
+            nodes[i].vegetation.destroy();
+        }
+        nodes.destroy();
+    }
+
     ~TerrainTree() {
     }
 
@@ -978,7 +1001,7 @@ struct TerrainTree {
                     initial_corners[indices[i][0]],
                     initial_corners[indices[i][1]],
                     initial_corners[indices[i][2]],
-                    0 } );
+                    0, nonstd::vector<texvert>() } );
         }
     }
 
@@ -1013,6 +1036,8 @@ struct TerrainTree {
                     center += point;
                     t.elevations[i] = nodes[node_idx].elevations[i];
                 }
+                center /= 3.0;
+                // the local normalized inverse gravity vector in spheroid and octahedron space
                 t.normal = normalize(nodes[node_idx].verts[0]);
                 
                 nodes[node_idx].triangle = tris->size();
@@ -1034,19 +1059,56 @@ struct TerrainTree {
                     // high inclination: nothing
                     uint64_t vegetation = rng.get();
                     if(level <= MAX_LOD){
-                        // add a billboard for vegetation and buildings
+                        // add a merged mesh of the estimated vegetation/rocks/buildings for this node's subtree with
+                        // extremely low polygon count per object
                     } else {
                         // add a mesh for vegetation and buildings
                         uint64_t local_address = (path & 0x1FF80000000UL) >> 31UL;
                         uint64_t mask = local_address + (local_address << 12) + (local_address << 24) +
                             (local_address << 36) + (local_address << 48);
-                        //uint64_t notrandom = vegetation ^ local_address;
                         uint64_t notrandom = vegetation ^ mask;
 
                         if((notrandom / 15) % 4 == 0) {
-                            printf("tree! %08lx\n", notrandom);
+                            // generate vegetation if it doesn't exist yet
+                            if( ! nodes[node_idx].vegetation.count) {
+                                //printf("tree! %08lx\n", notrandom);
+                                // create a tree mesh (or rock or whatever)
+                                // the mesh's coordinate space should be zeroed at the center of the node's triangle
+                                // and not pre-rotated. rotation will be done when exporting to the gpu.
+                                //
+                                
+                                // nonstd::vector<texvert> vegetation();
+                                
+                                double h_trunk = 10.0;
+                                double r_trunk = 0.2;
+                                glm::vec3 uvw_trunk(0.0, 0.0, 0.0);
+                                double h_canopy = 2.0;
+                                double r_canopy = 4.0;
+                                glm::vec3 uvw_canopy(0.0, 0.0, 0.0);
+                                // trunk, should be at least 4 quads
+                                mkquad(&nodes[node_idx].vegetation, glm::vec3(-r_trunk, 0.0, 0.0), glm::vec3(r_trunk, 0.0, 0.0), glm::vec3(-r_trunk, h_trunk, 0.0), glm::vec3(r_trunk, h_trunk, 0.0), uvw_trunk);
+
+                                // canopy, should be at least 4 triangles
+                                mkquad(&nodes[node_idx].vegetation, glm::vec3(-r_canopy, h_trunk, 0.0), glm::vec3(r_canopy, h_trunk, 0.0), glm::vec3(-r_canopy, h_trunk + h_canopy, 0.0), glm::vec3(r_canopy, h_trunk + h_canopy, 0.0), uvw_canopy);
+                            }
+                            // transform vegetation to node space coordinates
+                            glm::mat4 rotation_matrix = glm::toMat4(glm::rotation(glm::vec3(0.0, 1.0, 0.0), glm::vec3(t.normal)));
+                            for(int i = 0; i < nodes[node_idx].vegetation.count; i+= 3) {
+                                dTri t2;
+
+                                for(int j = 0; j < 3; j++) {
+                                    t2.verts[j] = verts->size();
+                                    glm::vec4 point4 = rotation_matrix * glm::vec4(nodes[node_idx].vegetation[i + j].xyz, 1.0f);
+                                    glm::dvec3 point = glm::dvec3(point4) + center;
+                                    verts->push_back(point);
+                                    t2.elevations[j] = nodes[node_idx].elevations[j];
+                                }
+                                t2.normal = t.normal;
+                                tris->push_back(t2);
+                            }
                         } else {
-                            printf("no tree! %08lx\n", notrandom);
+                            //printf("no tree! %08lx\n", notrandom);
+                            // do nothing
                         }
                     }
                 }
@@ -1096,7 +1158,7 @@ struct TerrainTree {
                 new_verts[0],
                 new_verts[1],
                 new_verts[2],
-                0 });
+                0, nonstd::vector<texvert>() });
             // the other 3 triangles neighbor the center triangle and child trangles of the parent's neighbors
             // we can't know the parent's neighbors' children because they may not exist yet
             for(int i = 0; i < 3; i++) {
@@ -1111,7 +1173,7 @@ struct TerrainTree {
                     nodes[node_idx].verts[i],
                     new_verts[i],
                     new_verts[(i + 2) % 3],
-                    0 });
+                    0, nonstd::vector<texvert>() });
             }
         }
         // we need to go deeper

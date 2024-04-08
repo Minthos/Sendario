@@ -28,14 +28,17 @@ terragen.o: terragen.cpp
 sha256.o: SHA-Intrinsics/sha256-x86.c
 	g++ $(TAKEOFF_FLAGS) -pg -c SHA-Intrinsics/sha256-x86.c -o sha256.o
 
+sha256_debug.o: SHA-Intrinsics/sha256.c
+	g++ $(TAKEOFF_FLAGS) -ggdb3 -D DEBUG -c SHA-Intrinsics/sha256.c -o sha256_debug.o
+
 terragen_debug.o: terragen.cpp
 	g++ $(TAKEOFF_FLAGS) -ggdb3 -D DEBUG -c terragen.cpp -o terragen_debug.o $(LIBDIR) $(INCDIR)
 
 takeoff: $(NEW_SRC) terragen.o sha256.o
 	g++ $(TAKEOFF_FLAGS) -pg terragen.o sha256.o client.cpp -o takeoff $(LIBDIR) $(INCDIR) $(NEW_LIBS)
 
-takeoff_debug: $(NEW_SRC) terragen_debug.o sha256.o
-	g++ $(TAKEOFF_FLAGS) -ggdb3 -D DEBUG terragen_debug.o sha256.o client.cpp -o takeoff_debug $(LIBDIR) $(INCDIR) $(NEW_LIBS)
+takeoff_debug: $(NEW_SRC) terragen_debug.o sha256_debug.o
+	g++ $(TAKEOFF_FLAGS) -ggdb3 -D DEBUG terragen_debug.o sha256_debug.o client.cpp -o takeoff_debug $(LIBDIR) $(INCDIR) $(NEW_LIBS)
 
 #takeoff_debug: $(NEW_SRC)
 #	g++ -g3 -D DEBUG -march=native -c $(NEW_SRC) $(NEW_LIBS)
