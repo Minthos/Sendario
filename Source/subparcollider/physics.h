@@ -43,6 +43,11 @@ enum terrain_upload_status_enum {
     done_uploading
 };
 
+enum vertex_type_id {
+    VERTEX_TYPE_NONE,
+    VERTEX_TYPE_TERRAIN,
+    VERTEX_TYPE_VEGETATION
+};
 
 size_t min(size_t a, size_t b) {
     return a > b ? b : a;
@@ -330,10 +335,11 @@ struct dTri {
     uint32_t verts[3];
     float elevations[3];
     glm::dvec3 normal;
+    int32_t type_id;
 
     dTri() {}
 
-    dTri(uint32_t pverts[3], dvec3* vertData, dvec3 center) {
+    dTri(uint32_t pverts[3], dvec3* vertData, dvec3 center, int32_t ptype_id) {
         verts[0] = pverts[0];
         verts[1] = pverts[1];
         verts[2] = pverts[2];
@@ -342,6 +348,7 @@ struct dTri {
         if(dotProduct < 0.0){
             normal = -normal;
         }
+        type_id = ptype_id;
     }
 };
 
@@ -400,8 +407,8 @@ struct dMesh {
         for(int i = 0; i < 6; i++) {
             uint32_t tri1[3] = {faces[i * 4], faces[i * 4 + 1], faces[i * 4 + 2]};
             uint32_t tri2[3] = {faces[i * 4 + 1], faces[i * 4 + 2], faces[i * 4 + 3]};
-            triangles[i * 2] = dTri(tri1, vertices, center);
-            triangles[i * 2 + 1] = dTri(tri2, vertices, center);
+            triangles[i * 2] = dTri(tri1, vertices, center, VERTEX_TYPE_NONE);
+            triangles[i * 2 + 1] = dTri(tri2, vertices, center, VERTEX_TYPE_NONE);
         }
         return dMesh(vertices, numVertices, triangles, numTriangles);
     }
@@ -410,17 +417,18 @@ struct dMesh {
 
 struct texvert {
     glm::vec3 xyz;
+    int32_t type_id;
     glm::vec3 uvw;
-    texvert(glm::vec3 a, glm::vec3 b) { xyz = a; uvw = b; }
+    texvert(glm::vec3 a, int32_t ptype_id, glm::vec3 b) { xyz = a; type_id = ptype_id; uvw = b; }
 };
 
-void mkquad(nonstd::vector<texvert> *dest, glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 uvw){
-    dest->push_back({a, uvw});
-    dest->push_back({b, uvw});
-    dest->push_back({c, uvw});
-    dest->push_back({c, uvw});
-    dest->push_back({b, uvw});
-    dest->push_back({d, uvw});
+void mkquad(nonstd::vector<texvert> *dest, glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 uvw, int32_t type_id){
+    dest->push_back({a, type_id, uvw});
+    dest->push_back({b, type_id, uvw});
+    dest->push_back({c, type_id, uvw});
+    dest->push_back({c, type_id, uvw});
+    dest->push_back({b, type_id, uvw});
+    dest->push_back({d, type_id, uvw});
 }
 
 
@@ -1027,6 +1035,7 @@ struct TerrainTree {
 
             if(ratio > LOD_DISTANCE_SCALE || level > MAX_LOD) {
                 dTri t;
+                t.type_id = VERTEX_TYPE_TERRAIN;
                 dvec3 center = {0, 0, 0};
                 for(int i = 0; i < 3; i++) {
                     t.verts[i] = verts->size();
@@ -1086,16 +1095,16 @@ struct TerrainTree {
                                 double r_canopy = 4.0;
                                 glm::vec3 uvw_canopy(0.0, 0.0, 0.0);
                                 // trunk, should be at least 4 quads
-                                mkquad(&nodes[node_idx].vegetation, glm::vec3(-r_trunk, 0.0, 0.0), glm::vec3(r_trunk, 0.0, 0.0), glm::vec3(-r_trunk, h_trunk, 0.0), glm::vec3(r_trunk, h_trunk, 0.0), uvw_trunk);
+                                mkquad(&nodes[node_idx].vegetation, glm::vec3(-r_trunk, 0.0, 0.0), glm::vec3(r_trunk, 0.0, 0.0), glm::vec3(-r_trunk, h_trunk, 0.0), glm::vec3(r_trunk, h_trunk, 0.0), uvw_trunk, VERTEX_TYPE_VEGETATION);
 
                                 // canopy, should be at least 4 triangles
-                                mkquad(&nodes[node_idx].vegetation, glm::vec3(-r_canopy, h_trunk, 0.0), glm::vec3(r_canopy, h_trunk, 0.0), glm::vec3(-r_canopy, h_trunk + h_canopy, 0.0), glm::vec3(r_canopy, h_trunk + h_canopy, 0.0), uvw_canopy);
+                                mkquad(&nodes[node_idx].vegetation, glm::vec3(-r_canopy, h_trunk, 0.0), glm::vec3(r_canopy, h_trunk, 0.0), glm::vec3(-r_canopy, h_trunk + h_canopy, 0.0), glm::vec3(r_canopy, h_trunk + h_canopy, 0.0), uvw_canopy, VERTEX_TYPE_VEGETATION);
                             }
                             // transform vegetation to node space coordinates
                             glm::mat4 rotation_matrix = glm::toMat4(glm::rotation(glm::vec3(0.0, 1.0, 0.0), glm::vec3(t.normal)));
                             for(int i = 0; i < nodes[node_idx].vegetation.count; i+= 3) {
                                 dTri t2;
-
+                                t2.type_id = VERTEX_TYPE_VEGETATION;
                                 for(int j = 0; j < 3; j++) {
                                     t2.verts[j] = verts->size();
                                     glm::vec4 point4 = rotation_matrix * glm::vec4(nodes[node_idx].vegetation[i + j].xyz, 1.0f);

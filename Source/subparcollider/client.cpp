@@ -203,10 +203,10 @@ struct RenderObject {
             dTri* t1 = &po->mesh.tris[i * 2];
             dTri* t2 = &po->mesh.tris[i * 2 + 1];
             texvert verts[4] = {
-                texvert(vec3(po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4    ]]), texture_corners[0]),
-                texvert(vec3(po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4 + 1]]), texture_corners[1]),
-                texvert(vec3(po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4 + 2]]), texture_corners[2]),
-                texvert(vec3(po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4 + 3]]), texture_corners[3])};
+                texvert(vec3(po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4    ]]), VERTEX_TYPE_NONE, texture_corners[0]),
+                texvert(vec3(po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4 + 1]]), VERTEX_TYPE_NONE, texture_corners[1]),
+                texvert(vec3(po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4 + 2]]), VERTEX_TYPE_NONE, texture_corners[2]),
+                texvert(vec3(po->mesh.verts[8 * (i / 6) + faces[(i % 6) * 4 + 3]]), VERTEX_TYPE_NONE, texture_corners[3])};
             vertices.insert(vertices.end(), {verts[0], verts[1], verts[2], verts[3]});
             // correct the winding order so we can use backface culling
             bool ccw = ((i % 6 == 2) || (i % 6 == 3) || (i % 6 == 5) || (i % 6 == 0));
@@ -225,11 +225,14 @@ struct RenderObject {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
         // Position attribute
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat) + sizeof(GLint), (void*)0);
         glEnableVertexAttribArray(0);
-        // Texture coordinate attribute
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+        // Type id attribute
+        glVertexAttribPointer(1, 1, GL_INT, GL_FALSE, 6 * sizeof(GLfloat) + sizeof(GLint), (void*)(3 * sizeof(GLfloat)));
         glEnableVertexAttribArray(1);
+        // Texture coordinate attribute
+        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat) + sizeof(GLint), (void*)(3 * sizeof(GLfloat) + sizeof(GLint)));
+        glEnableVertexAttribArray(2);
         glBindVertexArray(0);
     }
 
@@ -243,11 +246,14 @@ struct RenderObject {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh->num_tris * 3 * sizeof(GLuint), nil, GL_STATIC_DRAW);
         // Position attribute
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat) + sizeof(GLint), (void*)0);
         glEnableVertexAttribArray(0);
-        // Texture coordinate attribute
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+        // Type id attribute
+        glVertexAttribPointer(1, 1, GL_INT, GL_FALSE, 6 * sizeof(GLfloat) + sizeof(GLint), (void*)(3 * sizeof(GLfloat)));
         glEnableVertexAttribArray(1);
+        // Texture coordinate attribute
+        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat) + sizeof(GLint), (void*)(3 * sizeof(GLfloat) + sizeof(GLint)));
+        glEnableVertexAttribArray(2);
         glBindVertexArray(0);
     }
 
@@ -270,7 +276,11 @@ struct RenderObject {
             float inclination = glm::angle(normal, glm::vec3(t->normal));
             float insolation = glm::dot(normal, glm::vec3(0.4, 0.4, 0.4));
             for(int j = 0; j < 3; j++){
-                vertices.insert(vertices.end(), {floatverts[j], glm::vec3(inclination, insolation, t->elevations[j])});
+                vertices.insert(vertices.end(), {floatverts[j], t->type_id, glm::vec3(inclination, insolation, t->elevations[j])});
+                assert(t->type_id != VERTEX_TYPE_NONE);
+                assert(t->type_id == VERTEX_TYPE_TERRAIN || t->type_id == VERTEX_TYPE_VEGETATION);
+                if(t->type_id == VERTEX_TYPE_TERRAIN) assert(t->type_id == 1);
+                if(t->type_id == VERTEX_TYPE_VEGETATION) assert(t->type_id == 2);
             }
         }
         auto begin_upload = now();
@@ -322,6 +332,8 @@ int framerate_handicap = 1;
 //int framerate_handicap = 10000;
 auto prevFrameTime = now();
 bool game_paused = false;
+bool mouse_capture = true;
+bool autorun = true;
 
 glm::vec3 camera_target = vec3(0,0,0);
 glm::quat camera_rot;
@@ -471,7 +483,9 @@ dvec3 input_vector(GLFWwindow* window) {
     if(glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS){
         vel *= 10000.0;
     }
-    vel.z -= 10.0;
+    if(autorun){
+        vel.z -= 10.0;
+    }
     return vel;
 }
 
@@ -484,6 +498,9 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
                 break;
             case GLFW_KEY_SPACE:
                 game_paused = !game_paused;
+                break;
+            case GLFW_KEY_GRAVE_ACCENT:
+                autorun = !autorun;
                 break;
         }
     }
@@ -635,6 +652,9 @@ int main(int argc, char** argv) {
         if(!strncmp(argv[i], "--potato", min(8, strlen(argv[i])))){
             POTATO_MODE = true;
         }
+        if(!strncmp(argv[i], "--nocapture", min(11, strlen(argv[i])))){
+            mouse_capture = false;
+        }
         if(!strncmp(argv[i], "seed=", min(5, strlen(argv[i])))){
             seed = atol(argv[i] + 5);
         }
@@ -663,9 +683,10 @@ int main(int argc, char** argv) {
     }
     if(argc < 2 || verbose){
         std::cout << "\n\n";
-        std::cout << "Usage: " << argv[0] << " [-v] [--potato] [seed=n] [lod=n] [aa=n] [af=n] [blur=n] [blurmode=n]\n";
+        std::cout << "Usage: " << argv[0] << " [-v] [--potato] [--nocapture] [seed=n] [lod=n] [aa=n] [af=n] [blur=n] [blurmode=n]\n";
         std::cout << "-v: print debug information to console.\n";
         std::cout << "--potato: compatibility mode for single-core CPUs and debugging with valgrind.\n";
+        std::cout << "--nocapture: don't capture the mouse pointer.\n";
         std::cout << "seed: the random seed used to generate the world. 52 is default.\n";
         std::cout << "lod: the target level of detail for terrain rendering. 1 or higher.\n";
         std::cout << "aa: antialiasing. 1 to 8. Number of samples per pixel is the square of this number so 2 is 4x, 4 is 16x.\n";
@@ -682,8 +703,10 @@ int main(int argc, char** argv) {
     glfwWindowHint(GLFW_AUTO_ICONIFY, GL_FALSE);
     glfwSetWindowSizeCallback(window, reshape);
     glfwSetKeyCallback(window, key_callback);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+    if(mouse_capture) {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+    }
     //glfwSetCursorPosCallback(window, mouselook_callback);
     glfwSetCursorPosCallback(window, mouselook_callback_gimbal_locked);
     glfwSetScrollCallback(window, scroll_callback);
@@ -905,9 +928,9 @@ terrain_lock.unlock(); // release mutex
                     ro.upload_boxen_mesh();
                     ro.shader = shaders["box"];
                     ro.texture = textures["green_transparent_wireframe_box_64x64.png"];
-                    glDisable(GL_CULL_FACE);
+//                    glDisable(GL_CULL_FACE);
                     render(&ro);
-                    glEnable(GL_CULL_FACE);
+//                    glEnable(GL_CULL_FACE);
                 }
 #endif
             }

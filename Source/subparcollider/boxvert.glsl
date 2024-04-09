@@ -1,7 +1,8 @@
 #version 430
 
 layout(location = 0) in vec3 vertexPosition;
-layout(location = 1) in vec3 vertexTexCoord;
+layout(location = 1) in int typeId;
+layout(location = 2) in vec3 vertexTexCoord;
 
 uniform mat4 current;
 uniform mat4 previous;
