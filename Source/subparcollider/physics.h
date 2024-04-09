@@ -1145,137 +1145,80 @@ struct TerrainTree {
                     // high roughness: rocks
                     // high inclination: nothing
                     uint64_t vegetation_random_value = rng.get();
-                    if(level <= MAX_LOD){
-                        bool should_generate = nodes[node_idx].vegetation.count == 0;
-                        // add a merged mesh of the estimated vegetation/rocks/buildings for this node's subtree with
-                        // extremely low polygon count per object
-                        int num_subdivisions = 2 + MAX_LOD - level;
-                        int num_leaves = 1 << (2 * num_subdivisions);
+                    bool should_generate = nodes[node_idx].vegetation.count == 0;
+                    // add a merged mesh of the estimated vegetation/rocks/buildings for this node's subtree with
+                    // extremely low polygon count per object
+                    int num_subdivisions = 2 + MAX_LOD - level;
+                    int num_leaves = 1 << (2 * num_subdivisions);
 
-                        //glm::vec3 floatverts[3] = {
-                        //    glm::vec3(nodes[node_idx].verts[0] - nodespace_center),
-                        //    glm::vec3(nodes[node_idx].verts[1] - nodespace_center),
-                        //    glm::vec3(nodes[node_idx].verts[2] - nodespace_center)};
-                        glm::vec3 floatverts[3] = {
-                            glm::vec3((*verts)[t.verts[0]]) - zonespace_center,
-                            glm::vec3((*verts)[t.verts[1]]) - zonespace_center,
-                            glm::vec3((*verts)[t.verts[2]]) - zonespace_center};
-                    
-                        glm::vec3 surfacenormal = glm::normalize(glm::cross(floatverts[1] - floatverts[0], floatverts[2] - floatverts[0]));
-                        //glm::mat4 transformation = glm::toMat4(glm::rotation(glm::vec3(0.0, 1.0, 0.0), glm::vec3(t.normal)));
-                        //glm::mat4 transformation = glm::toMat4(glm::rotation( glm::vec3(t.normal), glm::vec3(0.0, 1.0, 0.0)));
-                        glm::mat4 transformation = glm::toMat4(glm::rotation( glm::vec3(surfacenormal), glm::vec3(0.0, 1.0, 0.0)));
-                        //glm::mat4 transformation = glm::toMat4(glm::rotation(glm::vec3(0.0, 1.0, 0.0), glm::vec3(surfacenormal)));
-                        //transformation = glm::rotate(transformation, (float)((vegetation_random_value ^ leaf_path) % 360), glm::vec3(t.normal));
-                        //transformation = glm::translate(transformation, vec3(center));
-                        glm::vec3 object_space_verts[3] = {
-                            glm::vec3(transformation * (glm::vec4(floatverts[0], 1.0))),
-                            glm::vec3(transformation * (glm::vec4(floatverts[1], 1.0))),
-                            glm::vec3(transformation * (glm::vec4(floatverts[2], 1.0)))};
+                    //glm::vec3 floatverts[3] = {
+                    //    glm::vec3(nodes[node_idx].verts[0] - nodespace_center),
+                    //    glm::vec3(nodes[node_idx].verts[1] - nodespace_center),
+                    //    glm::vec3(nodes[node_idx].verts[2] - nodespace_center)};
+                    glm::vec3 floatverts[3] = {
+                        glm::vec3((*verts)[t.verts[0]]) - zonespace_center,
+                        glm::vec3((*verts)[t.verts[1]]) - zonespace_center,
+                        glm::vec3((*verts)[t.verts[2]]) - zonespace_center};
+                
+                    glm::vec3 surfacenormal = glm::normalize(glm::cross(floatverts[1] - floatverts[0], floatverts[2] - floatverts[0]));
+                    //glm::mat4 transformation = glm::toMat4(glm::rotation(glm::vec3(0.0, 1.0, 0.0), glm::vec3(t.normal)));
+                    //glm::mat4 transformation = glm::toMat4(glm::rotation( glm::vec3(t.normal), glm::vec3(0.0, 1.0, 0.0)));
+                    glm::mat4 transformation = glm::toMat4(glm::rotation( glm::vec3(surfacenormal), glm::vec3(0.0, 1.0, 0.0)));
+                    //glm::mat4 transformation = glm::toMat4(glm::rotation(glm::vec3(0.0, 1.0, 0.0), glm::vec3(surfacenormal)));
+                    //transformation = glm::rotate(transformation, (float)((vegetation_random_value ^ leaf_path) % 360), glm::vec3(t.normal));
+                    //transformation = glm::translate(transformation, vec3(center));
+                    glm::vec3 object_space_verts[3] = {
+                        glm::vec3(transformation * (glm::vec4(floatverts[0], 1.0))),
+                        glm::vec3(transformation * (glm::vec4(floatverts[1], 1.0))),
+                        glm::vec3(transformation * (glm::vec4(floatverts[2], 1.0)))};
 
-                        uint64_t invprob = 1;
-                        float density = max(0.0f, min(1.0f, (nodes[node_idx].elevations[0] / 50.0f)));
-                        density = max(0.0f, min(density, 1.0f - ((nodes[node_idx].elevations[0] - 1500.0f) / 1500.0f)));
-                        float inclination = length(glm::vec3(t.normal) - surfacenormal);
-                        density *= (1.0f - inclination);
+                    float density = max(0.0f, min(1.0f, (nodes[node_idx].elevations[0] / 50.0f)));
+                    density = max(0.0f, min(density, 1.0f - ((nodes[node_idx].elevations[0] - 1500.0f) / 1500.0f)));
+                    float inclination = length(glm::vec3(t.normal) - surfacenormal);
+                    density *= (1.0f - inclination);
 
-                        for(int leaf = 0; leaf < num_leaves; leaf++){
-                            //uint64_t leaf_path = (path << (num_subdivisions * 2)) | leaf;
-                            uint64_t local_address = ((path & 0x1FE00000000UL) >> 33UL) | leaf;
-                            uint64_t mask = local_address + (local_address << 12) + (local_address << 24) +
-                                (local_address << 36) + (local_address << 48);
-                            uint64_t notrandom = vegetation_random_value ^ mask;
+                    for(int leaf = 0; leaf < num_leaves; leaf++){
 
-                            glm::vec3 leaf_center = calculate_center(num_subdivisions - 1, leaf, object_space_verts[0], object_space_verts[1], object_space_verts[2]);
-                            //glm::vec3 leaf_center = glm::vec3(0);
-                            if(density > 0){
-                                invprob = (uint64_t)(1.0f / density);
-                            }
-                            if((density > 0) && (((notrandom / 15) % invprob) == 0)) {
-                                // generate vegetation if it doesn't exist yet
-                                if(should_generate) {
-                                    double h_trunk = 3.0;
-                                    double r_trunk = 0.2;
-                                    double h_canopy = 10.0;
-                                    double r_canopy = 4.0;
-                                    mktree(&nodes[node_idx].vegetation, h_trunk, r_trunk, h_canopy, r_canopy, leaf_center);
-                                }
-                            }
-                        }
-                        // transform vegetation to node space coordinates
-                        glm::mat4 rotation_matrix = glm::toMat4(glm::rotation(glm::vec3(0.0, 1.0, 0.0), glm::vec3(t.normal)));
-                        for(int i = 0; i < nodes[node_idx].vegetation.count; i+= 3) {
-                            dTri t2;
-                            t2.type_id = *(uint32_t*)(&nodes[node_idx].vegetation[i].xyz.w);
-                            for(int j = 0; j < 3; j++) {
-                                t2.verts[j] = verts->size();
-                                glm::vec4 point4 = nodes[node_idx].vegetation[i + j].xyz;
-                                point4.w = 1.0f;
-                                point4 = rotation_matrix * point4;
-                                glm::dvec3 point = glm::dvec3(point4) + zonespace_center;
-                                verts->push_back(point);
-                                //t2.elevations[j] = nodes[node_idx].vegetation[i + j].uvw.x;
-                                t2.elevations[j] = inclination;
-                            }
-                            t2.normal = t.normal;
-                            tris->push_back(t2);
-                        }
-                    } else {
-                        // add a mesh for vegetation and buildings
-                        uint64_t local_address = (path & 0x1FE00000000UL) >> 33UL;
+                        uint64_t estimated_path = path;
+                        estimated_path <<= 2 * num_subdivisions;
+                        estimated_path |= (leaf << (2 * (level + num_subdivisions)));
+
+                        uint64_t local_address = ((path & 0x1FE00000000UL) >> 33UL) | leaf;
                         uint64_t mask = local_address + (local_address << 12) + (local_address << 24) +
                             (local_address << 36) + (local_address << 48);
                         uint64_t notrandom = vegetation_random_value ^ mask;
 
-                        uint64_t invprob = 1;
-                        glm::vec3 floatverts[3] = {
-                            glm::vec3((*verts)[t.verts[0]]) - zonespace_center,
-                            glm::vec3((*verts)[t.verts[1]]) - zonespace_center,
-                            glm::vec3((*verts)[t.verts[2]]) - zonespace_center};
-                        //glm::vec3 floatverts[3] = {
-                        //    glm::vec3(nodes[node_idx].verts[0]),
-                        //    glm::vec3(nodes[node_idx].verts[1]),
-                        //    glm::vec3(nodes[node_idx].verts[2])};
-                        glm::vec3 surfacenormal = glm::normalize(glm::cross(floatverts[1] - floatverts[0], floatverts[2] - floatverts[0]));
-                        float density = max(0.0f, min(1.0f, (nodes[node_idx].elevations[0] / 50.0f)));
-                        density = max(0.0f, min(density, 1.0f - ((nodes[node_idx].elevations[0] - 1500.0f) / 1500.0f)));
-                        float inclination = length(glm::vec3(t.normal) - surfacenormal);
-                        density *= (1.0f - inclination);
-                        if(density > 0){
-                            invprob = (uint64_t)(1.0f / density);
-                        }
-                        if(density > 0 && (notrandom / 15) % invprob == 0) {
+                        glm::vec3 leaf_center = calculate_center(num_subdivisions - 1, leaf, object_space_verts[0], object_space_verts[1], object_space_verts[2]);
+                        float probability_score = (float)((notrandom / 15UL) % 1000UL);
+                        probability_score /= 1000.0;
+                        if(density > probability_score) {
                             // generate vegetation if it doesn't exist yet
-                            if( ! nodes[node_idx].vegetation.count) {
+                            if(should_generate) {
                                 double h_trunk = 3.0;
                                 double r_trunk = 0.2;
                                 double h_canopy = 10.0;
                                 double r_canopy = 4.0;
-                                // todo: make a high resolution version of the tree
-                                mktree(&nodes[node_idx].vegetation, h_trunk, r_trunk, h_canopy, r_canopy, glm::vec3(0.0, 0.0, 0.0));
+                                mktree(&nodes[node_idx].vegetation, h_trunk, r_trunk, h_canopy, r_canopy, leaf_center);
                             }
-                            // transform vegetation to node space coordinates
-                            glm::mat4 rotation_matrix = glm::toMat4(glm::rotation(glm::vec3(0.0, 1.0, 0.0), glm::vec3(t.normal)));
-                            rotation_matrix = glm::rotate(rotation_matrix, (float)((vegetation_random_value ^ path) % 360), glm::vec3(t.normal));
-                            for(int i = 0; i < nodes[node_idx].vegetation.count; i+= 3) {
-                                dTri t2;
-                                t2.type_id = *(uint32_t*)(&nodes[node_idx].vegetation[i].xyz.w);
-                                for(int j = 0; j < 3; j++) {
-                                    t2.verts[j] = verts->size();
-                                    glm::vec4 point4 = nodes[node_idx].vegetation[i + j].xyz;
-                                    point4.w = 1.0f;
-                                    point4 = rotation_matrix * point4;
-                                    glm::dvec3 point = glm::dvec3(point4) + zonespace_center;
-                                    verts->push_back(point);
-                                    //t2.elevations[j] = nodes[node_idx].vegetation[i + j].uvw.x;
-                                    t2.elevations[j] = inclination;
-                                }
-                                t2.normal = t.normal;
-                                tris->push_back(t2);
-                            }
-                        } else {
-                            // no vegetation
                         }
+                    }
+                    // transform vegetation to node space coordinates
+                    glm::mat4 rotation_matrix = glm::toMat4(glm::rotation(glm::vec3(0.0, 1.0, 0.0), surfacenormal));
+                    for(int i = 0; i < nodes[node_idx].vegetation.count; i+= 3) {
+                        dTri t2;
+                        t2.type_id = *(uint32_t*)(&nodes[node_idx].vegetation[i].xyz.w);
+                        for(int j = 0; j < 3; j++) {
+                            t2.verts[j] = verts->size();
+                            glm::vec4 point4 = nodes[node_idx].vegetation[i + j].xyz;
+                            point4.w = 1.0f;
+                            point4 = rotation_matrix * point4;
+                            glm::dvec3 point = glm::dvec3(point4) + zonespace_center;
+                            verts->push_back(point);
+                            //t2.elevations[j] = nodes[node_idx].vegetation[i + j].uvw.x;
+                            t2.elevations[j] = inclination;
+                        }
+                        t2.normal = t.normal;
+                        tris->push_back(t2);
                     }
                 }
                 return;
