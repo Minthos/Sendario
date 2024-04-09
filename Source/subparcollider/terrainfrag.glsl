@@ -31,10 +31,10 @@ void main() {
         }
         break;
     case 2: // treetrunk
-        fragColor = mix(vec4(0.4, 0.3, 0.2, 1.0), vec4(0, 0, 0, 1), texCoord.z);
+        fragColor = mix(vec4(0.4, 0.3, 0.2, 1.0), vec4(0, 0, 0, 1), 1.0 - texCoord.z);
         break;
     case 3: // leaf
-        fragColor = mix(vec4(vec3(0.15, 0.4, 0.15), 1.0), vec4(0, 0, 0, 1), texCoord.z);
+        fragColor = mix(vec4(vec3(0.15, 0.4, 0.15), 1.0), vec4(0, 0, 0, 1), 1.0 - texCoord.z);
         break;
     }
     float depth = log2(z + 2.0) * 0.03;

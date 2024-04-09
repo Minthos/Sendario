@@ -943,7 +943,7 @@ glm::vec3 calculate_center(uint64_t level, uint64_t address, glm::vec3 v0, glm::
         glm::vec3 mid1 = (v1 + v2) * 0.5f; // Midpoint of v1 and v2
         glm::vec3 mid2 = (v2 + v0) * 0.5f; // Midpoint of v2 and v0
 
-        switch ((address >> level) & 3) { // Last 2 bits of address
+        switch ((address >> (2 * level)) & 3) { // Last 2 bits of address
             case 0: // Center triangle
                 v0 = mid0;
                 v1 = mid1;
@@ -1134,12 +1134,10 @@ struct TerrainTree {
                 nodes[node_idx].rendered_at_level = level;
 
                 // generate vegetation and shit
-                if(level >= 15) {
+                if(level >= 16) {
                     Prng rng;
-                    rng.init(path & 0x7FFFFFFFUL, seed);
-                    // create a seed for this tile's level 15 parent
-                    // use seed to generate some vegetation, then discard vegetation that's not within this node if
-                    // the node is at a deeper level than 15
+                    rng.init(path & 0x1FFFFFFFUL, seed);
+                    // create a seed for this tile's level 16 parent
                     //
                     // elevation 20-2000: vegetation and rocks
                     // low roughness: grass
@@ -1151,16 +1149,31 @@ struct TerrainTree {
                         bool should_generate = nodes[node_idx].vegetation.count == 0;
                         // add a merged mesh of the estimated vegetation/rocks/buildings for this node's subtree with
                         // extremely low polygon count per object
-                        int num_subdivisions = MAX_LOD - level;
+                        int num_subdivisions = 1 + MAX_LOD - level;
                         int num_leaves = 1 << (2 * num_subdivisions);
 
-
+                        //glm::vec3 floatverts[3] = {
+                        //    glm::vec3(nodes[node_idx].verts[0] - nodespace_center),
+                        //    glm::vec3(nodes[node_idx].verts[1] - nodespace_center),
+                        //    glm::vec3(nodes[node_idx].verts[2] - nodespace_center)};
                         glm::vec3 floatverts[3] = {
-                            glm::vec3(nodes[node_idx].verts[0] - nodespace_center),
-                            glm::vec3(nodes[node_idx].verts[1] - nodespace_center),
-                            glm::vec3(nodes[node_idx].verts[2] - nodespace_center)};
-                        uint64_t invprob = 1;
+                            glm::vec3((*verts)[t.verts[0]]) - zonespace_center,
+                            glm::vec3((*verts)[t.verts[1]]) - zonespace_center,
+                            glm::vec3((*verts)[t.verts[2]]) - zonespace_center};
+                    
                         glm::vec3 surfacenormal = glm::normalize(glm::cross(floatverts[1] - floatverts[0], floatverts[2] - floatverts[0]));
+                        //glm::mat4 transformation = glm::toMat4(glm::rotation(glm::vec3(0.0, 1.0, 0.0), glm::vec3(t.normal)));
+                        //glm::mat4 transformation = glm::toMat4(glm::rotation( glm::vec3(t.normal), glm::vec3(0.0, 1.0, 0.0)));
+                        glm::mat4 transformation = glm::toMat4(glm::rotation( glm::vec3(surfacenormal), glm::vec3(0.0, 1.0, 0.0)));
+                        //glm::mat4 transformation = glm::toMat4(glm::rotation(glm::vec3(0.0, 1.0, 0.0), glm::vec3(surfacenormal)));
+                        //transformation = glm::rotate(transformation, (float)((vegetation_random_value ^ leaf_path) % 360), glm::vec3(t.normal));
+                        //transformation = glm::translate(transformation, vec3(center));
+                        glm::vec3 object_space_verts[3] = {
+                            glm::vec3(transformation * (glm::vec4(floatverts[0], 1.0))),
+                            glm::vec3(transformation * (glm::vec4(floatverts[1], 1.0))),
+                            glm::vec3(transformation * (glm::vec4(floatverts[2], 1.0)))};
+
+                        uint64_t invprob = 1;
                         float density = max(0.0f, min(1.0f, (nodes[node_idx].elevations[0] / 50.0f)));
                         density = max(0.0f, min(density, 1.0f - ((nodes[node_idx].elevations[0] - 1500.0f) / 1500.0f)));
                         float inclination = length(glm::vec3(t.normal) - surfacenormal);
@@ -1172,20 +1185,13 @@ struct TerrainTree {
                             uint64_t mask = local_address + (local_address << 12) + (local_address << 24) +
                                 (local_address << 36) + (local_address << 48);
                             uint64_t notrandom = vegetation_random_value ^ mask;
-                        
-                            glm::mat4 transformation = glm::toMat4(glm::rotation(glm::vec3(t.normal), glm::vec3(0.0, 1.0, 0.0)));
-//                            transformation = glm::rotate(transformation, (float)((vegetation_random_value ^ leaf_path) % 360), glm::vec3(t.normal));
-                            //transformation = glm::translate(transformation, vec3(center));
-                            glm::vec3 object_space_verts[3] = {
-                                glm::vec3(transformation * (glm::vec4(floatverts[0], 1.0))),
-                                glm::vec3(transformation * (glm::vec4(floatverts[1], 1.0))),
-                                glm::vec3(transformation * (glm::vec4(floatverts[2], 1.0)))};
+
                             glm::vec3 leaf_center = calculate_center(num_subdivisions, leaf, object_space_verts[0], object_space_verts[1], object_space_verts[2]);
                             //glm::vec3 leaf_center = glm::vec3(0);
                             if(density > 0){
                                 invprob = (uint64_t)(1.0f / density);
                             }
-                            if(density > 0 && (notrandom / 15) % invprob == 0) {
+                            if((density > 0) && (((notrandom / 15) % invprob) == 0)) {
                                 // generate vegetation if it doesn't exist yet
                                 if(should_generate) {
                                     double h_trunk = 3.0;
@@ -1216,16 +1222,20 @@ struct TerrainTree {
                         }
                     } else {
                         // add a mesh for vegetation and buildings
-                        uint64_t local_address = (path & 0x1FF80000000UL) >> 31UL;
+                        uint64_t local_address = (path & 0x1FFF0000000UL) >> 29UL;
                         uint64_t mask = local_address + (local_address << 12) + (local_address << 24) +
                             (local_address << 36) + (local_address << 48);
                         uint64_t notrandom = vegetation_random_value ^ mask;
 
                         uint64_t invprob = 1;
                         glm::vec3 floatverts[3] = {
-                            glm::vec3(nodes[node_idx].verts[0]),
-                            glm::vec3(nodes[node_idx].verts[1]),
-                            glm::vec3(nodes[node_idx].verts[2])};
+                            glm::vec3((*verts)[t.verts[0]]) - zonespace_center,
+                            glm::vec3((*verts)[t.verts[1]]) - zonespace_center,
+                            glm::vec3((*verts)[t.verts[2]]) - zonespace_center};
+                        //glm::vec3 floatverts[3] = {
+                        //    glm::vec3(nodes[node_idx].verts[0]),
+                        //    glm::vec3(nodes[node_idx].verts[1]),
+                        //    glm::vec3(nodes[node_idx].verts[2])};
                         glm::vec3 surfacenormal = glm::normalize(glm::cross(floatverts[1] - floatverts[0], floatverts[2] - floatverts[0]));
                         float density = max(0.0f, min(1.0f, (nodes[node_idx].elevations[0] / 50.0f)));
                         density = max(0.0f, min(density, 1.0f - ((nodes[node_idx].elevations[0] - 1500.0f) / 1500.0f)));
