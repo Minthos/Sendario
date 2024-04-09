@@ -1151,7 +1151,7 @@ struct TerrainTree {
                         bool should_generate = nodes[node_idx].vegetation.count == 0;
                         // add a merged mesh of the estimated vegetation/rocks/buildings for this node's subtree with
                         // extremely low polygon count per object
-                        int num_subdivisions = level - 15;
+                        int num_subdivisions = MAX_LOD - level;
                         int num_leaves = 1 << (2 * num_subdivisions);
 
 
