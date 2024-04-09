@@ -224,7 +224,7 @@ struct RenderObject {
         // Position attribute
         glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(texvert), (void*)0);
         glEnableVertexAttribArray(0);
-        // Type id attribute
+        // Type id attribute (this doesn't work so I packed it into the w component of the position attribute as a workaround)
 //        glVertexAttribIPointer(1, 1, GL_INT, sizeof(texvert), (void*)(3 * sizeof(GLfloat)));
 //        glEnableVertexAttribArray(1);
         // Texture coordinate attribute
@@ -245,7 +245,7 @@ struct RenderObject {
         // Position attribute
         glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(texvert), (void*)0);
         glEnableVertexAttribArray(0);
-        // Type id attribute
+        // Type id attribute (this doesn't work so I packed it into the w component of the position attribute as a workaround)
 //        glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, sizeof(texvert), (void*)(3 * sizeof(GLfloat)));
 //        glEnableVertexAttribArray(1);
         // Texture coordinate attribute
@@ -275,12 +275,14 @@ struct RenderObject {
             glm::vec3 normal = glm::normalize(glm::cross(floatverts[1] - floatverts[0], floatverts[2] - floatverts[0]));
             float inclination = glm::angle(normal, glm::vec3(t->normal));
             float insolation = glm::dot(normal, glm::vec3(0.4, 0.4, 0.4));
-            for(int j = 0; j < 3; j++){
-                vertices.insert(vertices.end(), {floatverts[j], t->type_id, glm::vec3(inclination, insolation, t->elevations[j])});
-                assert(t->type_id != VERTEX_TYPE_NONE);
-                assert(t->type_id == VERTEX_TYPE_TERRAIN || t->type_id == VERTEX_TYPE_VEGETATION);
-                if(t->type_id == VERTEX_TYPE_TERRAIN) assert(t->type_id == 1);
-                if(t->type_id == VERTEX_TYPE_VEGETATION) assert(t->type_id == 2);
+            if(t->type_id == VERTEX_TYPE_TERRAIN){
+                for(int j = 0; j < 3; j++){
+                    vertices.insert(vertices.end(), {floatverts[j], t->type_id, glm::vec3(inclination, insolation, t->elevations[j])});
+                }
+            } else {
+                for(int j = 0; j < 3; j++){
+                    vertices.insert(vertices.end(), {floatverts[j], t->type_id, glm::vec3(inclination, insolation, t->elevations[j])});
+                }
             }
         }
         auto begin_upload = now();

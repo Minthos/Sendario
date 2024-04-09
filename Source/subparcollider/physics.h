@@ -19,6 +19,8 @@
 
 #define nil nullptr
 
+
+
 using std::isnan;
 using std::mutex;
 using std::string;
@@ -32,6 +34,7 @@ using glm::dquat;
 bool verbose = false;
 bool POTATO_MODE = false;
 uint32_t frame_counter = 0;
+float PI = 3.14159265359f;
 
 enum terrain_upload_status_enum {
     idle,
@@ -46,7 +49,8 @@ enum terrain_upload_status_enum {
 enum vertex_type_id {
     VERTEX_TYPE_NONE,
     VERTEX_TYPE_TERRAIN,
-    VERTEX_TYPE_VEGETATION
+    VERTEX_TYPE_TREETRUNK,
+    VERTEX_TYPE_LEAF
 };
 
 size_t min(size_t a, size_t b) {
@@ -417,7 +421,7 @@ struct dMesh {
 
 struct texvert {
     glm::vec4 xyz;
-//    int32_t type_id;
+//    int32_t type_id; (opengl clobbered this when I passed it as int so I packed it into the w component of xyz as a workaround)
     glm::vec3 uvw;
     texvert(glm::vec3 a, int32_t ptype_id, glm::vec3 b) { xyz = glm::vec4(a.x, a.y, a.z, *(float*)(&ptype_id)); uvw = b; }
 };
@@ -431,6 +435,40 @@ void mkquad(nonstd::vector<texvert> *dest, glm::vec3 a, glm::vec3 b, glm::vec3 c
     dest->push_back({d, type_id, uvw});
 }
 
+void mktree(nonstd::vector<texvert> *dest, float h_trunk, float r_trunk, float h_canopy, float r_canopy){
+    glm::vec3 uvw_trunk(0.0, 0.0, 0.0);
+    glm::vec3 uvw_canopy(0.0, 0.0, 0.0);
+    float h_root = -0.5;
+    // trunk, should be at least 4 quads
+    mkquad(dest,
+            glm::vec3(-r_trunk, h_root, -r_trunk),
+            glm::vec3(r_trunk, h_root, -r_trunk),
+            glm::vec3(-r_trunk, h_trunk, -r_trunk),
+            glm::vec3(r_trunk, h_trunk, -r_trunk),
+            glm::vec3(0.0f), VERTEX_TYPE_TREETRUNK);
+    mkquad(dest,
+            glm::vec3(r_trunk, h_root, r_trunk),
+            glm::vec3(-r_trunk, h_root, r_trunk),
+            glm::vec3(r_trunk, h_trunk, r_trunk),
+            glm::vec3(-r_trunk, h_trunk, r_trunk),
+            glm::vec3(0.333333f), VERTEX_TYPE_TREETRUNK);
+    mkquad(dest,
+            glm::vec3(r_trunk, h_root, -r_trunk),
+            glm::vec3(r_trunk, h_root, r_trunk),
+            glm::vec3(r_trunk, h_trunk, -r_trunk),
+            glm::vec3(r_trunk, h_trunk, r_trunk),
+            glm::vec3(0.666667f), VERTEX_TYPE_TREETRUNK);
+    mkquad(dest,
+            glm::vec3(-r_trunk, h_root, -r_trunk),
+            glm::vec3(-r_trunk, h_root, r_trunk),
+            glm::vec3(-r_trunk, h_trunk, -r_trunk),
+            glm::vec3(-r_trunk, h_trunk, r_trunk),
+            glm::vec3(1.0f), VERTEX_TYPE_TREETRUNK);
+
+    // canopy, should be at least 4 triangles
+    mkquad(dest, glm::vec3(-r_canopy, h_trunk, -r_canopy), glm::vec3(-r_canopy, h_trunk, r_canopy), glm::vec3(0.0, h_trunk + h_canopy, 0.0), glm::vec3(r_canopy, h_trunk, r_canopy), glm::vec3(0.0f), VERTEX_TYPE_LEAF);
+    mkquad(dest, glm::vec3(r_canopy, h_trunk, r_canopy), glm::vec3(r_canopy, h_trunk, -r_canopy), glm::vec3(0.0, h_trunk + h_canopy, 0.0), glm::vec3(-r_canopy, h_trunk, -r_canopy), glm::vec3(1.0f), VERTEX_TYPE_LEAF);
+}
 
 struct Motor {
     double max_force;
@@ -1066,7 +1104,7 @@ struct TerrainTree {
                     // medium roughness: trees
                     // high roughness: rocks
                     // high inclination: nothing
-                    uint64_t vegetation = rng.get();
+                    uint64_t vegetation_random_value = rng.get();
                     if(level <= MAX_LOD){
                         // add a merged mesh of the estimated vegetation/rocks/buildings for this node's subtree with
                         // extremely low polygon count per object
@@ -1075,7 +1113,7 @@ struct TerrainTree {
                         uint64_t local_address = (path & 0x1FF80000000UL) >> 31UL;
                         uint64_t mask = local_address + (local_address << 12) + (local_address << 24) +
                             (local_address << 36) + (local_address << 48);
-                        uint64_t notrandom = vegetation ^ mask;
+                        uint64_t notrandom = vegetation_random_value ^ mask;
 
                         if((notrandom / 15) % 4 == 0) {
                             // generate vegetation if it doesn't exist yet
@@ -1088,23 +1126,20 @@ struct TerrainTree {
                                 
                                 // nonstd::vector<texvert> vegetation();
                                 
-                                double h_trunk = 10.0;
+                                double h_trunk = 3.0;
                                 double r_trunk = 0.2;
                                 glm::vec3 uvw_trunk(0.0, 0.0, 0.0);
-                                double h_canopy = 2.0;
+                                double h_canopy = 10.0;
                                 double r_canopy = 4.0;
                                 glm::vec3 uvw_canopy(0.0, 0.0, 0.0);
-                                // trunk, should be at least 4 quads
-                                mkquad(&nodes[node_idx].vegetation, glm::vec3(-r_trunk, 0.0, 0.0), glm::vec3(r_trunk, 0.0, 0.0), glm::vec3(-r_trunk, h_trunk, 0.0), glm::vec3(r_trunk, h_trunk, 0.0), uvw_trunk, VERTEX_TYPE_VEGETATION);
-
-                                // canopy, should be at least 4 triangles
-                                mkquad(&nodes[node_idx].vegetation, glm::vec3(-r_canopy, h_trunk, 0.0), glm::vec3(r_canopy, h_trunk, 0.0), glm::vec3(-r_canopy, h_trunk + h_canopy, 0.0), glm::vec3(r_canopy, h_trunk + h_canopy, 0.0), uvw_canopy, VERTEX_TYPE_VEGETATION);
+                                mktree(&nodes[node_idx].vegetation, h_trunk, r_trunk, h_canopy, r_canopy);
                             }
                             // transform vegetation to node space coordinates
                             glm::mat4 rotation_matrix = glm::toMat4(glm::rotation(glm::vec3(0.0, 1.0, 0.0), glm::vec3(t.normal)));
+                            rotation_matrix = glm::rotate(rotation_matrix, (float)((vegetation_random_value ^ path) % 360), glm::vec3(t.normal));
                             for(int i = 0; i < nodes[node_idx].vegetation.count; i+= 3) {
                                 dTri t2;
-                                t2.type_id = VERTEX_TYPE_VEGETATION;
+                                t2.type_id = *(uint32_t*)(&nodes[node_idx].vegetation[i].xyz.w);
                                 for(int j = 0; j < 3; j++) {
                                     t2.verts[j] = verts->size();
                                     glm::vec4 point4 = nodes[node_idx].vegetation[i + j].xyz;
@@ -1112,7 +1147,7 @@ struct TerrainTree {
                                     point4 = rotation_matrix * point4;//glm::vec4(nodes[node_idx].vegetation[i + j].xyz, 1.0f);
                                     glm::dvec3 point = glm::dvec3(point4) + center;
                                     verts->push_back(point);
-                                    t2.elevations[j] = nodes[node_idx].elevations[j];
+                                    t2.elevations[j] = nodes[node_idx].vegetation[i + j].uvw.x;
                                 }
                                 t2.normal = t.normal;
                                 tris->push_back(t2);
