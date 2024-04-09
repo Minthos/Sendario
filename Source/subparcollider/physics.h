@@ -1186,7 +1186,7 @@ struct TerrainTree {
                                 (local_address << 36) + (local_address << 48);
                             uint64_t notrandom = vegetation_random_value ^ mask;
 
-                            glm::vec3 leaf_center = calculate_center(num_subdivisions, leaf, object_space_verts[0], object_space_verts[1], object_space_verts[2]);
+                            glm::vec3 leaf_center = calculate_center(num_subdivisions - 1, leaf, object_space_verts[0], object_space_verts[1], object_space_verts[2]);
                             //glm::vec3 leaf_center = glm::vec3(0);
                             if(density > 0){
                                 invprob = (uint64_t)(1.0f / density);
