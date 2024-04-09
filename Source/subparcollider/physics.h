@@ -416,10 +416,10 @@ struct dMesh {
 };
 
 struct texvert {
-    glm::vec3 xyz;
-    int32_t type_id;
+    glm::vec4 xyz;
+//    int32_t type_id;
     glm::vec3 uvw;
-    texvert(glm::vec3 a, int32_t ptype_id, glm::vec3 b) { xyz = a; type_id = ptype_id; uvw = b; }
+    texvert(glm::vec3 a, int32_t ptype_id, glm::vec3 b) { xyz = glm::vec4(a.x, a.y, a.z, *(float*)(&ptype_id)); uvw = b; }
 };
 
 void mkquad(nonstd::vector<texvert> *dest, glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 uvw, int32_t type_id){
@@ -1107,7 +1107,9 @@ struct TerrainTree {
                                 t2.type_id = VERTEX_TYPE_VEGETATION;
                                 for(int j = 0; j < 3; j++) {
                                     t2.verts[j] = verts->size();
-                                    glm::vec4 point4 = rotation_matrix * glm::vec4(nodes[node_idx].vegetation[i + j].xyz, 1.0f);
+                                    glm::vec4 point4 = nodes[node_idx].vegetation[i + j].xyz;
+                                    point4.w = 1.0f;
+                                    point4 = rotation_matrix * point4;//glm::vec4(nodes[node_idx].vegetation[i + j].xyz, 1.0f);
                                     glm::dvec3 point = glm::dvec3(point4) + center;
                                     verts->push_back(point);
                                     t2.elevations[j] = nodes[node_idx].elevations[j];

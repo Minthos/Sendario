@@ -1,8 +1,8 @@
 #version 430
 
-layout(location = 0) in vec3 vertexPosition;
-layout(location = 1) in int typeId;
-layout(location = 2) in vec3 vertexTexCoord;
+layout(location = 0) in vec4 vertexPosition;
+//layout(location = 1) in int typeId;
+layout(location = 1) in vec3 vertexTexCoord;
 
 uniform mat4 current;
 uniform mat4 previous;
@@ -17,10 +17,12 @@ uniform mat4 previous;
 out vec2 texCoord;
 out vec2 velocity;
 out float z;
+flat out int typeid;
 
 void main() {
-    vec4 curPos = current * vec4(vertexPosition, 1.0);
-    vec4 prevPos = previous * vec4(vertexPosition, 1.0);
+    vec4 curPos = current * vec4(vertexPosition.xyz, 1.0);
+    vec4 prevPos = previous * vec4(vertexPosition.xyz, 1.0);
+    typeid = floatBitsToInt(vertexPosition.w);
 
     velocity = (curPos.xy - prevPos.xy) / max(1.0, max(prevPos.w, curPos.w));
     gl_Position = curPos;

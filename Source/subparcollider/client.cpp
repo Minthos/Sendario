@@ -221,18 +221,18 @@ struct RenderObject {
         glGenBuffers(1, &vbo);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
         glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(texvert), vertices.data(), GL_STATIC_DRAW);
+        // Position attribute
+        glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(texvert), (void*)0);
+        glEnableVertexAttribArray(0);
+        // Type id attribute
+//        glVertexAttribIPointer(1, 1, GL_INT, sizeof(texvert), (void*)(3 * sizeof(GLfloat)));
+//        glEnableVertexAttribArray(1);
+        // Texture coordinate attribute
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(texvert), (void*)(3 * sizeof(GLfloat) + sizeof(GLint)));
+        glEnableVertexAttribArray(1);
         glGenBuffers(1, &ebo);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
-        // Position attribute
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat) + sizeof(GLint), (void*)0);
-        glEnableVertexAttribArray(0);
-        // Type id attribute
-        glVertexAttribPointer(1, 1, GL_INT, GL_FALSE, 6 * sizeof(GLfloat) + sizeof(GLint), (void*)(3 * sizeof(GLfloat)));
-        glEnableVertexAttribArray(1);
-        // Texture coordinate attribute
-        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat) + sizeof(GLint), (void*)(3 * sizeof(GLfloat) + sizeof(GLint)));
-        glEnableVertexAttribArray(2);
         glBindVertexArray(0);
     }
 
@@ -242,18 +242,18 @@ struct RenderObject {
         glGenBuffers(1, &vbo);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
         glBufferData(GL_ARRAY_BUFFER, mesh->num_tris * 3 * sizeof(texvert), nil, GL_STATIC_DRAW);
+        // Position attribute
+        glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(texvert), (void*)0);
+        glEnableVertexAttribArray(0);
+        // Type id attribute
+//        glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, sizeof(texvert), (void*)(3 * sizeof(GLfloat)));
+//        glEnableVertexAttribArray(1);
+        // Texture coordinate attribute
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(texvert), (void*)(3 * sizeof(GLfloat) + sizeof(GLint)));
+        glEnableVertexAttribArray(1);
         glGenBuffers(1, &ebo);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh->num_tris * 3 * sizeof(GLuint), nil, GL_STATIC_DRAW);
-        // Position attribute
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat) + sizeof(GLint), (void*)0);
-        glEnableVertexAttribArray(0);
-        // Type id attribute
-        glVertexAttribPointer(1, 1, GL_INT, GL_FALSE, 6 * sizeof(GLfloat) + sizeof(GLint), (void*)(3 * sizeof(GLfloat)));
-        glEnableVertexAttribArray(1);
-        // Texture coordinate attribute
-        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat) + sizeof(GLint), (void*)(3 * sizeof(GLfloat) + sizeof(GLint)));
-        glEnableVertexAttribArray(2);
         glBindVertexArray(0);
     }
 
@@ -301,7 +301,7 @@ void initializeGLFW() {
         exit(EXIT_FAILURE);
     }
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 }
 
