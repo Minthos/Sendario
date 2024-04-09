@@ -1149,7 +1149,7 @@ struct TerrainTree {
                         bool should_generate = nodes[node_idx].vegetation.count == 0;
                         // add a merged mesh of the estimated vegetation/rocks/buildings for this node's subtree with
                         // extremely low polygon count per object
-                        int num_subdivisions = 1 + MAX_LOD - level;
+                        int num_subdivisions = 2 + MAX_LOD - level;
                         int num_leaves = 1 << (2 * num_subdivisions);
 
                         //glm::vec3 floatverts[3] = {
@@ -1180,8 +1180,8 @@ struct TerrainTree {
                         density *= (1.0f - inclination);
 
                         for(int leaf = 0; leaf < num_leaves; leaf++){
-                            uint64_t leaf_path = (path << (num_subdivisions * 2)) | leaf;
-                            uint64_t local_address = (leaf_path & 0x1FF80000000UL) >> 31UL;
+                            //uint64_t leaf_path = (path << (num_subdivisions * 2)) | leaf;
+                            uint64_t local_address = ((path & 0x1FE00000000UL) >> 33UL) | leaf;
                             uint64_t mask = local_address + (local_address << 12) + (local_address << 24) +
                                 (local_address << 36) + (local_address << 48);
                             uint64_t notrandom = vegetation_random_value ^ mask;
@@ -1222,7 +1222,7 @@ struct TerrainTree {
                         }
                     } else {
                         // add a mesh for vegetation and buildings
-                        uint64_t local_address = (path & 0x1FFF0000000UL) >> 29UL;
+                        uint64_t local_address = (path & 0x1FE00000000UL) >> 33UL;
                         uint64_t mask = local_address + (local_address << 12) + (local_address << 24) +
                             (local_address << 36) + (local_address << 48);
                         uint64_t notrandom = vegetation_random_value ^ mask;
