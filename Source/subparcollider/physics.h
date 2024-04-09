@@ -464,8 +464,18 @@ void mktree(nonstd::vector<texvert> *dest, float h_trunk, float r_trunk, float h
             glm::vec3(1.0f), VERTEX_TYPE_TREETRUNK);
 
     // canopy, should be at least 4 triangles
-    mkquad(dest, glm::vec3(-r_canopy, h_trunk, -r_canopy), glm::vec3(-r_canopy, h_trunk, r_canopy), glm::vec3(0.0, h_trunk + h_canopy, 0.0), glm::vec3(r_canopy, h_trunk, r_canopy), glm::vec3(0.0f), VERTEX_TYPE_LEAF);
-    mkquad(dest, glm::vec3(r_canopy, h_trunk, r_canopy), glm::vec3(r_canopy, h_trunk, -r_canopy), glm::vec3(0.0, h_trunk + h_canopy, 0.0), glm::vec3(-r_canopy, h_trunk, -r_canopy), glm::vec3(1.0f), VERTEX_TYPE_LEAF);
+    mkquad(dest,
+            glm::vec3(-r_canopy, h_trunk, -r_canopy) + origin,
+            glm::vec3(-r_canopy, h_trunk, r_canopy) + origin,
+            glm::vec3(0.0, h_trunk + h_canopy, 0.0) + origin,
+            glm::vec3(r_canopy, h_trunk, r_canopy) + origin,
+            glm::vec3(0.0f), VERTEX_TYPE_LEAF);
+    mkquad(dest,
+            glm::vec3(r_canopy, h_trunk, r_canopy) + origin,
+            glm::vec3(r_canopy, h_trunk, -r_canopy) + origin,
+            glm::vec3(0.0, h_trunk + h_canopy, 0.0) + origin,
+            glm::vec3(-r_canopy, h_trunk, -r_canopy) + origin,
+            glm::vec3(1.0f), VERTEX_TYPE_LEAF);
 }
 
 struct Motor {
@@ -838,7 +848,7 @@ struct ttnode {
     }
 
     // position of 0th vertex transformed to zone space (LOD space)
-    vec3 LODspacePosition(dvec3 location, double radius, int i) {
+    vec3 zone_space_position(dvec3 location, double radius, int i) {
         glm::vec3 point = verts[i];
         double length = glm::length(point);
         point = point * (radius / length); // scaled from node space to spheroid
@@ -927,13 +937,13 @@ struct ttnode {
     }
 };
 
-glm::vec3 calculate_center(uint64_t address, glm::vec3 v0, glm::vec3 v1, glm::vec3 v2) {
-    while (address) {
+glm::vec3 calculate_center(uint64_t level, uint64_t address, glm::vec3 v0, glm::vec3 v1, glm::vec3 v2) {
+    while (level) {
         glm::vec3 mid0 = (v0 + v1) * 0.5f; // Midpoint of v0 and v1
         glm::vec3 mid1 = (v1 + v2) * 0.5f; // Midpoint of v1 and v2
         glm::vec3 mid2 = (v2 + v0) * 0.5f; // Midpoint of v2 and v0
 
-        switch (address & 3) { // Last 2 bits of address
+        switch ((address >> level) & 3) { // Last 2 bits of address
             case 0: // Center triangle
                 v0 = mid0;
                 v1 = mid1;
@@ -952,7 +962,7 @@ glm::vec3 calculate_center(uint64_t address, glm::vec3 v0, glm::vec3 v1, glm::ve
                 v1 = mid1;
                 break;
         }
-        address >>= 2; // Move to the next subdivision level
+        level--;
     }
 
     // Calculate the center of the final triangle
@@ -1097,24 +1107,25 @@ struct TerrainTree {
         double noise_xzscaling2 = -0.00001;
         // a LOD going on here
         if(level > min_level) {
+            dvec3 nodespace_center = nodes[node_idx].center();
             //double distance = glm::length(location - nodes[node_idx].verts[0]);
-            double distance = glm::length(location - (nodes[node_idx].center() * radius / glm::length(nodes[node_idx].center())));
+            double distance = glm::length(location - (nodespace_center * radius / glm::length(nodespace_center)));
             double nodeWidth = glm::length(nodes[node_idx].verts[0] - nodes[node_idx].verts[1]);
             double ratio = distance / nodeWidth;
 
             if(ratio > LOD_DISTANCE_SCALE || level > MAX_LOD) {
                 dTri t;
                 t.type_id = VERTEX_TYPE_TERRAIN;
-                dvec3 center = {0, 0, 0};
+                dvec3 zonespace_center = {0, 0, 0};
                 for(int i = 0; i < 3; i++) {
                     t.verts[i] = verts->size();
                     // scaling each point to the surface of the spheroid, subtracting location and adding the elevation value
-                    glm::vec3 point = nodes[node_idx].LODspacePosition(location, radius, i);
+                    glm::vec3 point = nodes[node_idx].zone_space_position(location, radius, i);
                     verts->push_back(point);
-                    center += point;
+                    zonespace_center += point;
                     t.elevations[i] = nodes[node_idx].elevations[i];
                 }
-                center /= 3.0;
+                zonespace_center /= 3.0;
                 // the local normalized inverse gravity vector in spheroid and octahedron space
                 t.normal = normalize(nodes[node_idx].verts[0]);
                 
@@ -1142,10 +1153,12 @@ struct TerrainTree {
                         // extremely low polygon count per object
                         int num_subdivisions = level - 15;
                         int num_leaves = 1 << (2 * num_subdivisions);
+
+
                         glm::vec3 floatverts[3] = {
-                            glm::vec3(nodes[node_idx].verts[0]),
-                            glm::vec3(nodes[node_idx].verts[1]),
-                            glm::vec3(nodes[node_idx].verts[2])};
+                            glm::vec3(nodes[node_idx].verts[0] - nodespace_center),
+                            glm::vec3(nodes[node_idx].verts[1] - nodespace_center),
+                            glm::vec3(nodes[node_idx].verts[2] - nodespace_center)};
                         uint64_t invprob = 1;
                         glm::vec3 surfacenormal = glm::normalize(glm::cross(floatverts[1] - floatverts[0], floatverts[2] - floatverts[0]));
                         float density = max(0.0f, min(1.0f, (nodes[node_idx].elevations[0] / 50.0f)));
@@ -1155,24 +1168,20 @@ struct TerrainTree {
 
                         for(int leaf = 0; leaf < num_leaves; leaf++){
                             uint64_t leaf_path = (path << (num_subdivisions * 2)) | leaf;
-                            // add a mesh for vegetation and buildings
                             uint64_t local_address = (leaf_path & 0x1FF80000000UL) >> 31UL;
                             uint64_t mask = local_address + (local_address << 12) + (local_address << 24) +
                                 (local_address << 36) + (local_address << 48);
                             uint64_t notrandom = vegetation_random_value ^ mask;
-
                         
                             glm::mat4 transformation = glm::toMat4(glm::rotation(glm::vec3(t.normal), glm::vec3(0.0, 1.0, 0.0)));
 //                            transformation = glm::rotate(transformation, (float)((vegetation_random_value ^ leaf_path) % 360), glm::vec3(t.normal));
-                            transformation = glm::translate(transformation, vec3(center));
-                            
+                            //transformation = glm::translate(transformation, vec3(center));
                             glm::vec3 object_space_verts[3] = {
                                 glm::vec3(transformation * (glm::vec4(floatverts[0], 1.0))),
                                 glm::vec3(transformation * (glm::vec4(floatverts[1], 1.0))),
                                 glm::vec3(transformation * (glm::vec4(floatverts[2], 1.0)))};
-                            
-                            glm::vec3 leaf_center = calculate_center(leaf, floatverts[0], floatverts[1], floatverts[2]);
-
+                            glm::vec3 leaf_center = calculate_center(num_subdivisions, leaf, object_space_verts[0], object_space_verts[1], object_space_verts[2]);
+                            //glm::vec3 leaf_center = glm::vec3(0);
                             if(density > 0){
                                 invprob = (uint64_t)(1.0f / density);
                             }
@@ -1197,7 +1206,7 @@ struct TerrainTree {
                                 glm::vec4 point4 = nodes[node_idx].vegetation[i + j].xyz;
                                 point4.w = 1.0f;
                                 point4 = rotation_matrix * point4;
-                                glm::dvec3 point = glm::dvec3(point4) + center;
+                                glm::dvec3 point = glm::dvec3(point4) + zonespace_center;
                                 verts->push_back(point);
                                 //t2.elevations[j] = nodes[node_idx].vegetation[i + j].uvw.x;
                                 t2.elevations[j] = inclination;
@@ -1232,6 +1241,7 @@ struct TerrainTree {
                                 double r_trunk = 0.2;
                                 double h_canopy = 10.0;
                                 double r_canopy = 4.0;
+                                // todo: make a high resolution version of the tree
                                 mktree(&nodes[node_idx].vegetation, h_trunk, r_trunk, h_canopy, r_canopy, glm::vec3(0.0, 0.0, 0.0));
                             }
                             // transform vegetation to node space coordinates
@@ -1245,7 +1255,7 @@ struct TerrainTree {
                                     glm::vec4 point4 = nodes[node_idx].vegetation[i + j].xyz;
                                     point4.w = 1.0f;
                                     point4 = rotation_matrix * point4;
-                                    glm::dvec3 point = glm::dvec3(point4) + center;
+                                    glm::dvec3 point = glm::dvec3(point4) + zonespace_center;
                                     verts->push_back(point);
                                     //t2.elevations[j] = nodes[node_idx].vegetation[i + j].uvw.x;
                                     t2.elevations[j] = inclination;
@@ -1258,7 +1268,7 @@ struct TerrainTree {
                         }
                     }
                 }
-               return;
+                return;
             }
         }
         // procedurally generate terrain height values on demand
