@@ -1137,7 +1137,7 @@ struct TerrainTree {
                 // generate vegetation and shit
                 if(level >= 16) {
                     Prng rng;
-					uint64_t level16mask = 0x1FFFFFFFFUL;
+					uint64_t level16mask = 0x1FFFFFFFFULL;
                     // create a seed for this tile's level 16 parent (or the tile itself if at level 16)
                     rng.init(path & level16mask, seed);
                     //
@@ -1149,6 +1149,7 @@ struct TerrainTree {
                     uint64_t vegetation_random_value = rng.get();
                     bool should_generate = nodes[node_idx].vegetation.count == 0;
                     int num_subdivisions = MAX_LOD - level;
+                    int offset = 33 + 2 * num_subdivisions;
                     int num_leaves = 1 << (2 * num_subdivisions);
                     glm::vec3 floatverts[3] = {
                         glm::vec3((*verts)[t.verts[0]]) - zonespace_center,
@@ -1172,12 +1173,11 @@ struct TerrainTree {
                         for(int j = 0; j < num_subdivisions; j++){
                         	leaf_address |= (  (leaf & (3ULL << (2 * j))) << (2 * (num_subdivisions - 1)) >> (4 * j)  );
                         }
-                        estimated_path |= (leaf_address << 33);
-                        assert(path | leaf_address == path ^ leaf_address);
+                        estimated_path |= (leaf_address << offset);
+                        assert((path | (leaf_address << offset)) == (path ^ (leaf_address << offset)));
                         
                         uint64_t local_address = leaf_address;
-                        //uint64_t local_address = (estimated_path & 0x1FE00000000UL) >> 33;
-                        
+                        //uint64_t local_address = (estimated_path & 0x7F800000000ULL) >> offset;
                         //estimated_path |= (leaf << (2 * (level + num_subdivisions)));
                         //uint64_t local_address = (estimated_path & 0x1FE00000000UL) >> 33UL;
                         //uint64_t local_address = ((path & 0x1FE00000000UL) >> 33UL) | leaf;
@@ -1185,14 +1185,14 @@ struct TerrainTree {
                             (local_address << 36) + (local_address << 48);
 
 
-                        if((0x2aaaaaaaa8UL & path) == path){
+                        if((0x2aaaaaaaa8ULL & path) == path){
                             printf("%lx, %lx, %d -- %lx %lx %x\n", path & level16mask, path, level, estimated_path, local_address, leaf_address);
                         }
 
                         uint64_t notrandom = vegetation_random_value ^ mask;
                         glm::vec3 leaf_center = calculate_center(num_subdivisions - 1, leaf,
                                 object_space_verts[0], object_space_verts[1], object_space_verts[2]);
-                        float probability_score = (float)((notrandom / 15UL) % 1000UL);
+                        float probability_score = (float)((notrandom / 15ULL) % 1000UL);
                         probability_score /= 1000.0;
                         if(density > probability_score) {
                             // generate vegetation if it doesn't exist yet
