@@ -716,8 +716,8 @@ struct ctleaf {
 };
 
 struct AABB {
-	hvec3 max;
-	hvec3 min;
+    hvec3 max;
+    hvec3 min;
 };
 
 AABB calculateBounds(ctleaf* p, uint32_t first, uint32_t last) {
@@ -813,8 +813,8 @@ struct CollisionTree {
         root->setBounds(globalBounds);
         uint32_t poolPtr = 1;
         root->subdivide(nodes, &poolPtr, leaves, 0, N - 1);
-    //	glBindBuffer(GL_SHADER_STORAGE_BUFFER, TLASBuffer);
-    //	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(ctnode) * poolPtr, nodes, GL_STATIC_DRAW);
+    //    glBindBuffer(GL_SHADER_STORAGE_BUFFER, TLASBuffer);
+    //    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(ctnode) * poolPtr, nodes, GL_STATIC_DRAW);
     }
 
 };
@@ -937,8 +937,8 @@ struct ttnode {
     }
 };
 
-glm::vec3 calculate_center(uint64_t level, uint64_t address, glm::vec3 v0, glm::vec3 v1, glm::vec3 v2) {
-	assert(level < 32);
+glm::vec3 calculate_center(uint64_t level, uint64_t address, glm::vec3 v0, glm::vec3 v1, glm::vec3 v2, uint64_t wiggle) {
+    assert(level < 32);
     for(int i = 0; i < level; i++){
         glm::vec3 mid0 = (v0 + v1) * 0.5f;
         glm::vec3 mid1 = (v1 + v2) * 0.5f;
@@ -963,8 +963,17 @@ glm::vec3 calculate_center(uint64_t level, uint64_t address, glm::vec3 v0, glm::
                 break;
         }
     }
-    glm::vec3 center = (v0 + v1 + v2) / 3.0f;
-    return center;
+    if(wiggle) {
+        float r1 = sqrt((wiggle % 10000000) / 10000000.0f);
+        float r2 = (wiggle % 9000000) / 9000000.0f;
+        float a = 1 - r1;
+        float b = r1 * (1 - r2);
+        float c = r1 * r2;
+        return a * v0 + b * v1 + c * v2;
+    } else {
+        glm::vec3 center = (v0 + v1 + v2) / 3.0f;
+        return center;
+    }
 }
 
 struct TerrainTree {
@@ -1136,8 +1145,8 @@ struct TerrainTree {
                     Prng rng;
                     uint64_t level_mask = 1;
                     for(int i = 0; i < tree_render_level; i++){
-						level_mask <<= 2;
-						level_mask |= 3;
+                        level_mask <<= 2;
+                        level_mask |= 3;
                     }
                     // create a seed for this tile's level 16 parent (or the tile itself if at level 16)
                     rng.init(path & level_mask, seed);
@@ -1166,11 +1175,12 @@ struct TerrainTree {
                     density = max(0.0f, min(density, 1.0f - ((nodes[node_idx].elevations[0] - 1500.0f) / 1500.0f)));
                     float inclination = length(glm::vec3(t.normal) - surfacenormal);
                     density *= (1.0f - inclination);
+                    // "leaf" here refers to a leaf node of the terrain tree, not a piece of geometry in the vegetation we're generating
                     for(int leaf = 0; leaf < num_leaves; leaf++){
                         uint64_t estimated_path = path;
                         uint64_t leaf_address = 0;
                         for(int j = 0; j < num_subdivisions; j++){
-                        	leaf_address |= (  (leaf & (3ULL << (2 * j))) << (2 * (num_subdivisions - 1)) >> (4 * j)  );
+                            leaf_address |= (  (leaf & (3ULL << (2 * j))) << (2 * (num_subdivisions - 1)) >> (4 * j)  );
                         }
                         estimated_path |= (leaf_address << offset);
                         assert((path | (leaf_address << offset)) == (path ^ (leaf_address << offset)));
@@ -1178,8 +1188,8 @@ struct TerrainTree {
                         uint64_t mask = local_address + (local_address << 12) + (local_address << 24) +
                             (local_address << 36) + (local_address << 48);
                         uint64_t notrandom = ((vegetation_random_value ^ estimated_path) % 1511);
-                        glm::vec3 leaf_center = calculate_center(num_subdivisions, leaf_address,
-                                object_space_verts[0], object_space_verts[1], object_space_verts[2]);
+                        glm::vec3 leaf_node_center = calculate_center(num_subdivisions, leaf_address,
+                                object_space_verts[0], object_space_verts[1], object_space_verts[2], vegetation_random_value ^ estimated_path);
                         float probability_score = notrandom / 1511.0f;
                         if(density > probability_score) {
                             // generate vegetation if it doesn't exist yet
@@ -1188,7 +1198,7 @@ struct TerrainTree {
                                 double r_trunk = 0.2;
                                 double h_canopy = 10.0;
                                 double r_canopy = 4.0;
-                                mktree(&nodes[node_idx].vegetation, h_trunk, r_trunk, h_canopy, r_canopy, leaf_center);
+                                mktree(&nodes[node_idx].vegetation, h_trunk, r_trunk, h_canopy, r_canopy, leaf_node_center);
                             }
                         }
                     }
