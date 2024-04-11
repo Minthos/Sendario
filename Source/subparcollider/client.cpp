@@ -335,7 +335,7 @@ int framerate_handicap = 1;
 auto prevFrameTime = now();
 bool game_paused = false;
 bool mouse_capture = true;
-bool autorun = true;
+bool autorun = false;
 
 glm::vec3 camera_target = vec3(0,0,0);
 glm::quat camera_rot;
@@ -917,7 +917,8 @@ terrain_lock.unlock(); // release mutex
             } else {
                 ctleaf *leaf = &t.leaves[node->first_leaf];
                 render(leaf->object->ro);
-#ifdef DEBUG
+//#ifdef DEBUG
+#ifdef THIS_CAUSES_OPENGL_ERRORS
                 dvec3 hi = node->hi.todvec3();
                 dvec3 lo = node->lo.todvec3();
                 dvec3 center = (hi + lo) * 0.5;

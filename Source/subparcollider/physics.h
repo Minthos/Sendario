@@ -1045,7 +1045,7 @@ struct TerrainTree {
         radius = pradius;
         noise_yscaling = sqrt(radius);
         LOD_DISTANCE_SCALE = pLOD;
-        MAX_LOD = 19;
+        MAX_LOD = 20;
         generator = new TerrainGenerator(seed, roughness);
         // 6 corners
         dvec3 initial_corners[6] = {
@@ -1113,7 +1113,7 @@ struct TerrainTree {
             double nodeWidth = glm::length(nodes[node_idx].verts[0] - nodes[node_idx].verts[1]);
             double ratio = distance / nodeWidth;
 
-            if(ratio > LOD_DISTANCE_SCALE || level > MAX_LOD) {
+            if(ratio > LOD_DISTANCE_SCALE || level >= MAX_LOD) {
                 dTri t;
                 t.type_id = VERTEX_TYPE_TERRAIN;
                 dvec3 zonespace_center = {0, 0, 0};
@@ -1133,11 +1133,13 @@ struct TerrainTree {
                 tris->push_back(t);
                 nodes[node_idx].rendered_at_level = level;
 
+
                 // generate vegetation and shit
                 if(level >= 16) {
                     Prng rng;
-                    rng.init(path & 0x1FFFFFFFUL, seed);
-                    // create a seed for this tile's level 16 parent
+					uint64_t level16mask = 0x1FFFFFFFFUL;
+                    // create a seed for this tile's level 16 parent (or the tile itself if at level 16)
+                    rng.init(path & level16mask, seed);
                     //
                     // elevation 20-2000: vegetation and rocks
                     // low roughness: grass
@@ -1146,7 +1148,7 @@ struct TerrainTree {
                     // high inclination: nothing
                     uint64_t vegetation_random_value = rng.get();
                     bool should_generate = nodes[node_idx].vegetation.count == 0;
-                    int num_subdivisions = 2 + MAX_LOD - level;
+                    int num_subdivisions = MAX_LOD - level;
                     int num_leaves = 1 << (2 * num_subdivisions);
                     glm::vec3 floatverts[3] = {
                         glm::vec3((*verts)[t.verts[0]]) - zonespace_center,
@@ -1162,21 +1164,29 @@ struct TerrainTree {
                     density = max(0.0f, min(density, 1.0f - ((nodes[node_idx].elevations[0] - 1500.0f) / 1500.0f)));
                     float inclination = length(glm::vec3(t.normal) - surfacenormal);
                     density *= (1.0f - inclination);
+
                     for(int leaf = 0; leaf < num_leaves; leaf++){
-
-
-
                         uint64_t estimated_path = path;
-                        estimated_path <<= 2 * num_subdivisions;
-                        estimated_path |= (leaf << (2 * (level + num_subdivisions)));
-
-                        uint64_t local_address = ((path & 0x1FE00000000UL) >> 33UL) | leaf;
+                        //estimated_path <<= 2 * num_subdivisions;
+                        uint64_t leaf_address = 0;
+                        for(int j = 0; j < num_subdivisions; j++){
+                        	leaf_address |= (  (leaf & (3ULL << (2 * j))) << (2 * (num_subdivisions - 1)) >> (4 * j)  );
+                        }
+                        estimated_path |= (leaf_address << 33);
+                        assert(path | leaf_address == path ^ leaf_address);
+                        
+                        uint64_t local_address = leaf_address;
+                        //uint64_t local_address = (estimated_path & 0x1FE00000000UL) >> 33;
+                        
+                        //estimated_path |= (leaf << (2 * (level + num_subdivisions)));
+                        //uint64_t local_address = (estimated_path & 0x1FE00000000UL) >> 33UL;
+                        //uint64_t local_address = ((path & 0x1FE00000000UL) >> 33UL) | leaf;
                         uint64_t mask = local_address + (local_address << 12) + (local_address << 24) +
                             (local_address << 36) + (local_address << 48);
 
 
                         if((0x2aaaaaaaa8UL & path) == path){
-                            printf("%lx, %d -- %lx %lx %x\n", path, level, estimated_path, local_address, leaf);
+                            printf("%lx, %lx, %d -- %lx %lx %x\n", path & level16mask, path, level, estimated_path, local_address, leaf_address);
                         }
 
                         uint64_t notrandom = vegetation_random_value ^ mask;
