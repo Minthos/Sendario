@@ -936,38 +936,6 @@ struct ttnode {
         return e / (sum_distance * 0.5);
     }
 };
-/*
-glm::vec3 calculate_center(uint64_t level, uint64_t address, glm::vec3 v0, glm::vec3 v1, glm::vec3 v2) {
-	assert(level < 32);
-    while (level > 0) {
-        glm::vec3 mid0 = (v0 + v1) * 0.5f;
-        glm::vec3 mid1 = (v1 + v2) * 0.5f;
-        glm::vec3 mid2 = (v2 + v0) * 0.5f;
-        switch ((address >> (2 * level)) & 3) {
-            case 0: // Center triangle
-                v0 = mid0;
-                v1 = mid1;
-                v2 = mid2;
-                break;
-            case 1: // First corner triangle
-                v1 = mid0;
-                v2 = mid2;
-                break;
-            case 2: // Second corner triangle
-                v2 = mid1;
-                v0 = mid0;
-                break;
-            case 3: // Third corner triangle
-                v0 = mid2;
-                v1 = mid1;
-                break;
-        }
-        level--;
-    }
-    glm::vec3 center = (v0 + v1 + v2) / 3.0f;
-    return center;
-}
-*/
 
 glm::vec3 calculate_center(uint64_t level, uint64_t address, glm::vec3 v0, glm::vec3 v1, glm::vec3 v2) {
 	assert(level < 32);
@@ -1163,11 +1131,16 @@ struct TerrainTree {
                 nodes[node_idx].rendered_at_level = level;
 
                 // generate vegetation and shit
-                if(level >= 16) {
+                int tree_render_level = 18;
+                if(level >= tree_render_level) {
                     Prng rng;
-					uint64_t level16mask = 0x1FFFFFFFFULL;
+                    uint64_t level_mask = 1;
+                    for(int i = 0; i < tree_render_level; i++){
+						level_mask <<= 2;
+						level_mask |= 3;
+                    }
                     // create a seed for this tile's level 16 parent (or the tile itself if at level 16)
-                    rng.init(path & level16mask, seed);
+                    rng.init(path & level_mask, seed);
                     //
                     // elevation 20-2000: vegetation and rocks
                     // low roughness: grass
@@ -1193,7 +1166,6 @@ struct TerrainTree {
                     density = max(0.0f, min(density, 1.0f - ((nodes[node_idx].elevations[0] - 1500.0f) / 1500.0f)));
                     float inclination = length(glm::vec3(t.normal) - surfacenormal);
                     density *= (1.0f - inclination);
-
                     for(int leaf = 0; leaf < num_leaves; leaf++){
                         uint64_t estimated_path = path;
                         uint64_t leaf_address = 0;
@@ -1205,17 +1177,9 @@ struct TerrainTree {
                         uint64_t local_address = leaf_address;
                         uint64_t mask = local_address + (local_address << 12) + (local_address << 24) +
                             (local_address << 36) + (local_address << 48);
-
-                        if((0x2aaaaaaaa8ULL & path) == path){
-                            printf("%d %lx %lx %lx %lx\n", level, path, estimated_path, leaf_address << offset, leaf_address);
-                        }
-
-                        //uint64_t notrandom = vegetation_random_value ^ mask;
                         uint64_t notrandom = ((vegetation_random_value ^ estimated_path) % 1511);
                         glm::vec3 leaf_center = calculate_center(num_subdivisions, leaf_address,
                                 object_space_verts[0], object_space_verts[1], object_space_verts[2]);
-                        //float probability_score = (float)((notrandom / 15ULL) % 1000UL);
-                        //probability_score /= 1000.0;
                         float probability_score = notrandom / 1511.0f;
                         if(density > probability_score) {
                             // generate vegetation if it doesn't exist yet
