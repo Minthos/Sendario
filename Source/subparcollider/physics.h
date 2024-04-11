@@ -936,14 +936,14 @@ struct ttnode {
         return e / (sum_distance * 0.5);
     }
 };
-
+/*
 glm::vec3 calculate_center(uint64_t level, uint64_t address, glm::vec3 v0, glm::vec3 v1, glm::vec3 v2) {
-    while (level) {
-        glm::vec3 mid0 = (v0 + v1) * 0.5f; // Midpoint of v0 and v1
-        glm::vec3 mid1 = (v1 + v2) * 0.5f; // Midpoint of v1 and v2
-        glm::vec3 mid2 = (v2 + v0) * 0.5f; // Midpoint of v2 and v0
-
-        switch ((address >> (2 * level)) & 3) { // Last 2 bits of address
+	assert(level < 32);
+    while (level > 0) {
+        glm::vec3 mid0 = (v0 + v1) * 0.5f;
+        glm::vec3 mid1 = (v1 + v2) * 0.5f;
+        glm::vec3 mid2 = (v2 + v0) * 0.5f;
+        switch ((address >> (2 * level)) & 3) {
             case 0: // Center triangle
                 v0 = mid0;
                 v1 = mid1;
@@ -964,8 +964,37 @@ glm::vec3 calculate_center(uint64_t level, uint64_t address, glm::vec3 v0, glm::
         }
         level--;
     }
+    glm::vec3 center = (v0 + v1 + v2) / 3.0f;
+    return center;
+}
+*/
 
-    // Calculate the center of the final triangle
+glm::vec3 calculate_center(uint64_t level, uint64_t address, glm::vec3 v0, glm::vec3 v1, glm::vec3 v2) {
+	assert(level < 32);
+    for(int i = 0; i < level; i++){
+        glm::vec3 mid0 = (v0 + v1) * 0.5f;
+        glm::vec3 mid1 = (v1 + v2) * 0.5f;
+        glm::vec3 mid2 = (v2 + v0) * 0.5f;
+        switch ((address >> (2 * i)) & 3) {
+            case 0: // Center triangle
+                v0 = mid0;
+                v1 = mid1;
+                v2 = mid2;
+                break;
+            case 1: // First corner triangle
+                v1 = mid0;
+                v2 = mid2;
+                break;
+            case 2: // Second corner triangle
+                v2 = mid1;
+                v0 = mid0;
+                break;
+            case 3: // Third corner triangle
+                v0 = mid2;
+                v1 = mid1;
+                break;
+        }
+    }
     glm::vec3 center = (v0 + v1 + v2) / 3.0f;
     return center;
 }
@@ -1133,7 +1162,6 @@ struct TerrainTree {
                 tris->push_back(t);
                 nodes[node_idx].rendered_at_level = level;
 
-
                 // generate vegetation and shit
                 if(level >= 16) {
                     Prng rng;
@@ -1149,7 +1177,7 @@ struct TerrainTree {
                     uint64_t vegetation_random_value = rng.get();
                     bool should_generate = nodes[node_idx].vegetation.count == 0;
                     int num_subdivisions = MAX_LOD - level;
-                    int offset = 33 + 2 * num_subdivisions;
+                    int offset = 1 + (2 * level);
                     int num_leaves = 1 << (2 * num_subdivisions);
                     glm::vec3 floatverts[3] = {
                         glm::vec3((*verts)[t.verts[0]]) - zonespace_center,
@@ -1168,32 +1196,27 @@ struct TerrainTree {
 
                     for(int leaf = 0; leaf < num_leaves; leaf++){
                         uint64_t estimated_path = path;
-                        //estimated_path <<= 2 * num_subdivisions;
                         uint64_t leaf_address = 0;
                         for(int j = 0; j < num_subdivisions; j++){
                         	leaf_address |= (  (leaf & (3ULL << (2 * j))) << (2 * (num_subdivisions - 1)) >> (4 * j)  );
                         }
                         estimated_path |= (leaf_address << offset);
                         assert((path | (leaf_address << offset)) == (path ^ (leaf_address << offset)));
-                        
                         uint64_t local_address = leaf_address;
-                        //uint64_t local_address = (estimated_path & 0x7F800000000ULL) >> offset;
-                        //estimated_path |= (leaf << (2 * (level + num_subdivisions)));
-                        //uint64_t local_address = (estimated_path & 0x1FE00000000UL) >> 33UL;
-                        //uint64_t local_address = ((path & 0x1FE00000000UL) >> 33UL) | leaf;
                         uint64_t mask = local_address + (local_address << 12) + (local_address << 24) +
                             (local_address << 36) + (local_address << 48);
 
-
                         if((0x2aaaaaaaa8ULL & path) == path){
-                            printf("%lx, %lx, %d -- %lx %lx %x\n", path & level16mask, path, level, estimated_path, local_address, leaf_address);
+                            printf("%d %lx %lx %lx %lx\n", level, path, estimated_path, leaf_address << offset, leaf_address);
                         }
 
-                        uint64_t notrandom = vegetation_random_value ^ mask;
-                        glm::vec3 leaf_center = calculate_center(num_subdivisions - 1, leaf,
+                        //uint64_t notrandom = vegetation_random_value ^ mask;
+                        uint64_t notrandom = ((vegetation_random_value ^ estimated_path) % 1511);
+                        glm::vec3 leaf_center = calculate_center(num_subdivisions, leaf_address,
                                 object_space_verts[0], object_space_verts[1], object_space_verts[2]);
-                        float probability_score = (float)((notrandom / 15ULL) % 1000UL);
-                        probability_score /= 1000.0;
+                        //float probability_score = (float)((notrandom / 15ULL) % 1000UL);
+                        //probability_score /= 1000.0;
+                        float probability_score = notrandom / 1511.0f;
                         if(density > probability_score) {
                             // generate vegetation if it doesn't exist yet
                             if(should_generate) {
