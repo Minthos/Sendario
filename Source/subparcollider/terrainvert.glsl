@@ -1,4 +1,4 @@
-#version 460
+#version 430
 
 layout(location = 0) in vec4 vertexPosition;
 //layout(location = 1) in int typeId;
