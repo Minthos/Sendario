@@ -906,7 +906,7 @@ terrain_lock.unlock(); // release mutex
         CollisionTree t = CollisionTree(dvec3(0.0), &l, 1);
         checkGLerror();
 
-        nonstd::vector<ctnode*> stack;
+        static nonstd::vector<ctnode*> stack;
         stack.push_back(t.root);
         while(stack.size()){
             ctnode* node = stack[stack.size() - 1];
