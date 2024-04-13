@@ -1021,6 +1021,7 @@ struct TerrainTree {
         node->first_child = tmp->nodes.count;
         for(uint32_t i = 0; i < 4; ++i){
             tmp->nodes.push_back(nodes[first_child + i]);
+            tmp->nodes.back().vegetation.destroy();
         }
         for(uint32_t i = 0; i < 4; ++i){
             descend_and_omit(tmp, &tmp->nodes[node->first_child + i], cutoff);
