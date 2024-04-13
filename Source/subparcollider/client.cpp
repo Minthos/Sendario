@@ -598,7 +598,7 @@ terrain_lock.unlock();
 
         // this is just a "hardcoded heuristic" that should work fine on my computer. a more intelligent way to do this
         // would be to evict nodes based on how much free RAM the computer has.
-        if(glitch->terrain.nodes.count > gpu_transfer_batch_size * lod){
+        if((glitch->terrain.nodes.count > gpu_transfer_batch_size * lod) || (LOW_MEMORY_MODE && (frame_counter % 120 == 119))){
             last_eviction += ((frame_counter - last_eviction) / 2);
             terrain_in_waiting = glitch->terrain.omitting_copy(last_eviction);
             std::cout << "evicted " << glitch->terrain.nodes.count - terrain_in_waiting.nodes.count << " terrain nodes. " << terrain_in_waiting.nodes.count << " nodes in the new tree.\n";
@@ -647,16 +647,23 @@ terrain_lock.unlock();
 int main(int argc, char** argv) {
     auto start_time = now();
     int seed = 52;
-    int lod = 50;
+    int lod = 20;
     for(int i = 1; i < argc; i++){
         if(!strncmp(argv[i], "-v", min(2, strlen(argv[i])))){
             verbose = true;
+            std::cout << "using verbose mode\n";
         }
         if(!strncmp(argv[i], "--potato", min(8, strlen(argv[i])))){
             POTATO_MODE = true;
+            std::cout << "using potato mode\n";
+        }
+        if(!strncmp(argv[i], "--lowmem", min(8, strlen(argv[i])))){
+            LOW_MEMORY_MODE = true;
+            std::cout << "using low memory mode\n";
         }
         if(!strncmp(argv[i], "--nocapture", min(11, strlen(argv[i])))){
             mouse_capture = false;
+            std::cout << "not capturing mouse\n";
         }
         if(!strncmp(argv[i], "seed=", min(5, strlen(argv[i])))){
             seed = atol(argv[i] + 5);
@@ -690,9 +697,10 @@ int main(int argc, char** argv) {
     }
     if(argc < 2 || verbose){
         std::cout << "\n\n";
-        std::cout << "Usage: " << argv[0] << " [-v] [--potato] [--nocapture] [seed=n] [lod=n] [aa=n] [af=n] [blur=n] [blurmode=n]\n";
+        std::cout << "Usage: " << argv[0] << " [-v] [--potato] [--lowmem] [--nocapture] [seed=n] [lod=n] [bs=n] [aa=n] [af=n] [blur=n] [blurmode=n]\n";
         std::cout << "-v: print debug information to console.\n";
         std::cout << "--potato: compatibility mode for single-core CPUs and debugging with valgrind.\n";
+        std::cout << "--lowmem: conserve RAM by caching less of the procedurally generated content.\n";
         std::cout << "--nocapture: don't capture the mouse pointer.\n";
         std::cout << "seed: the random seed used to generate the world. 52 is default.\n";
         std::cout << "lod: the target level of detail for terrain rendering. 1 or higher.\n";
@@ -996,7 +1004,7 @@ terrain_lock.unlock(); // release mutex
             if(frameDuration < 1000000.0 / 120.0 && !
                     (terrain_upload_status == done_generating &&
                     terrain_upload_progress + gpu_transfer_batch_size >= mesh_in_waiting.num_tris)){
-    			usleep(1000000.0 / 120.0 - frameDuration);
+                usleep(1000000.0 / 120.0 - frameDuration);
             }
             prevFrameTime = now();
         }

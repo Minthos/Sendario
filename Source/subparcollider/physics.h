@@ -33,6 +33,7 @@ using glm::dquat;
 
 bool verbose = false;
 bool POTATO_MODE = false;
+bool LOW_MEMORY_MODE = false;
 uint32_t frame_counter = 0;
 float PI = 3.14159265359f;
 
@@ -1006,6 +1007,11 @@ struct TerrainTree {
         TerrainTree tmp;
         memcpy(&tmp, this, sizeof(TerrainTree));
         tmp.nodes = nodes.copy();
+        if(LOW_MEMORY_MODE) {
+            for(int i = 0; i < tmp.nodes.count; i++) {
+                tmp.nodes[i].vegetation.destroy();
+            }
+        }
         return tmp;
     }
 
