@@ -22,7 +22,13 @@ INCDIR := -I/usr/local/include -IFastNoise2/include
 CXXFLAGS := -O2 -march=native
 TAKEOFF_FLAGS := -std=c++20 -O2 -march=native -pthread
 
-terragen.o: terragen.cpp
+SHA-Intrinsics/sha256-x86.c:
+	git clone https://github.com/noloader/SHA-Intrinsics.git
+
+FastNoise2/include/FastNoise/FastNoise.h:
+	git clone https://github.com/Auburn/FastNoise2.git
+
+terragen.o: terragen.cpp FastNoise2/include/FastNoise/FastNoise.h
 	g++ $(TAKEOFF_FLAGS) -pg -c terragen.cpp -o terragen.o $(LIBDIR) $(INCDIR)
 
 sha256.o: SHA-Intrinsics/sha256-x86.c

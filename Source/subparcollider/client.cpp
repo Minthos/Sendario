@@ -25,6 +25,7 @@ float anisotropy = 16.0f; // should be 4 with no upscaling, 16 with upscaling
 int antialiasing = 2; // 1 (no upscaling) and 2 (4 samples per pixel) are good values
 int motion_blur_mode = 1; // 0 = off, 1 = nonlinear (sharp), 2 = linear (blurry)
 float motion_blur_invstr = 5.0f; // motion blur amount. 1.0 = very high. 5.0 = low.
+int gpu_transfer_batch_size = 100000;
 
 GLFWwindow* window = nil;
 Unit *player_character = nil;
@@ -261,10 +262,10 @@ struct RenderObject {
     uint32_t upload_terrain_mesh_chunked(dMesh *mesh, uint32_t progress) {
         auto begin = now();
         std::vector<texvert> vertices;
-        vertices.reserve(300000);
+        vertices.reserve(gpu_transfer_batch_size * 3);
         std::vector<GLuint> indices;
-        indices.reserve(300000);
-        uint32_t limit = min(mesh->num_tris, progress + 100000);
+        indices.reserve(gpu_transfer_batch_size * 3);
+        uint32_t limit = min(mesh->num_tris, progress + gpu_transfer_batch_size);
         for (uint32_t i = progress; i < limit; ++i) {
             dTri* t = &mesh->tris[i];
             indices.insert(indices.end(), {t->verts[0], t->verts[1], t->verts[2]});
@@ -597,7 +598,7 @@ terrain_lock.unlock();
 
         // this is just a "hardcoded heuristic" that should work fine on my computer. a more intelligent way to do this
         // would be to evict nodes based on how much free RAM the computer has.
-        if(glitch->terrain.nodes.count > 100000 * lod){
+        if(glitch->terrain.nodes.count > gpu_transfer_batch_size * lod){
             last_eviction += ((frame_counter - last_eviction) / 2);
             terrain_in_waiting = glitch->terrain.omitting_copy(last_eviction);
             std::cout << "evicted " << glitch->terrain.nodes.count - terrain_in_waiting.nodes.count << " terrain nodes. " << terrain_in_waiting.nodes.count << " nodes in the new tree.\n";
@@ -664,6 +665,10 @@ int main(int argc, char** argv) {
             lod = (double)atol(argv[i] + 4);
             assert(lod > 0);
         }
+        if(!strncmp(argv[i], "bs=", min(3, strlen(argv[i])))){
+            gpu_transfer_batch_size = atol(argv[i] + 3);
+            assert(gpu_transfer_batch_size >= 1000);
+        }
         if(!strncmp(argv[i], "aa=", min(3, strlen(argv[i])))){
             antialiasing = atol(argv[i] + 3);
             assert(antialiasing >= 1 && antialiasing <= 8);
@@ -691,12 +696,13 @@ int main(int argc, char** argv) {
         std::cout << "--nocapture: don't capture the mouse pointer.\n";
         std::cout << "seed: the random seed used to generate the world. 52 is default.\n";
         std::cout << "lod: the target level of detail for terrain rendering. 1 or higher.\n";
+        std::cout << "bs: gpu transfer batch size. minimum 1000, default 100000.\n";
         std::cout << "aa: antialiasing. 1 to 8. Number of samples per pixel is the square of this number so 2 is 4x, 4 is 16x.\n";
         std::cout << "af: anisotropic filtering. 0, to 16.\n";
         std::cout << "blur: the amount of motion blur. 0 to 50.\n";
-        std::cout << "\nexamples:\nlow: aa=1 af=0 blur=0 lod=10\n";
-        std::cout << "recommended: aa=2 af=16 blur=3 lod=50\n";
-        std::cout << "ultra: aa=4 af=16 blur=3 lod=200\n\n";
+        std::cout << "\nexamples:\nlow: aa=1 af=0 blur=0 bs=10000 lod=10\n";
+        std::cout << "recommended: aa=2 af=16 blur=3 lod=20\n";
+        std::cout << "ultra: aa=4 af=16 blur=3 lod=50\n\n";
         if(!verbose) std::cout << "No options have been specified. Using recommended settings.\n\n";
     }
     initializeGLFW();
@@ -989,7 +995,7 @@ terrain_lock.unlock(); // release mutex
             // limit the game to 120 fps if the system/libraries don't limit it for us
             if(frameDuration < 1000000.0 / 120.0 && !
                     (terrain_upload_status == done_generating &&
-                    terrain_upload_progress + 100000 >= mesh_in_waiting.num_tris)){
+                    terrain_upload_progress + gpu_transfer_batch_size >= mesh_in_waiting.num_tris)){
     			usleep(1000000.0 / 120.0 - frameDuration);
             }
             prevFrameTime = now();
