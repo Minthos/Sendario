@@ -17,11 +17,12 @@ SWIFT_SRC := main.swift gptphysics.swift spatialtypes.swift boxoid.swift gamelog
 OBJC_HEADERS := subparcollider-Bridging-Header.h
 LIBS := -lglfw -lGL -lGLEW -lm -lSDL2
 NEW_LIBS := -lGL -lGLEW -lglut -lGLU -lm -lglfw libFastNoise.a
-LIBDIR := -L/usr/local/lib
+LIBDIR := 
+#LIBDIR := -L/usr/local/lib
 INCDIR := -I/usr/local/include -IFastNoise2/include
 CXXFLAGS := -O2 -march=native
 #TAKEOFF_FLAGS := -std=c++20 -O2 -march=native -pthread
-TAKEOFF_FLAGS := -std=c++23 -O3 -mavx2 -ffast-math -march=native -mtune=native -pthread
+TAKEOFF_FLAGS := -std=c++23 -O3 -mavx2 -ffast-math -march=native -mtune=native -pthread -Wno-deprecated -Wno-nan-infinity-disabled
 COMPILER := clang++-18
 #COMPILER := g++
 
