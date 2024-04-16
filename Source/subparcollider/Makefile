@@ -21,6 +21,7 @@ LIBDIR := -L/usr/local/lib
 INCDIR := -I/usr/local/include -IFastNoise2/include
 CXXFLAGS := -O2 -march=native
 TAKEOFF_FLAGS := -std=c++20 -O2 -march=native -pthread
+COMPILER := clang++-18
 
 SHA-Intrinsics/sha256-x86.c:
 	git clone https://github.com/noloader/SHA-Intrinsics.git
@@ -29,31 +30,31 @@ FastNoise2/include/FastNoise/FastNoise.h:
 	git clone https://github.com/Auburn/FastNoise2.git
 
 terragen.o: terragen.cpp FastNoise2/include/FastNoise/FastNoise.h
-	g++ $(TAKEOFF_FLAGS) -pg -c terragen.cpp -o terragen.o $(LIBDIR) $(INCDIR)
+	$(COMPILER) $(TAKEOFF_FLAGS) -pg -c terragen.cpp -o terragen.o $(LIBDIR) $(INCDIR)
 
 sha256.o: SHA-Intrinsics/sha256-x86.c
-	g++ $(TAKEOFF_FLAGS) -pg -c SHA-Intrinsics/sha256-x86.c -o sha256.o
+	$(COMPILER) $(TAKEOFF_FLAGS) -pg -c SHA-Intrinsics/sha256-x86.c -o sha256.o
 
 sha256_debug.o: SHA-Intrinsics/sha256.c
-	g++ $(TAKEOFF_FLAGS) -ggdb3 -D DEBUG -c SHA-Intrinsics/sha256.c -o sha256_debug.o
+	$(COMPILER) $(TAKEOFF_FLAGS) -ggdb3 -D DEBUG -c SHA-Intrinsics/sha256.c -o sha256_debug.o
 
 terragen_debug.o: terragen.cpp
-	g++ $(TAKEOFF_FLAGS) -ggdb3 -D DEBUG -c terragen.cpp -o terragen_debug.o $(LIBDIR) $(INCDIR)
+	$(COMPILER) $(TAKEOFF_FLAGS) -ggdb3 -D DEBUG -c terragen.cpp -o terragen_debug.o $(LIBDIR) $(INCDIR)
 
 takeoff: $(NEW_SRC) terragen.o sha256.o
-	g++ $(TAKEOFF_FLAGS) -pg terragen.o sha256.o client.cpp -o takeoff $(LIBDIR) $(INCDIR) $(NEW_LIBS)
+	$(COMPILER) $(TAKEOFF_FLAGS) -pg terragen.o sha256.o client.cpp -o takeoff $(LIBDIR) $(INCDIR) $(NEW_LIBS)
 
 takeoff_debug: $(NEW_SRC) terragen_debug.o sha256_debug.o
-	g++ $(TAKEOFF_FLAGS) -ggdb3 -D DEBUG terragen_debug.o sha256_debug.o client.cpp -o takeoff_debug $(LIBDIR) $(INCDIR) $(NEW_LIBS)
+	$(COMPILER) $(TAKEOFF_FLAGS) -ggdb3 -D DEBUG terragen_debug.o sha256_debug.o client.cpp -o takeoff_debug $(LIBDIR) $(INCDIR) $(NEW_LIBS)
 
 #takeoff_debug: $(NEW_SRC)
-#	g++ -g3 -D DEBUG -march=native -c $(NEW_SRC) $(NEW_LIBS)
-#	g++ -g3 -D DEBUG -march=native $(NEW_SRC:.cpp=.o) -o takeoff_debug $(LIBDIR) $(INCDIR) $(NEW_LIBS)
+#	$(COMPILER) -g3 -D DEBUG -march=native -c $(NEW_SRC) $(NEW_LIBS)
+#	$(COMPILER) -g3 -D DEBUG -march=native $(NEW_SRC:.cpp=.o) -o takeoff_debug $(LIBDIR) $(INCDIR) $(NEW_LIBS)
 
 takeoff_release: $(NEW_SRC)
 	rm *.o
-	g++ -O2 -flto -march=native -c $(NEW_SRC) $(NEW_LIBS)
-	g++ -O2 -flto -march=native $(NEW_SRC:.cpp=.o) -o takeoff_release $(LIBDIR) $(INCDIR) $(NEW_LIBS)
+	$(COMPILER) -O2 -flto -march=native -c $(NEW_SRC) $(NEW_LIBS)
+	$(COMPILER) -O2 -flto -march=native $(NEW_SRC:.cpp=.o) -o takeoff_release $(LIBDIR) $(INCDIR) $(NEW_LIBS)
 
 old_optimized: $(CPP_SRC) $(SWIFT_SRC)
 	g++ -O3 -march=native -c $(CPP_SRC) -fpermissive -fPIC $(LIBS)
