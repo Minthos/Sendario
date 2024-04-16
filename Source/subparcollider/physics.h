@@ -1392,6 +1392,7 @@ struct TerrainTree {
     }
 
     dMesh buildMesh(dvec3 location, int min_subdivisions, terrain_upload_status_enum *status) {
+    	auto before = now();
         if(verbose) std::cout << "building mesh from vantage point (" << location.x << ", " << location.y << ", " << location.z << ")\n";
         nonstd::vector<uint32_t> node_indices;
         nonstd::vector<glm::dvec3> verts;
@@ -1406,7 +1407,9 @@ struct TerrainTree {
 
         memcpy(vertices, &verts[0], verts.size() * sizeof(dvec3));
         memcpy(triangles, &tris[0], tris.size() * sizeof(dTri));
-        if(verbose) std::cout << tris.size() << " triangles generated\n";
+        auto after = now();
+        double time_taken = std::chrono::duration_cast<std::chrono::microseconds>(after - before).count() / 1000.0;
+        if(verbose) std::cout << tris.size() << " triangles generated in " << time_taken << "ms (" << tris.size() / (time_taken * 0.001) << "tris/s)\n";
         verts.destroy();
         tris.destroy();
         return dMesh(vertices, num_verts, triangles, num_tris);

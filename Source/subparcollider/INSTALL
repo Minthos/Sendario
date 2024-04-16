@@ -7,15 +7,16 @@ cd FastNoise2
 sudo apt-get install libxinerama-dev
 cmake -S . -B build -D FASTNOISE2_NOISETOOL=OFF -D FASTNOISE2_TESTS=OFF
 # alternatively: cmake -S . -B build -D FASTNOISE2_NOISETOOL=OFF -D FASTNOISE2_TESTS=OFF -DCMAKE_CXX_COMPILER=clang++-18 -DCMAKE_C_COMPILER=clang-18
+# interestingly fastnoise runs faster when compiled with g++ and takeoff runs faster when compiled with clang++-18
 cmake --build build --config release
 cd ..
 cp FastNoise2/build/lib/libFastNoise.a ./
 
-# to install a decent compiler
+# to install a better compiler
 wget https://apt.llvm.org/llvm.sh
 chmod +x llvm.sh
 sudo ./llvm.sh 18
 
-# to fix clang c++ linker error, if using clang++
+# to fix clang c++ linker error
 sudo apt-get install libc++abi-dev libc++-dev
 

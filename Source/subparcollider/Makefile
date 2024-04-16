@@ -20,8 +20,10 @@ NEW_LIBS := -lGL -lGLEW -lglut -lGLU -lm -lglfw libFastNoise.a
 LIBDIR := -L/usr/local/lib
 INCDIR := -I/usr/local/include -IFastNoise2/include
 CXXFLAGS := -O2 -march=native
-TAKEOFF_FLAGS := -std=c++20 -O2 -march=native -pthread
+#TAKEOFF_FLAGS := -std=c++20 -O2 -march=native -pthread
+TAKEOFF_FLAGS := -std=c++23 -O3 -mavx2 -ffast-math -march=native -mtune=native -pthread
 COMPILER := clang++-18
+#COMPILER := g++
 
 SHA-Intrinsics/sha256-x86.c:
 	git clone https://github.com/noloader/SHA-Intrinsics.git
