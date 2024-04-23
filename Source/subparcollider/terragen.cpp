@@ -70,7 +70,7 @@ uint64_t hash(uint64_t seed_a, uint64_t seed_b) {
     return ((uint64_t*)state)[0];
 }
 
-void Prng::init(uint64_t seed_a, uint64_t seed_b) {
+void Prng_sha256::init(uint64_t seed_a, uint64_t seed_b) {
     index = 0;
     uint32_t grrstate[] = {
         0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
@@ -87,7 +87,7 @@ void Prng::init(uint64_t seed_a, uint64_t seed_b) {
     message[7] = 0x8d93f95dcaef97bd;
 }
 
-uint64_t Prng::get() {
+uint64_t Prng_sha256::get() {
     if(index % 8 == 0)
 #ifdef DEBUG
         sha256_process(state, (uint8_t*)message, sizeof(message));
@@ -97,10 +97,40 @@ uint64_t Prng::get() {
     return ((uint64_t*)state)[index++];
 }
 
-double Prng::uniform() {
+double Prng_sha256::uniform() {
     constexpr uint64_t mask1 = 0x3FF0000000000000ULL;
     constexpr uint64_t mask2 = 0x3FFFFFFFFFFFFFFFULL;
     const uint64_t to_12 = (get() | mask1) & mask2;
+    return (*(double*)(&to_12))-1.0;
+}
+
+static inline uint64_t rotl(const uint64_t x, int k) {
+    return (x << k) | (x >> (64 - k));
+}
+
+void Prng_xoshiro::init(uint64_t seed_a, uint64_t seed_b) {
+    uint64_t grrstate[] = {
+        seed_a ^ 0x6a09e667bb67ae85, seed_b ^ 0x3c6ef372a54ff53a,
+        0x510e527f9b05688c, 0x1f83d9ab5be0cd19
+    };
+    memcpy((void*)s, (void*)grrstate, sizeof(grrstate));
+}
+
+uint64_t Prng_xoshiro::get() {
+    const uint64_t result = rotl(s[0] + s[3], 23) + s[0];
+    const uint64_t t = s[1] << 17;
+    s[2] ^= s[0];
+    s[3] ^= s[1];
+    s[1] ^= s[2];
+    s[0] ^= s[3];
+    s[2] ^= t;
+    s[3] = rotl(s[3], 45);
+    return result;
+}
+
+double Prng_xoshiro::uniform() {
+    constexpr uint64_t mask1 = 0x3FFULL << 52;
+    const uint64_t to_12 = (get() >> 12 | mask1);
     return (*(double*)(&to_12))-1.0;
 }
 

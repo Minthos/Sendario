@@ -1149,7 +1149,8 @@ struct TerrainTree {
                 // generate vegetation and shit
                 int tree_render_level = 18;
                 if(level >= tree_render_level) {
-                    Prng rng;
+                    Prng_xoshiro rng;
+                    //Prng_sha256 rng;
                     uint64_t level_mask = 1;
                     for(int i = 0; i < tree_render_level; i++){
                         level_mask <<= 2;
@@ -1392,7 +1393,7 @@ struct TerrainTree {
     }
 
     dMesh buildMesh(dvec3 location, int min_subdivisions, terrain_upload_status_enum *status) {
-    	auto before = now();
+        auto before = now();
         if(verbose) std::cout << "building mesh from vantage point (" << location.x << ", " << location.y << ", " << location.z << ")\n";
         nonstd::vector<uint32_t> node_indices;
         nonstd::vector<glm::dvec3> verts;

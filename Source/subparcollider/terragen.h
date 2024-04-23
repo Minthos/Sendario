@@ -13,11 +13,19 @@ using glm::vec3;
 
 uint64_t hash(uint64_t seed_a, uint64_t seed_b);
 
-struct Prng {
+struct Prng_sha256 {
     uint32_t state[8];
     uint64_t message[8];
     uint64_t index;
 
+    void init(uint64_t seed_a, uint64_t seed_b);
+    uint64_t get();
+    double uniform();
+};
+
+struct Prng_xoshiro {
+    uint64_t s[4];
+    
     void init(uint64_t seed_a, uint64_t seed_b);
     uint64_t get();
     double uniform();
