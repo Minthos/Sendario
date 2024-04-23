@@ -23,6 +23,7 @@ INCDIR := -I/usr/local/include -IFastNoise2/include
 CXXFLAGS := -O2 -march=native
 #TAKEOFF_FLAGS := -std=c++20 -O2 -march=native -pthread
 TAKEOFF_FLAGS := -std=c++23 -O3 -mavx2 -ffast-math -march=native -mtune=native -pthread -Wno-deprecated -Wno-nan-infinity-disabled
+TAKEOFF_DEBUG_FLAGS := -std=c++23 -ggdb3 -D DEBUG -mavx2 -ffast-math -march=native -mtune=native -pthread -Wno-deprecated -Wno-nan-infinity-disabled
 COMPILER := clang++-18
 #COMPILER := g++
 
@@ -39,16 +40,16 @@ sha256.o: SHA-Intrinsics/sha256-x86.c
 	$(COMPILER) $(TAKEOFF_FLAGS) -pg -c SHA-Intrinsics/sha256-x86.c -o sha256.o
 
 sha256_debug.o: SHA-Intrinsics/sha256.c
-	$(COMPILER) $(TAKEOFF_FLAGS) -ggdb3 -D DEBUG -c SHA-Intrinsics/sha256.c -o sha256_debug.o
+	$(COMPILER) $(TAKEOFF_DEBUG_FLAGS) -c SHA-Intrinsics/sha256.c -o sha256_debug.o
 
 terragen_debug.o: terragen.cpp
-	$(COMPILER) $(TAKEOFF_FLAGS) -ggdb3 -D DEBUG -c terragen.cpp -o terragen_debug.o $(LIBDIR) $(INCDIR)
+	$(COMPILER) $(TAKEOFF_DEBUG_FLAGS) -c terragen.cpp -o terragen_debug.o $(LIBDIR) $(INCDIR)
 
 takeoff: $(NEW_SRC) terragen.o sha256.o
 	$(COMPILER) $(TAKEOFF_FLAGS) -pg terragen.o sha256.o client.cpp -o takeoff $(LIBDIR) $(INCDIR) $(NEW_LIBS)
 
 takeoff_debug: $(NEW_SRC) terragen_debug.o sha256_debug.o
-	$(COMPILER) $(TAKEOFF_FLAGS) -ggdb3 -D DEBUG terragen_debug.o sha256_debug.o client.cpp -o takeoff_debug $(LIBDIR) $(INCDIR) $(NEW_LIBS)
+	$(COMPILER) $(TAKEOFF_DEBUG_FLAGS) terragen_debug.o sha256_debug.o client.cpp -o takeoff_debug $(LIBDIR) $(INCDIR) $(NEW_LIBS)
 
 #takeoff_debug: $(NEW_SRC)
 #	$(COMPILER) -g3 -D DEBUG -march=native -c $(NEW_SRC) $(NEW_LIBS)
