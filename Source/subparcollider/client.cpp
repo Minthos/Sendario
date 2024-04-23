@@ -20,6 +20,15 @@
 #include <vector>
 #include <thread>
 
+#ifndef __clang__
+#define BOOST_STACKTRACE_USE_BACKTRACE
+#include <boost/stacktrace.hpp>
+#endif
+
+#include <signal.h>
+#include <execinfo.h>
+#include <ucontext.h>
+
 // Rendering quality settings
 float anisotropy = 16.0f; // should be 4 with no upscaling, 16 with upscaling
 int antialiasing = 2; // 1 (no upscaling) and 2 (4 samples per pixel) are good values
@@ -34,6 +43,24 @@ using std::string;
 
 std::unordered_map<string, GLuint> shaders;
 std::unordered_map<string, GLuint> textures;
+
+void print_backtrace(int sig, siginfo_t *info, void *secret) {
+#ifndef __clang__
+	boost::stacktrace::stacktrace st;
+    for (std::size_t i = 0; i < st.size(); ++i) {
+		std::stringstream ss;
+		ss << st[i];
+		std::string s = ss.str();
+    	size_t pos = s.find(':');
+		if(pos != std::string::npos){
+			// subtract 2 from the line number because apparently that's necessary? ahh the joys of programming
+			std::cout << i << "# " << s.substr(0, pos) << " " << std::atoi(s.c_str() + pos + 1) - 2 << std::endl;
+		} else {
+			std::cout << i << "# " << s << std::endl;
+		}
+    }
+#endif
+}
 
 char* readShaderSource(const char* filePath) {
     FILE* file = fopen(filePath, "rb");
@@ -645,6 +672,13 @@ terrain_lock.unlock();
 }
 
 int main(int argc, char** argv) {
+	struct sigaction sa;
+	sa.sa_sigaction = print_backtrace;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = SA_SIGINFO;
+	sigaction(SIGSEGV, &sa, NULL);
+	sigaction(SIGABRT, &sa, NULL);
+
     auto start_time = now();
     int seed = 52;
     int lod = 20;
@@ -923,16 +957,15 @@ terrain_lock.unlock(); // release mutex
         static nonstd::vector<ctnode*> stack;
         stack.push_back(t.root);
         while(stack.size()){
-            ctnode* node = stack[stack.size() - 1];
-            stack.pop_back();
+            ctnode* node = stack.pop_back();
             if(node->count > 1) {
                 stack.push_back(&t.root[node->left_child]);
                 stack.push_back(&t.root[node->left_child + 1]);
             } else {
                 ctleaf *leaf = &t.leaves[node->first_leaf];
                 render(leaf->object->ro);
-//#ifdef DEBUG
-#ifdef THIS_CAUSES_OPENGL_ERRORS
+#ifdef DEBUG
+//#ifdef THIS_CAUSES_OPENGL_ERRORS
                 dvec3 hi = node->hi.todvec3();
                 dvec3 lo = node->lo.todvec3();
                 dvec3 center = (hi + lo) * 0.5;
@@ -942,11 +975,15 @@ terrain_lock.unlock(); // release mutex
 
                     PhysicsObject greencube = PhysicsObject(dMesh::createBox(center, size.x, size.y, size.z), nil);
                     RenderObject ro = RenderObject(&greencube);
+        			checkGLerror();
                     ro.upload_boxen_mesh();
+//        			glFlush();
                     ro.shader = shaders["box"];
                     ro.texture = textures["green_transparent_wireframe_box_64x64.png"];
+        			checkGLerror();
 //                    glDisable(GL_CULL_FACE);
                     render(&ro);
+        			checkGLerror();
 //                    glEnable(GL_CULL_FACE);
                 }
 #endif

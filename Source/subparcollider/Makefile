@@ -16,7 +16,7 @@ CPP_SRC := lintedrender5.cpp sdlwrapper.cpp
 SWIFT_SRC := main.swift gptphysics.swift spatialtypes.swift boxoid.swift gamelogic.swift
 OBJC_HEADERS := subparcollider-Bridging-Header.h
 LIBS := -lglfw -lGL -lGLEW -lm -lSDL2
-NEW_LIBS := -lGL -lGLEW -lglut -lGLU -lm -lglfw libFastNoise.a
+NEW_LIBS := -lGL -lGLEW -lglut -lGLU -lm -lglfw libFastNoise.a -lboost_stacktrace_backtrace -lbacktrace
 LIBDIR := 
 #LIBDIR := -L/usr/local/lib
 INCDIR := -I/usr/local/include -IFastNoise2/include
@@ -26,6 +26,7 @@ TAKEOFF_FLAGS := -std=c++23 -O3 -march=native -pthread
 TAKEOFF_DEBUG_FLAGS := -std=c++23 -ggdb3 -D DEBUG -march=native -pthread
 COMPILER := clang++-18
 #COMPILER := g++
+COMPILER_DEBUG := g++
 
 SHA-Intrinsics/sha256-x86.c:
 	git clone https://github.com/noloader/SHA-Intrinsics.git
@@ -40,16 +41,16 @@ sha256.o: SHA-Intrinsics/sha256-x86.c
 	$(COMPILER) $(TAKEOFF_FLAGS) -pg -c SHA-Intrinsics/sha256-x86.c -o sha256.o
 
 sha256_debug.o: SHA-Intrinsics/sha256.c
-	$(COMPILER) $(TAKEOFF_DEBUG_FLAGS) -c SHA-Intrinsics/sha256.c -o sha256_debug.o
+	$(COMPILER_DEBUG) $(TAKEOFF_DEBUG_FLAGS) -c SHA-Intrinsics/sha256.c -o sha256_debug.o
 
 terragen_debug.o: terragen.cpp
-	$(COMPILER) $(TAKEOFF_DEBUG_FLAGS) -c terragen.cpp -o terragen_debug.o $(LIBDIR) $(INCDIR)
+	$(COMPILER_DEBUG) $(TAKEOFF_DEBUG_FLAGS) -c terragen.cpp -o terragen_debug.o $(LIBDIR) $(INCDIR)
 
 takeoff: $(NEW_SRC) terragen.o sha256.o
 	$(COMPILER) $(TAKEOFF_FLAGS) -pg terragen.o sha256.o client.cpp -o takeoff $(LIBDIR) $(INCDIR) $(NEW_LIBS)
 
 takeoff_debug: $(NEW_SRC) terragen_debug.o sha256_debug.o
-	$(COMPILER) $(TAKEOFF_DEBUG_FLAGS) terragen_debug.o sha256_debug.o client.cpp -o takeoff_debug $(LIBDIR) $(INCDIR) $(NEW_LIBS)
+	$(COMPILER_DEBUG) $(TAKEOFF_DEBUG_FLAGS) terragen_debug.o sha256_debug.o client.cpp -o takeoff_debug $(LIBDIR) $(INCDIR) $(NEW_LIBS)
 
 #takeoff_debug: $(NEW_SRC)
 #	$(COMPILER) -g3 -D DEBUG -march=native -c $(NEW_SRC) $(NEW_LIBS)
