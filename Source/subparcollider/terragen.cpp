@@ -104,16 +104,15 @@ double Prng_sha256::uniform() {
     return (*(double*)(&to_12))-1.0;
 }
 
-static inline uint64_t rotl(const uint64_t x, int k) {
-    return (x << k) | (x >> (64 - k));
+void Prng_xoshiro::init(uint64_t seed_a, uint64_t seed_b) {
+	s[0] = seed_a ^ 0x6a09e667bb67ae85;
+	s[1] = seed_b ^ 0x3c6ef372a54ff53a;
+    s[2] = 0x510e527f9b05688c;
+    s[3] = 0x1f83d9ab5be0cd19;
 }
 
-void Prng_xoshiro::init(uint64_t seed_a, uint64_t seed_b) {
-    uint64_t grrstate[] = {
-        seed_a ^ 0x6a09e667bb67ae85, seed_b ^ 0x3c6ef372a54ff53a,
-        0x510e527f9b05688c, 0x1f83d9ab5be0cd19
-    };
-    memcpy((void*)s, (void*)grrstate, sizeof(grrstate));
+static inline uint64_t rotl(const uint64_t x, int k) {
+    return (x << k) | (x >> (64 - k));
 }
 
 uint64_t Prng_xoshiro::get() {
