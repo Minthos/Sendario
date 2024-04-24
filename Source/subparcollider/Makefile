@@ -22,7 +22,7 @@ LIBDIR :=
 INCDIR := -I/usr/local/include -IFastNoise2/include
 CXXFLAGS := -O2 -march=native
 #TAKEOFF_FLAGS := -std=c++20 -O2 -march=native -pthread
-TAKEOFF_FLAGS := -std=c++23 -O3 -march=native -pthread
+TAKEOFF_FLAGS := -std=c++23 -O3 -march=native -pthread -Wno-deprecated
 TAKEOFF_DEBUG_FLAGS := -std=c++23 -ggdb3 -D DEBUG -march=native -pthread
 COMPILER := clang++-18
 #COMPILER := g++
