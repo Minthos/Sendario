@@ -646,10 +646,6 @@ terrain_lock.lock();
         auto end = now();
         double time_taken = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
 terrain_lock.unlock();
-        if(time_taken > 10000.0 * lod) {
-            // uncomment to see something broken
-            //current_lod *= (1000000.0 / duration);
-        }
         while(terrain_upload_status != idle) { // wait for main thread to finish shoveling
             if(terrain_upload_status == should_exit){
                 return;
@@ -916,27 +912,12 @@ terrain_lock.unlock(); // release mutex
             player_character->body.rot = glm::conjugate(camera_rot * glm::angleAxis(glm::radians(0.0f), glm::vec3(0.0, 1.0, 0.0)));
             player_character->body.pos += player_character->body.rot * input_vector(window) * dt * 10.0;
             player_global_pos = origo + player_character->body.pos;
-
             ttnode* tile = glitch->terrain[player_global_pos];
-
-//            double terrain_elevation = zone->elevation();
-//            double terrain_elevation = tile->elevation();
-//            double terrain_elevation = tile->elevation_naive(player_character->body.pos, &glitch->body.mesh);
             double altitude = tile->player_altitude(player_character->body.pos, &glitch->body.mesh, local_gravity_normalized);
-//            double terrain_elevation = tile->elevation_projected(player_character->body.pos, &glitch->body.mesh, local_gravity_normalized);
-//            dvec3 player_elevation_3d = player_global_pos - tile->spheroidPosition(player_global_pos, glitch->terrain.radius);
-            // this player_elevation is always positive, even when terrain_elevation is negative..
-//            double player_elevation = glm::length(player_elevation_3d);
-
-//            double player_elevation = glm::length(player_global_pos) - glitch->terrain.radius;
-
-//            player_character->body.pos += local_gravity_normalized * (player_elevation - terrain_elevation);
             player_character->body.pos += altitude * local_gravity_normalized;
             player_global_pos = origo + player_character->body.pos;
-
             // optimization: compute view matrix here instead of in render()
             camera_target = vec3(player_character->body.pos);
-            //glitch.body.rot = glm::normalize(glm::angleAxis(0.0004, glm::dvec3(0.0, 0.0, 0.0)) * glitch.body.rot);
         }
         if(game_paused && !camera_dirty){
             usleep(8000.0);

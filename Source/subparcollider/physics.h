@@ -19,8 +19,21 @@
 
 #define nil nullptr
 
-
-
+#define takeoff_memcpy memcpy
+/*
+void *takeoff_memcpy(void *dest, const void *src, size_t n) {
+	size_t i = 0;
+	while((i + 1) * sizeof(uint64_t) <= n){
+		((uint64_t*)dest)[i] = ((uint64_t*)src)[i];
+		i++;
+	}
+	while(i * sizeof(uint8_t) < n){
+		((uint8_t*)dest)[i] = ((uint8_t*)src)[i];
+		i++;
+	}
+	return dest;
+}
+*/
 using std::isnan;
 using std::mutex;
 using std::string;
@@ -101,7 +114,7 @@ template <typename T> struct vector {
     vector<T> copy() {
         vector<T> tmp;
         tmp.data = (T*)malloc(sizeof(T) * count);
-        memcpy(tmp.data, data, sizeof(T) * count);
+        takeoff_memcpy(tmp.data, data, sizeof(T) * count);
         tmp.count = count;
         tmp.capacity = count;
         return tmp;
@@ -117,12 +130,12 @@ template <typename T> struct vector {
 
     void push_back(const T& val) {
         if(count == capacity) reserve(max(4, capacity) * 2);
-        memcpy(&data[count++], &val, sizeof(T));
+        takeoff_memcpy(&data[count++], &val, sizeof(T));
     }
 
     void push_back(T&& val) {
         if(count == capacity) reserve(max(4, capacity) * 2);
-        memcpy(&data[count++], &val, sizeof(T));
+        takeoff_memcpy(&data[count++], &val, sizeof(T));
     }
 
     template <typename... Args> constexpr T& emplace_back(Args&&... args) {
@@ -666,13 +679,13 @@ struct Unit {
             uint64_t vert_idx = 0;
 
             for(int i = 0; i < components.size(); i++){
-                memcpy(&verts[vert_idx], components[i].mesh.verts, components[i].mesh.num_verts * sizeof(dvec3));
+                takeoff_memcpy(&verts[vert_idx], components[i].mesh.verts, components[i].mesh.num_verts * sizeof(dvec3));
                 vert_idx += components[i].mesh.num_verts;
             }
 
             dTri *tris = (dTri*)&verts[vert_idx];
             for(int i = 0; i < components.size(); i++){
-                memcpy(&tris[tri_idx], components[i].mesh.tris, components[i].mesh.num_tris * sizeof(dTri));
+                takeoff_memcpy(&tris[tri_idx], components[i].mesh.tris, components[i].mesh.num_tris * sizeof(dTri));
                 tri_idx += components[i].mesh.num_tris;
             }
             
@@ -1005,7 +1018,7 @@ struct TerrainTree {
 
     TerrainTree copy() {
         TerrainTree tmp;
-        memcpy(&tmp, this, sizeof(TerrainTree));
+        takeoff_memcpy(&tmp, this, sizeof(TerrainTree));
         tmp.nodes = nodes.copy();
         if(LOW_MEMORY_MODE) {
             for(int i = 0; i < tmp.nodes.count; i++) {
@@ -1037,7 +1050,7 @@ struct TerrainTree {
     // omit nodes that haven't been used since the cutoff
     TerrainTree omitting_copy(uint32_t cutoff) {
         TerrainTree tmp;
-        memcpy(&tmp, this, sizeof(TerrainTree));
+        takeoff_memcpy(&tmp, this, sizeof(TerrainTree));
         bzero(&tmp.nodes, sizeof(tmp.nodes));
         tmp.nodes.reserve(nodes.count);
         for(int i = 0; i < 8; i++) {
@@ -1156,9 +1169,8 @@ struct TerrainTree {
                         level_mask <<= 2;
                         level_mask |= 3;
                     }
-                    // create a seed for this tile's level 16 parent (or the tile itself if at level 16)
                     rng.init(path & level_mask, seed);
-                    //
+                    // prescriptive, not descriptive:
                     // elevation 20-2000: vegetation and rocks
                     // low roughness: grass
                     // medium roughness: trees
@@ -1406,8 +1418,8 @@ struct TerrainTree {
         dvec3 *vertices = (dvec3*)malloc(verts.size() * sizeof(dvec3) + tris.size() * sizeof(dTri));
         dTri *triangles = (dTri*)&vertices[verts.size()];
 
-        memcpy(vertices, &verts[0], verts.size() * sizeof(dvec3));
-        memcpy(triangles, &tris[0], tris.size() * sizeof(dTri));
+        takeoff_memcpy(vertices, &verts[0], verts.size() * sizeof(dvec3));
+        takeoff_memcpy(triangles, &tris[0], tris.size() * sizeof(dTri));
         auto after = now();
         double time_taken = std::chrono::duration_cast<std::chrono::microseconds>(after - before).count() / 1000.0;
         if(verbose) std::cout << tris.size() << " triangles generated in " << time_taken << "ms (" << tris.size() / (time_taken * 0.001) << "tris/s)\n";
@@ -1430,7 +1442,7 @@ struct Celestial {
     nonstd::vector<Celestial> orbiting_bodies;
 
     Celestial(Celestial &&rhs) noexcept {
-        memcpy(this, &rhs, sizeof(Celestial));
+        takeoff_memcpy(this, &rhs, sizeof(Celestial));
         std::cout << "Celestial " << name << " memcpy copy constructor\n";
     }
 
@@ -1566,5 +1578,23 @@ reuse texture patterns with different colors.
 // 32 KB L1 data cache at 4 or 5 cycles
 // 512 KB L2 cache at 14 cycles
 // 96 MB shared L3 cache at 47 cycles
+
+/*
+DRAM row size
+sudo modprobe eeprom
+decode-dimms
+Banks x Rows x Columns x Bits                    16 x 16 x 10 x 64
+
+Rows and columns are actually number of address bits (you can check the decode-dimms source at https://fossies.org/linux/i2c-tools/eeprom/decode-dimms, and understand what the code is doing when you look at the DDR4 SPD information: https://en.wikipedia.org/wiki/Serial_presence_detect#DDR4_SDRAM)
+
+Thus, if we have 10 column bits, we have 1024 columns (2^10), where each column is composed of the module width (64 as per the data above, represented as "bits"). Since we can also see that the SDRAM device width is 8x, we can deduce that the DIMM locksteps 8 SDRAM chips (those black boxes you see in your DRAM stick) to get that total width of 64 bits.
+
+The row buffer size in my DDR4 is, therefore, 64 bits * 1024 columns = 65536 bits wide (8192 Bytes). Row buffer sizes in DDR3 and DDR4 are mostly this length, but new architectures such as HMC and HBM have different sizes.
+
+So, in one short commandline, to return in bits (just divide by 8 to get bytes): decode-dimms | grep "Columns x Bits" | awk -F 'x' '{print (2^$(NF-1))*$NF}
+
+https://stackoverflow.com/questions/66240032/what-is-the-typical-dram-row-buffer-size-how-to-find-it
+
+*/
 
 
