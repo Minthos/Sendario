@@ -1,58 +1,23 @@
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 TODO:
+color tiles beyond vegetation LOD according to estimated vegetation so the vegetation doesn't abruptly cut off
+physics
+gameplay (guns? vehicles? resources? crafting?)
 
-fps wasd movement
-re-center the player on a new LOD zone periodically
-gravity, velocity and collision test against ground
 
+LATER:
 positioning celestials relative to each other (galactic center -> star -> planet -> moon)
 universally unambiguous coordinate system (celestial-> zone-> pos)
 rts view with camera panning with keyboard
-
 fluid simulation
+character creation
+speedtree for better trees
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+DONE:
+fps wasd movement
+re-center the player on a new LOD zone periodically
+clamp to ground
 
 
 ---
