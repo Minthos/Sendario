@@ -303,13 +303,10 @@ struct RenderObject {
             glm::vec3 normal = glm::normalize(glm::cross(floatverts[1] - floatverts[0], floatverts[2] - floatverts[0]));
             float inclination = glm::angle(normal, glm::vec3(t->normal));
             float insolation = glm::dot(normal, glm::vec3(0.4, 0.4, 0.4));
-            float elevation = (t->elevations[0] + t->elevations[1] + t->elevations[2]) / 3.0;
             inclination /= PI;
             insolation += 0.5;
-            
             for(int j = 0; j < 3; j++){
                 float elevation = t->elevations[j];
-
                 vec3 fragColor = vec3(0.0f);
                 vec3 grass = vec3(0.0f);
                 vec3 rock = vec3(0.0f);
@@ -354,18 +351,8 @@ struct RenderObject {
                     fragColor = mix(vec3(0.15, 0.4, 0.15), vec3(0, 0, 0), 1.0 - elevation);
                     break;
                 }
-
                 vertices.insert(vertices.end(), {floatverts[j], t->type_id, fragColor});
             }
-/*            if(t->type_id == VERTEX_TYPE_TERRAIN){
-                for(int j = 0; j < 3; j++){
-                    vertices.insert(vertices.end(), {floatverts[j], t->type_id, glm::vec3(inclination, insolation, t->elevations[j])});
-                }
-            } else {
-                for(int j = 0; j < 3; j++){
-                    vertices.insert(vertices.end(), {floatverts[j], t->type_id, glm::vec3(inclination, insolation, t->elevations[j])});
-                }
-            }*/
         }
         auto begin_upload = now();
         glBindVertexArray(vao);
