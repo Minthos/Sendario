@@ -18,5 +18,5 @@ chmod +x llvm.sh
 sudo ./llvm.sh 18
 
 # to fix clang c++ linker error
-sudo apt-get install libc++abi-dev libc++-dev
+sudo apt-get install libc++abi-dev libc++-dev libstdc++-12-dev
 
