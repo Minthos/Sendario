@@ -40,6 +40,7 @@ using std::string;
 auto now = std::chrono::high_resolution_clock::now;
 using glm::dvec3;
 using glm::vec3;
+using glm::vec4;
 using glm::dmat4;
 using glm::dmat3;
 using glm::dquat;
@@ -63,6 +64,7 @@ enum terrain_upload_status_enum {
 enum vertex_type_id {
     VERTEX_TYPE_NONE,
     VERTEX_TYPE_TERRAIN,
+    VERTEX_TYPE_FARTERRAIN,
     VERTEX_TYPE_TREETRUNK,
     VERTEX_TYPE_LEAF
 };
@@ -354,10 +356,11 @@ struct dTri {
     float elevations[3];
     glm::dvec3 normal;
     int32_t type_id;
+    float foliage_density;
 
     dTri() {}
 
-    dTri(uint32_t pverts[3], dvec3* vertData, dvec3 center, int32_t ptype_id) {
+    dTri(uint32_t pverts[3], dvec3* vertData, dvec3 center, int32_t ptype_id, float pfoliage_density) {
         verts[0] = pverts[0];
         verts[1] = pverts[1];
         verts[2] = pverts[2];
@@ -367,6 +370,7 @@ struct dTri {
             normal = -normal;
         }
         type_id = ptype_id;
+        foliage_density = pfoliage_density;
     }
 };
 
@@ -425,8 +429,8 @@ struct dMesh {
         for(int i = 0; i < 6; i++) {
             uint32_t tri1[3] = {faces[i * 4], faces[i * 4 + 1], faces[i * 4 + 2]};
             uint32_t tri2[3] = {faces[i * 4 + 1], faces[i * 4 + 2], faces[i * 4 + 3]};
-            triangles[i * 2] = dTri(tri1, vertices, center, VERTEX_TYPE_NONE);
-            triangles[i * 2 + 1] = dTri(tri2, vertices, center, VERTEX_TYPE_NONE);
+            triangles[i * 2] = dTri(tri1, vertices, center, VERTEX_TYPE_NONE, 0);
+            triangles[i * 2 + 1] = dTri(tri2, vertices, center, VERTEX_TYPE_NONE, 0);
         }
         return dMesh(vertices, numVertices, triangles, numTriangles);
     }
@@ -843,6 +847,7 @@ struct ttnode {
     double roughnesses[3]; // terrain roughness at the node's 3 corners
     dvec3 verts[3]; // vertices (node space (octahedron with manhattan distance to center = r everywhere on the surface))
     uint32_t last_used_at_frame;
+    float foliage_density;
     nonstd::vector<texvert> vegetation;
 
 
@@ -1114,7 +1119,7 @@ struct TerrainTree {
                     initial_corners[indices[i][0]],
                     initial_corners[indices[i][1]],
                     initial_corners[indices[i][2]],
-                    0, nonstd::vector<texvert>() } );
+                    0, 0, nonstd::vector<texvert>() } );
         }
     }
 
@@ -1140,8 +1145,13 @@ struct TerrainTree {
             double ratio = distance / nodeWidth;
 
             if(ratio > LOD_DISTANCE_SCALE || level >= MAX_LOD) {
+                int tree_render_level = 18;
                 dTri t;
-                t.type_id = VERTEX_TYPE_TERRAIN;
+                if(level < tree_render_level){
+                    t.type_id = VERTEX_TYPE_FARTERRAIN;
+                } else {
+                    t.type_id = VERTEX_TYPE_TERRAIN;
+                }
                 dvec3 zonespace_center = {0, 0, 0};
                 for(int i = 0; i < 3; i++) {
                     t.verts[i] = verts->size();
@@ -1154,16 +1164,26 @@ struct TerrainTree {
                 zonespace_center /= 3.0;
                 // the local normalized inverse gravity vector in spheroid and octahedron space
                 t.normal = normalize(nodes[node_idx].verts[0]);
+                glm::vec3 floatverts[3] = {
+                    glm::vec3((*verts)[t.verts[0]]) - zonespace_center,
+                    glm::vec3((*verts)[t.verts[1]]) - zonespace_center,
+                    glm::vec3((*verts)[t.verts[2]]) - zonespace_center};
+                glm::vec3 surfacenormal = glm::normalize(glm::cross(
+                            floatverts[1] - floatverts[0], floatverts[2] - floatverts[0]));
+                float density = max(0.0f, min(1.0f, (nodes[node_idx].elevations[0] / 50.0f)));
+                density = max(0.0f, min(density, 1.0f - ((nodes[node_idx].elevations[0] - 1500.0f) / 1500.0f)));
+                float inclination = length(glm::vec3(t.normal) - surfacenormal);
+                density *= (1.0f - inclination);
+                nodes[node_idx].foliage_density = density;
                 
                 nodes[node_idx].triangle = tris->size();
+                t.foliage_density = density;
                 tris->push_back(t);
                 nodes[node_idx].rendered_at_level = level;
 
                 // generate vegetation and shit
-                int tree_render_level = 18;
-                if(level >= tree_render_level) {
+                if(level >= tree_render_level){
                     Prng_xoshiro rng;
-                    //Prng_sha256 rng;
                     uint64_t level_mask = 1;
                     for(int i = 0; i < tree_render_level; i++){
                         level_mask <<= 2;
@@ -1181,20 +1201,11 @@ struct TerrainTree {
                     int num_subdivisions = MAX_LOD - level;
                     int offset = 1 + (2 * level);
                     int num_leaves = 1 << (2 * num_subdivisions);
-                    glm::vec3 floatverts[3] = {
-                        glm::vec3((*verts)[t.verts[0]]) - zonespace_center,
-                        glm::vec3((*verts)[t.verts[1]]) - zonespace_center,
-                        glm::vec3((*verts)[t.verts[2]]) - zonespace_center};
-                    glm::vec3 surfacenormal = glm::normalize(glm::cross(floatverts[1] - floatverts[0], floatverts[2] - floatverts[0]));
                     glm::mat4 transformation = glm::toMat4(glm::rotation( glm::vec3(surfacenormal), glm::vec3(0.0, 1.0, 0.0)));
                     glm::vec3 object_space_verts[3] = {
                         glm::vec3(transformation * (glm::vec4(floatverts[0], 1.0))),
                         glm::vec3(transformation * (glm::vec4(floatverts[1], 1.0))),
                         glm::vec3(transformation * (glm::vec4(floatverts[2], 1.0)))};
-                    float density = max(0.0f, min(1.0f, (nodes[node_idx].elevations[0] / 50.0f)));
-                    density = max(0.0f, min(density, 1.0f - ((nodes[node_idx].elevations[0] - 1500.0f) / 1500.0f)));
-                    float inclination = length(glm::vec3(t.normal) - surfacenormal);
-                    density *= (1.0f - inclination);
                     // "leaf" here refers to a leaf node of the terrain tree, not a piece of geometry in the vegetation we're generating
                     for(int leaf = 0; leaf < num_leaves; leaf++){
                         uint64_t estimated_path = path;
@@ -1287,7 +1298,7 @@ struct TerrainTree {
                 new_verts[0],
                 new_verts[1],
                 new_verts[2],
-                0, nonstd::vector<texvert>() });
+                0, 0, nonstd::vector<texvert>() });
             // the other 3 triangles neighbor the center triangle and child trangles of the parent's neighbors
             // we can't know the parent's neighbors' children because they may not exist yet
             for(int i = 0; i < 3; i++) {
@@ -1302,7 +1313,7 @@ struct TerrainTree {
                     nodes[node_idx].verts[i],
                     new_verts[i],
                     new_verts[(i + 2) % 3],
-                    0, nonstd::vector<texvert>() });
+                    0, 0, nonstd::vector<texvert>() });
             }
         }
         // we need to go deeper

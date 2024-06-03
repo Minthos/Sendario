@@ -11,7 +11,7 @@ layout(location = 0) out vec4 fragColor;
 layout(location = 1) out ivec4 velocityOut;
 
 void main() {
-    const float pi = 3.1415926535897932384626433832795;
+/*    const float pi = 3.1415926535897932384626433832795;
     float inclination = texCoord.x / pi;
     float insolation = texCoord.y + 0.5;
     float elevation = texCoord.z;
@@ -31,12 +31,14 @@ void main() {
         }
         break;
     case 2: // treetrunk
-        fragColor = mix(vec4(0.4, 0.3, 0.2, 1.0), vec4(0, 0, 0, 1), 1.0 - texCoord.z);
+        fragColor = mix(vec4(0.4, 0.3, 0.2, 1.0), vec4(0, 0, 0, 1), 1.0 - elevation);
         break;
     case 3: // leaf
-        fragColor = mix(vec4(vec3(0.15, 0.4, 0.15), 1.0), vec4(0, 0, 0, 1), 1.0 - texCoord.z);
+        fragColor = mix(vec4(vec3(0.15, 0.4, 0.15), 1.0), vec4(0, 0, 0, 1), 1.0 - elevation);
         break;
     }
+    */
+    fragColor = vec4(texCoord, 1.0);
     float depth = log2(z + 2.0) * 0.03;
     velocityOut = ivec4(velocity * 4096.0, z, 1);
     gl_FragDepth = depth;
