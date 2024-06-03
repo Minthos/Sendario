@@ -306,53 +306,55 @@ struct RenderObject {
             float elevation = (t->elevations[0] + t->elevations[1] + t->elevations[2]) / 3.0;
             inclination /= PI;
             insolation += 0.5;
-
-            vec3 fragColor = vec3(0.0f);
-            vec3 grass = vec3(0.0f);
-            vec3 rock = vec3(0.0f);
-            vec3 sand = vec3(0.0f);
-            vec3 color = vec3(0.0f);
-            vec3 foliage = vec3(0.0f);
-            switch(t->type_id){
-            case VERTEX_TYPE_TERRAIN:
-                grass = mix(vec3(0.15, 0.4, 0.15), vec3(1.0), min(1.0, max(0.0, (elevation - 2000.0) / 1000.0)));
-                rock = mix(vec3(0.7, 0.5, 0.3), vec3(0.15), min(1.0, max(0.0, elevation / 2000.0)));
-                color = mix(grass, rock, max(0.0, min(1.0, (-0.5 + 5 * inclination) - max(0.0, (elevation - 3000) / 2000.0) )));
-                sand = mix(vec3(194/255.0, 178/255.0, 128/255.0), color, min(1.0, max(0.0, (elevation + (20.0 * inclination)) / 10.0)));
-                if(elevation < 1.0){
-                    color = vec3(0.1, 0.2, 0.3);
-                    fragColor = vec3(color * (3.0 + insolation) * 0.25);
-                } else if(elevation < 100.0) {
-                    fragColor = vec3(sand * insolation);
-                } else {
-                    fragColor = vec3(color * insolation);
-                }
-                break;
-            case VERTEX_TYPE_FARTERRAIN:
-                grass = mix(vec3(0.15, 0.4, 0.15), vec3(1.0), min(1.0, max(0.0, (elevation - 2000.0) / 1000.0)));
-                rock = mix(vec3(0.7, 0.5, 0.3), vec3(0.15), min(1.0, max(0.0, elevation / 2000.0)));
-                color = mix(grass, rock, max(0.0, min(1.0, (-0.5 + 5 * inclination) - max(0.0, (elevation - 3000) / 2000.0) )));
-                sand = mix(vec3(194/255.0, 178/255.0, 128/255.0), color, min(1.0, max(0.0, (elevation + (20.0 * inclination)) / 10.0)));
-                if(elevation < 1.0){
-                    color = vec3(0.1, 0.2, 0.3);
-                    fragColor = vec3(color * (3.0 + insolation) * 0.25);
-                } else if(elevation < 100.0) {
-                    fragColor = vec3(sand * insolation);
-                } else {
-                    fragColor = vec3(color * insolation);
-                }
-                foliage = mix(vec3(0.15, 0.4, 0.15), vec3(0, 0, 0), 1.0 - inclination);
-                fragColor = mix(fragColor, foliage, t->foliage_density);
-                break;
-            case VERTEX_TYPE_TREETRUNK:
-                fragColor = mix(vec3(0.4, 0.3, 0.2), vec3(0, 0, 0), 1.0 - elevation);
-                break;
-            case VERTEX_TYPE_LEAF:
-                fragColor = mix(vec3(0.15, 0.4, 0.15), vec3(0, 0, 0), 1.0 - elevation);
-                break;
-            }
-
+            
             for(int j = 0; j < 3; j++){
+                float elevation = t->elevations[j];
+
+                vec3 fragColor = vec3(0.0f);
+                vec3 grass = vec3(0.0f);
+                vec3 rock = vec3(0.0f);
+                vec3 sand = vec3(0.0f);
+                vec3 color = vec3(0.0f);
+                vec3 foliage = vec3(0.0f);
+                switch(t->type_id){
+                case VERTEX_TYPE_TERRAIN:
+                    grass = mix(vec3(0.15, 0.4, 0.15), vec3(1.0), min(1.0, max(0.0, (elevation - 2000.0) / 1000.0)));
+                    rock = mix(vec3(0.7, 0.5, 0.3), vec3(0.15), min(1.0, max(0.0, elevation / 2000.0)));
+                    color = mix(grass, rock, max(0.0, min(1.0, (-0.5 + 5 * inclination) - max(0.0, (elevation - 3000) / 2000.0) )));
+                    sand = mix(vec3(194/255.0, 178/255.0, 128/255.0), color, min(1.0, max(0.0, (elevation + (20.0 * inclination)) / 10.0)));
+                    if(elevation < 1.0){
+                        color = vec3(0.1, 0.2, 0.3);
+                        fragColor = vec3(color * (3.0 + insolation) * 0.25);
+                    } else if(elevation < 100.0) {
+                        fragColor = vec3(sand * insolation);
+                    } else {
+                        fragColor = vec3(color * insolation);
+                    }
+                    break;
+                case VERTEX_TYPE_FARTERRAIN:
+                    grass = mix(vec3(0.15, 0.4, 0.15), vec3(1.0), min(1.0, max(0.0, (elevation - 2000.0) / 1000.0)));
+                    rock = mix(vec3(0.7, 0.5, 0.3), vec3(0.15), min(1.0, max(0.0, elevation / 2000.0)));
+                    color = mix(grass, rock, max(0.0, min(1.0, (-0.5 + 5 * inclination) - max(0.0, (elevation - 3000) / 2000.0) )));
+                    sand = mix(vec3(194/255.0, 178/255.0, 128/255.0), color, min(1.0, max(0.0, (elevation + (20.0 * inclination)) / 10.0)));
+                    if(elevation < 1.0){
+                        color = vec3(0.1, 0.2, 0.3);
+                        fragColor = vec3(color * (3.0 + insolation) * 0.25);
+                    } else if(elevation < 100.0) {
+                        fragColor = vec3(sand * insolation);
+                    } else {
+                        fragColor = vec3(color * insolation);
+                    }
+                    foliage = mix(vec3(0.15, 0.4, 0.15), vec3(0, 0, 0), 1.0 - inclination);
+                    fragColor = mix(fragColor, foliage, t->foliage_density[j]);
+                    break;
+                case VERTEX_TYPE_TREETRUNK:
+                    fragColor = mix(vec3(0.4, 0.3, 0.2), vec3(0, 0, 0), 1.0 - elevation);
+                    break;
+                case VERTEX_TYPE_LEAF:
+                    fragColor = mix(vec3(0.15, 0.4, 0.15), vec3(0, 0, 0), 1.0 - elevation);
+                    break;
+                }
+
                 vertices.insert(vertices.end(), {floatverts[j], t->type_id, fragColor});
             }
 /*            if(t->type_id == VERTEX_TYPE_TERRAIN){
