@@ -1,6 +1,6 @@
 # Takeoff Sendario
 
-### Massively multiplayer sci-fi physics sandbox
+### Massively multiplayer sci-fi physics sandbox/game
 
 (most of this has not been implemented yet)
 
