@@ -1515,6 +1515,20 @@ struct state_update {
 
 Physics solving
 
+enable collision detection for trees
+
+when two objects collide they may deform at the location they were hit.
+chip off a flake and leave a crater
+split in to or more pieces
+bend around a line or point in object space
+compress along an axis
+
+
+
+
+
+----
+
 To intersect two meshes we can do point-triangle intersection and edge-edge intersection.
 
 

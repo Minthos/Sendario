@@ -779,9 +779,11 @@ int main(int argc, char** argv) {
         std::cout << "aa: antialiasing. 1 to 8. Number of samples per pixel is the square of this number so 2 is 4x, 4 is 16x.\n";
         std::cout << "af: anisotropic filtering. 0, to 16.\n";
         std::cout << "blur: the amount of motion blur. 0 to 50.\n";
-        std::cout << "\nexamples:\nlow: aa=1 af=0 blur=0 bs=10000 lod=10\n";
-        std::cout << "recommended: aa=2 af=16 blur=3 lod=20\n";
-        std::cout << "ultra: aa=4 af=16 blur=3 lod=50\n\n";
+        std::cout << "\nexamples:\nlow: ./takeoff aa=1 af=0 blur=0 bs=10000 lod=10\n";
+        std::cout << "recommended: ./takeoff aa=2 af=16 blur=2 lod=20\n";
+        std::cout << "high: ./takeoff aa=2 af=16 blur=2 lod=50\n";
+        std::cout << "LODmaxxing: ./takeoff aa=1 af=4 blur=0 lod=80 --lowmem\n";
+        std::cout << "ultra: ./takeoff aa=4 af=16 blur=2 lod=100\n\n";
         if(!verbose) std::cout << "No options have been specified. Using recommended settings.\n\n";
     }
     initializeGLFW();
@@ -1082,7 +1084,7 @@ terrain_lock.unlock(); // release mutex
     }
     std::cout << "\n" << std::chrono::duration_cast<std::chrono::seconds>(now() - start_time).count() <<
         " seconds closer to the singularity.\n";
-    std::cout << "Learn C, Python, English, math and physics. Stack sats. Lift something heavy. Go for a walk.\n";
+    std::cout << "What are you building anon?\n";
     return 0;
 }
 
