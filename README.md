@@ -1,6 +1,20 @@
 # Takeoff Sendario
 
-Project status: Very far from ready
+### Massively multiplayer sci-fi physics sandbox
+
+(most of this has not been implemented yet)
+
+Procedurally generated universe
+Crafting system should be a physics sandbox inspired by KSP, satisfactory, the sims, RTS games
+Resource gathering should be as simple as phyisically moving resources from where they found to the place where they will be used for crafting and chaining crafting steps together to create more advanced stuff
+Combat should be as close to actual physics as feasible within a constrained compute and development budget
+Focus on player-generated content and allowing for rich and complex player-player interactions
+I would ideally implement some scripted content, NPCs, NPC factions, civilian cities, pve combat and so on if I had time.
+To save development resources I will initially let players program NPCs to automate tasks and thus open the possibility for crafty players to build bot armies and try to claim significant territory from other players.
+No inventory, everything has to be physically moved.
+That sounds tediuous so players should program robots to do it for them.
+
+----
 
 The interesting stuff is actually in the Source/subparcollider folder.
 The Unreal Engine stuff is not being developed.
@@ -11,11 +25,6 @@ Licence to be determined (open source).
 
 
 ![screenshot](/Takeoff_000.jpg?raw=true "")
-
-### Massively multiplayer sci-fi physics sandbox.
-
-That is my vision at least. The implementation leaves something to be desired.
-
 
 
 
