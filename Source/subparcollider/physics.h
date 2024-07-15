@@ -852,6 +852,13 @@ struct ttnode {
     float foliage_density[3];
     nonstd::vector<texvert> vegetation;
 
+    vec3 wind_velocity;
+    float pressure;
+    vec3 fluid_velocity;
+    float fluid_depth;
+    float temperature;
+    float snow_depth;
+
 
     // add more stuff like temperature, moisture, vegetation
     std::string str(){
@@ -1121,7 +1128,9 @@ struct TerrainTree {
                     initial_corners[indices[i][0]],
                     initial_corners[indices[i][1]],
                     initial_corners[indices[i][2]],
-                    0, {0, 0, 0}, nonstd::vector<texvert>() } );
+                    0, {0, 0, 0}, nonstd::vector<texvert>(),
+                    vec3(0, 0, 0), 0.0f, vec3(0, 0, 0), 0.0f, 0.0f, 0.0f
+                    } );
         }
     }
 
@@ -1306,7 +1315,9 @@ struct TerrainTree {
                 new_verts[0],
                 new_verts[1],
                 new_verts[2],
-                0, {0, 0, 0}, nonstd::vector<texvert>() });
+                0, {0, 0, 0}, nonstd::vector<texvert>(),
+                vec3(0, 0, 0), 0.0f, vec3(0, 0, 0), 0.0f, 0.0f, 0.0f
+                });
             // the other 3 triangles neighbor the center triangle and child trangles of the parent's neighbors
             // we can't know the parent's neighbors' children because they may not exist yet
             for(int i = 0; i < 3; i++) {
@@ -1321,7 +1332,9 @@ struct TerrainTree {
                     nodes[node_idx].verts[i],
                     new_verts[i],
                     new_verts[(i + 2) % 3],
-                    0, {0, 0, 0}, nonstd::vector<texvert>() });
+                    0, {0, 0, 0}, nonstd::vector<texvert>(),
+                    vec3(0, 0, 0), 0.0f, vec3(0, 0, 0), 0.0f, 0.0f, 0.0f
+                    });
             }
         }
         // we need to go deeper

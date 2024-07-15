@@ -101,6 +101,27 @@ add more cool shit
 ----
 
 
+fluid simulation of rainfall and surface water
+traverse the terrain tree in multiple passes
+fluid on a triangle flows to adjacent triangles based on the fluid level and the lowest point on the shared edge
+
+simulate some erosion based on average rainfall over enough steps to make it look good
+initial fluid levels for local fluid simulations are the average fluid levels from the erosion model
+then recorded weather history is applied
+
+what blocks me from working on this:
+I haven't set the correct neighbor pointers for the terrain tree yet
+
+
+----
+
+each terrain tile should have a direction, magnitude and type enum to represent footprints, wheel tracks, various road surfaces, railroad, airfield and such. magnitude in case of footprints can represent 1 set of footprints per 10 magnitude, with smaller values representing footprints that have faded due to weather
+
+also a snow depth which adjusts the rendered terrain coordinates upwards and colors the terrain white
+
+----
+
+
 
 physics engine: record and replay
 every second: snapshot of the physics state

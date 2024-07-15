@@ -37,6 +37,8 @@ Not implemented. Pull requests welcome.
 ### ios/android/mac support
 Not implemented. Pull requests welcome.
 
+
+
 ## Gameplay
 
 ### How is it about AI?
@@ -63,9 +65,15 @@ Initially the game can be free to play for everyone but if it becomes popular I 
 Another idea is to separate players into two tiers: Paying subscribers can build as many fusion reactors as their resources allow them to, free players can have max 1 fusion reactor and it can never be stolen but it can be destroyed by the environment or other players. If it's destroyed they get a new one for free including a new ship. The ship is made from bioplastic so while it can't be farmed for construction materials it can be incinerated for a tiny energy gain. Even though they can't have more than 1 fusion reactor they can have nuclear reactors, solar panels, antimatter reactors and such. Solar is cheap but heavy, suitable for bases, stations and satellites that are near the habitable zone of a star. Nuclear works everywhere and is the cheapest and most reliable alternative to fusion power on spaceships and remote outposts. Antimatter is lightweight and extremely powerful but can only be used for short durations because of the waste heat and because the fuel is very expensive.
 
 
+### trees
 
+The trees are beautiful and anyone who disagrees owes me a pull request.
 
+Ideally we would have textured quads as impostors for distant trees and for the highest LOD we would have
+trees that look like speedtree or thereabouts, with the flexibility to create alien flora for exoplanets but not by
+simply applying the "purple and weird is cruise control for alien" template no man's sky went for. Maybe take into account the star's emission spectrum, the atmosphere's absorption spectrum, chemicals present,
+temperature, wind and moisture.
 
-
+Don't let scope creep kill you though, just better looking trees would be a good start.
 
 
