@@ -1,4 +1,11 @@
 
+!!! THIS FILE IS OUT OF DATE !!!
+
+This file has not been updated to reflect the switch to the new rendering system.
+When I switched to the new rendering system I abandoned the swift-based physics engine and have not yet
+made a physics engine in c++.
+
+
 # physics stuff
 
 Implement zoning in the physics engine
@@ -107,14 +114,10 @@ y: repeat last action, redo
 
 ## Low priority:
 
-* switch to Unreal Engine or Godot
 * render exhaust plumes
-* boxid support in the physics engine
-* more creative use of boxoids in the physics engine for things like explosions, magnetic fields, gas clouds, exhaust plumes
-* some refactoring of the physics engine
 * implement tidal effects on celestial spin and orbit
-* it would be fun to model centre of mass shifting as propellant moves around in the tank. workshop should at least
-  show dry and wet centres of mass. maybe we just assume tanks have built-in pistons or bladders to avoid slosh and cavitation.
+* it would be fun to model centre of mass shifting as propellant moves around in a tank. workshop should at least
+  show dry and wet centres of mass.
 
 
 ## Ideas:
