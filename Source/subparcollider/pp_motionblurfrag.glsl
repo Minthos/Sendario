@@ -24,7 +24,7 @@ void main() {
     vec2 velocity = texture(velocityTexture, coords).xy / 4096.0;
     // metadata.x: z value before log2 conversion
     // metadata.y: which shader produced the pixel (terrainfrag = 1, boxfrag = 2)
-    ivec2 metadata = texture(velocityTexture, coords).za;
+    ivec2 metadata = texture(velocityTexture, coords).ba;
 
     // disabling motion blur for the player character (well.. every box mesh actually..)
     // also disabling motion blur but leaving antialiasing
@@ -40,7 +40,7 @@ void main() {
     velocity /= (0.5 * iterations * (1 + inv_strength));
 
     // suppress motion blur for slow-moving pixels
-    float magnitude = velocity.length;
+    float magnitude = length(velocity);
     if(magnitude < 2){
         velocity *= (0.5 * magnitude);
     }
