@@ -1,4 +1,16 @@
 
+Incompatible ideas: massively multiplayer, rts with unlimited number of units per player, detailed physics simulation of the internal workings of vehicles and components, free to play
+
+performance optimizations increase the total amount of cool shit we can do, but there must still be some limits
+
+One fun game mode would be to have one unit per player, physics simulation of player-crafted components (with as much as possible pre-computed so it doesn't all have to be computed real-time during battles), pay to play, fleet battles with thousands of players.
+
+No FTL travel initially. Advanced-ish fusion technology can make the travel time between planets in a star system ~hours. ~minutes between moons of a planet. Atmospheric flight is slower due to aerodynamics but the atmosphere provides unlimited propellant and coolant.
+
+Make new planets available on a regular schedule depending on how crowded planets get. The planets should be within lightyears of each other. That gives me the option to introduce FTL travel to the tech tree a few years into the game.
+
+
+
 ----
 
 Difficulty modes

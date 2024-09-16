@@ -444,6 +444,7 @@ struct texvert {
 //    int32_t type_id; (opengl clobbered this when I passed it as int so I packed it into the w component of xyz as a workaround)
     glm::vec3 uvw;
     texvert(glm::vec3 a, int32_t ptype_id, glm::vec3 b) { xyz = glm::vec4(a.x, a.y, a.z, *(float*)(&ptype_id)); uvw = b; }
+    // yes mr. pcie customs officer that is definitely a float. if the bit pattern looks like an integer that's just a coincidence. how are your wife and kids?
 };
 
 void mkquad(nonstd::vector<texvert> *dest, glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 uvw, int32_t type_id){
@@ -1517,6 +1518,98 @@ struct state_update {
     uint64_t tick;
 };
 
+////
+
+// begin ChatGPT o1 preview generated code
+
+bool checkBroadPhaseCollision(PhysicsObject* a, PhysicsObject* b) {
+    double distanceSquared = glm::length2(a->pos - b->pos);
+    double radiusSum = a->radius + b->radius;
+    return distanceSquared <= radiusSum * radiusSum;
+}
+
+void resolveCollision(PhysicsObject* a, PhysicsObject* b) {
+    // Calculate relative velocity
+    dvec3 rv = b->vel - a->vel;
+
+    // Calculate relative position
+    dvec3 normal = glm::normalize(b->pos - a->pos);
+
+    // Calculate relative velocity in terms of the normal direction
+    double velAlongNormal = glm::dot(rv, normal);
+
+    // Do not resolve if velocities are separating
+    if (velAlongNormal > 0)
+        return;
+
+    // Calculate restitution (bounciness)
+    double e = 1.0; // Perfectly elastic collision
+
+    // Calculate impulse scalar
+    double j = -(1 + e) * velAlongNormal;
+    j /= (1 / a->mass) + (1 / b->mass);
+
+    // Apply impulse
+    dvec3 impulse = j * normal;
+    a->vel -= (1 / a->mass) * impulse;
+    b->vel += (1 / b->mass) * impulse;
+}
+
+void buildCollisionTree(std::vector<PhysicsObject*>& objects, CollisionTree& tree) {
+    // Convert PhysicsObjects to ctleafs
+    uint32_t N = objects.size();
+    ctleaf* leaves = new ctleaf[N];
+    for (uint32_t i = 0; i < N; ++i) {
+        leaves[i] = ctleaf(objects[i]);
+    }
+    tree = CollisionTree(dvec3(0.0), leaves, N);
+}
+
+void buildCollisionTree(std::vector<PhysicsObject*>& objects, CollisionTree& tree) {
+    // Convert PhysicsObjects to ctleafs
+    uint32_t N = objects.size();
+    ctleaf* leaves = new ctleaf[N];
+    for (uint32_t i = 0; i < N; ++i) {
+        leaves[i] = ctleaf(objects[i]);
+    }
+    tree = CollisionTree(dvec3(0.0), leaves, N);
+}
+
+void gameLoop(double deltaTime) {
+    // Update unit positions and AABBs
+    for (Unit& unit : units) {
+        unit.body.pos += unit.body.vel * deltaTime;
+        unit.body.updateAABB();
+    }
+
+    // Build collision tree
+    std::vector<PhysicsObject*> objects;
+    for (Unit& unit : units) {
+        objects.push_back(&unit.body);
+    }
+    CollisionTree collisionTree;
+    buildCollisionTree(objects, collisionTree);
+
+    // Use collision tree to find potential collisions
+    std::vector<std::pair<PhysicsObject*, PhysicsObject*>> potentialCollisions;
+    collisionTree.findPotentialCollisions(potentialCollisions);
+
+    // Check and resolve collisions
+    for (auto& pair : potentialCollisions) {
+        PhysicsObject* a = pair.first;
+        PhysicsObject* b = pair.second;
+
+        if (checkBroadPhaseCollision(a, b) && checkAABBCollision(a, b)) {
+            // Narrow-phase collision detection can go here
+            resolveCollision(a, b);
+        }
+    }
+
+    // Clean up
+    collisionTree.destroy();
+}
+
+// end ChatGPT o1 preview generated code
 
 
 
@@ -1536,7 +1629,18 @@ split in to or more pieces
 bend around a line or point in object space
 compress along an axis
 
+----
 
+two objects collide, creating a temporary collision object
+collision object stores collision energy and distributes it
+
+elastic deformation energy to be returned as velocity change, minus energy lost to heat
+permanent deformation converts kinetic energy into deformation damage (dents, chips, spall, penetration)
+friction converts energy into heat and abrasion damage
+
+when the objects have separated the collision object can be deleted
+if they are not moving relative to each other and the forces pushing them together are constant, the collision can be
+marked as sleeping
 
 
 
@@ -1550,7 +1654,7 @@ https://box2d.org/posts/2024/02/solver2d/
 
 https://matthias-research.github.io/pages/tenMinutePhysics/index.html
 https://www.youtube.com/watch?v=zzy6u1z_l9A recommends to solve locally instead of globally to simplify and to do
-multiple iterations
+multiple ~~iterations~~ substeps
 
 ----
 
