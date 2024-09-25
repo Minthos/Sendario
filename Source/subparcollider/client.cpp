@@ -34,7 +34,11 @@ float anisotropy = 4.0f; // should be 4 with no upscaling, 16 with upscaling
 int antialiasing = 1; // 1 (no upscaling) and 2 (4 samples per pixel) are good values
 int motion_blur_mode = 1; // 0 = off, 1 = nonlinear (sharp), 2 = linear (blurry)
 float motion_blur_invstr = 5.0f; // inverse of motion blur amount. 1.0 = very high. 5.0 = low.
+#ifdef DEBUG
+int gpu_transfer_batch_size = 10000; // reduce this if LOD updates cause stutter even at low LOD
+#else
 int gpu_transfer_batch_size = 100000; // reduce this if LOD updates cause stutter even at low LOD
+#endif
 
 GLFWwindow* window = nil;
 Unit *player_character = nil;
@@ -46,18 +50,18 @@ std::unordered_map<string, GLuint> textures;
 
 void print_backtrace(int sig, siginfo_t *info, void *secret) {
 #ifndef __clang__
-	boost::stacktrace::stacktrace st;
+    boost::stacktrace::stacktrace st;
     for (std::size_t i = 0; i < st.size(); ++i) {
-		std::stringstream ss;
-		ss << st[i];
-		std::string s = ss.str();
-    	size_t pos = s.find(':');
-		if(pos != std::string::npos){
-			// subtract 2 from the line number because apparently that's necessary? ahh the joys of programming
-			std::cout << i << "# " << s.substr(0, pos) << " " << std::atoi(s.c_str() + pos + 1) - 2 << std::endl;
-		} else {
-			std::cout << i << "# " << s << std::endl;
-		}
+        std::stringstream ss;
+        ss << st[i];
+        std::string s = ss.str();
+        size_t pos = s.find(':');
+        if(pos != std::string::npos){
+            // subtract 2 from the line number because apparently that's necessary? ahh the joys of programming
+            std::cout << i << "# " << s.substr(0, pos) << " " << std::atoi(s.c_str() + pos + 1) - 2 << std::endl;
+        } else {
+            std::cout << i << "# " << s << std::endl;
+        }
     }
 #endif
 }
@@ -84,9 +88,10 @@ char* readShaderSource(const char* filePath) {
     return buffer;
 }
 
-void checkGLerror() {
+void checkGLerror(std::string message = "") {
     GLenum err;
     while((err = glGetError()) != GL_NO_ERROR) { 
+        std::cout << message << std::endl;
         std::cout << "OpenGL Error: ";
         switch (err) {
             case GL_INVALID_ENUM: std::cout << "GL_INVALID_ENUM"; break;
@@ -282,6 +287,13 @@ struct RenderObject {
         glGenBuffers(1, &ebo);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh->num_tris * 3 * sizeof(GLuint), nil, GL_STATIC_DRAW);
+        glBindVertexArray(0);
+    }
+
+    void rebind_buffers_chunked(dMesh *mesh) {
+        glBindVertexArray(vao);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
         glBindVertexArray(0);
     }
 
@@ -709,12 +721,12 @@ terrain_lock.unlock();
 }
 
 int main(int argc, char** argv) {
-	struct sigaction sa;
-	sa.sa_sigaction = print_backtrace;
-	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = SA_SIGINFO;
-	sigaction(SIGSEGV, &sa, NULL);
-	sigaction(SIGABRT, &sa, NULL);
+    struct sigaction sa;
+    sa.sa_sigaction = print_backtrace;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_SIGINFO;
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGABRT, &sa, NULL);
 
     auto start_time = now();
     int seed = 52;
@@ -899,6 +911,9 @@ terrain_lock.lock(); // grab mutex
                 terrain1->texture = textures["isqswjwki55a1.png"];
                 terrain1->prepare_buffers_chunked(&mesh_in_waiting);
             }
+            else {
+                terrain1->rebind_buffers_chunked(&mesh_in_waiting);
+            }
             terrain_upload_progress = terrain1->upload_terrain_mesh_chunked(&mesh_in_waiting, terrain_upload_progress);
             if(terrain_upload_progress == mesh_in_waiting.num_tris){
                 terrain_upload_status = done_uploading;
@@ -915,7 +930,6 @@ terrain_lock.lock(); // grab mutex
             the_old_terrain.destroy();
             the_old_terrain = glitch->terrain;
             glitch->terrain = terrain_in_waiting;
-
 
             ttnode* ozone = glitch->terrain[origo]; // the old zone
             ttnode* vzone = glitch->terrain[vantage]; // the new zone
@@ -942,7 +956,7 @@ terrain_lock.lock(); // grab mutex
 terrain_lock.unlock(); // release mutex
 
 //        ttnode* tile = glitch->terrain[player_global_pos];
-        checkGLerror();
+        checkGLerror(fstr("terrain_upload_status: %d", terrain_upload_status));
 
         if(!game_paused){
             local_gravity_normalized = -glm::normalize(player_global_pos);
@@ -990,26 +1004,31 @@ terrain_lock.unlock(); // release mutex
                 render(leaf->object->ro);
 #ifdef DEBUG
 //#ifdef THIS_CAUSES_OPENGL_ERRORS
+// on further investigation, the opengl errors happen if we do this when terrain_upload_status is done_generating, i.e. while we are copying
+// the terrain mesh to the gpu. since this is just debug info we can not do that.. but it would be nice to know more about why it's
+// happening and how to avoid it. would suck to not be able to spawn new render objects while the terrain is being updated.
+// ok, created rebind_buffers_chunked and that seems to have done the trick. maybe that means I'm doing something else wrong..
+        //    if(terrain_upload_status != done_generating){
                 dvec3 hi = node->hi.todvec3();
                 dvec3 lo = node->lo.todvec3();
                 dvec3 center = (hi + lo) * 0.5;
                 dvec3 size = (hi - lo);
                 // it's really fucking weird that size has a 0 component
                 if( ! (size.x == 0 || size.y == 0 || size.z == 0) ){
-
                     PhysicsObject greencube = PhysicsObject(dMesh::createBox(center, size.x, size.y, size.z), nil);
                     RenderObject ro = RenderObject(&greencube);
-        			checkGLerror();
+                    checkGLerror();
                     ro.upload_boxen_mesh();
-//        			glFlush();
+//                    glFlush();
                     ro.shader = shaders["box"];
                     ro.texture = textures["green_transparent_wireframe_box_64x64.png"];
-        			checkGLerror();
+                    checkGLerror();
 //                    glDisable(GL_CULL_FACE);
                     render(&ro);
-        			checkGLerror();
+                    checkGLerror();
 //                    glEnable(GL_CULL_FACE);
                 }
+        //    }
 #endif
             }
         }

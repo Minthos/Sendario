@@ -22,16 +22,16 @@
 #define takeoff_memcpy memcpy
 /*
 void *takeoff_memcpy(void *dest, const void *src, size_t n) {
-	size_t i = 0;
-	while((i + 1) * sizeof(uint64_t) <= n){
-		((uint64_t*)dest)[i] = ((uint64_t*)src)[i];
-		i++;
-	}
-	while(i * sizeof(uint8_t) < n){
-		((uint8_t*)dest)[i] = ((uint8_t*)src)[i];
-		i++;
-	}
-	return dest;
+    size_t i = 0;
+    while((i + 1) * sizeof(uint64_t) <= n){
+        ((uint64_t*)dest)[i] = ((uint64_t*)src)[i];
+        i++;
+    }
+    while(i * sizeof(uint8_t) < n){
+        ((uint8_t*)dest)[i] = ((uint8_t*)src)[i];
+        i++;
+    }
+    return dest;
 }
 */
 using std::isnan;
@@ -130,6 +130,7 @@ template <typename T> struct vector {
         capacity = new_capacity;
     }
 
+    // starting with 4 capacity is not optimal for performance, but it's nice to start with a low number so bugs are discovered early.
     void push_back(const T& val) {
         if(count == capacity) reserve(max(4, capacity) * 2);
         takeoff_memcpy(&data[count++], &val, sizeof(T));
@@ -1521,7 +1522,7 @@ struct state_update {
 ////
 
 // begin ChatGPT o1 preview generated code
-
+/*
 bool checkBroadPhaseCollision(PhysicsObject* a, PhysicsObject* b) {
     double distanceSquared = glm::length2(a->pos - b->pos);
     double radiusSum = a->radius + b->radius;
@@ -1529,44 +1530,22 @@ bool checkBroadPhaseCollision(PhysicsObject* a, PhysicsObject* b) {
 }
 
 void resolveCollision(PhysicsObject* a, PhysicsObject* b) {
-    // Calculate relative velocity
     dvec3 rv = b->vel - a->vel;
-
-    // Calculate relative position
     dvec3 normal = glm::normalize(b->pos - a->pos);
-
-    // Calculate relative velocity in terms of the normal direction
     double velAlongNormal = glm::dot(rv, normal);
-
-    // Do not resolve if velocities are separating
     if (velAlongNormal > 0)
         return;
-
-    // Calculate restitution (bounciness)
+    // restitution (bounciness)
     double e = 1.0; // Perfectly elastic collision
-
-    // Calculate impulse scalar
+    // impulse scalar
     double j = -(1 + e) * velAlongNormal;
     j /= (1 / a->mass) + (1 / b->mass);
-
-    // Apply impulse
     dvec3 impulse = j * normal;
     a->vel -= (1 / a->mass) * impulse;
     b->vel += (1 / b->mass) * impulse;
 }
 
 void buildCollisionTree(std::vector<PhysicsObject*>& objects, CollisionTree& tree) {
-    // Convert PhysicsObjects to ctleafs
-    uint32_t N = objects.size();
-    ctleaf* leaves = new ctleaf[N];
-    for (uint32_t i = 0; i < N; ++i) {
-        leaves[i] = ctleaf(objects[i]);
-    }
-    tree = CollisionTree(dvec3(0.0), leaves, N);
-}
-
-void buildCollisionTree(std::vector<PhysicsObject*>& objects, CollisionTree& tree) {
-    // Convert PhysicsObjects to ctleafs
     uint32_t N = objects.size();
     ctleaf* leaves = new ctleaf[N];
     for (uint32_t i = 0; i < N; ++i) {
@@ -1576,39 +1555,28 @@ void buildCollisionTree(std::vector<PhysicsObject*>& objects, CollisionTree& tre
 }
 
 void gameLoop(double deltaTime) {
-    // Update unit positions and AABBs
     for (Unit& unit : units) {
         unit.body.pos += unit.body.vel * deltaTime;
         unit.body.updateAABB();
     }
-
-    // Build collision tree
     std::vector<PhysicsObject*> objects;
     for (Unit& unit : units) {
         objects.push_back(&unit.body);
     }
     CollisionTree collisionTree;
     buildCollisionTree(objects, collisionTree);
-
-    // Use collision tree to find potential collisions
     std::vector<std::pair<PhysicsObject*, PhysicsObject*>> potentialCollisions;
     collisionTree.findPotentialCollisions(potentialCollisions);
-
-    // Check and resolve collisions
     for (auto& pair : potentialCollisions) {
         PhysicsObject* a = pair.first;
         PhysicsObject* b = pair.second;
-
         if (checkBroadPhaseCollision(a, b) && checkAABBCollision(a, b)) {
-            // Narrow-phase collision detection can go here
             resolveCollision(a, b);
         }
     }
-
-    // Clean up
     collisionTree.destroy();
 }
-
+*/
 // end ChatGPT o1 preview generated code
 
 
