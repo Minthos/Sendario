@@ -1003,12 +1003,8 @@ terrain_lock.unlock(); // release mutex
                 ctleaf *leaf = &t.leaves[node->first_leaf];
                 render(leaf->object->ro);
 #ifdef DEBUG
-//#ifdef THIS_CAUSES_OPENGL_ERRORS
-// on further investigation, the opengl errors happen if we do this when terrain_upload_status is done_generating, i.e. while we are copying
-// the terrain mesh to the gpu. since this is just debug info we can not do that.. but it would be nice to know more about why it's
-// happening and how to avoid it. would suck to not be able to spawn new render objects while the terrain is being updated.
+// this was causing opengl errors
 // ok, created rebind_buffers_chunked and that seems to have done the trick. maybe that means I'm doing something else wrong..
-        //    if(terrain_upload_status != done_generating){
                 dvec3 hi = node->hi.todvec3();
                 dvec3 lo = node->lo.todvec3();
                 dvec3 center = (hi + lo) * 0.5;
@@ -1019,7 +1015,6 @@ terrain_lock.unlock(); // release mutex
                     RenderObject ro = RenderObject(&greencube);
                     checkGLerror();
                     ro.upload_boxen_mesh();
-//                    glFlush();
                     ro.shader = shaders["box"];
                     ro.texture = textures["green_transparent_wireframe_box_64x64.png"];
                     checkGLerror();
@@ -1028,7 +1023,6 @@ terrain_lock.unlock(); // release mutex
                     checkGLerror();
 //                    glEnable(GL_CULL_FACE);
                 }
-        //    }
 #endif
             }
         }
