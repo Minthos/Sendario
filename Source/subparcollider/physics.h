@@ -457,6 +457,7 @@ void mkquad(nonstd::vector<texvert> *dest, glm::vec3 a, glm::vec3 b, glm::vec3 c
     dest->push_back({d, type_id, uvw});
 }
 
+// foliage, not data structure
 void mktree(nonstd::vector<texvert> *dest, float h_trunk, float r_trunk, float h_canopy, float r_canopy, glm::vec3 origin){
     float h_root = -0.5;
     // trunk, should be at least 4 quads
@@ -724,6 +725,7 @@ struct Unit {
 // 6. we can now read from the BVH and write to the physics objects to our heart's content for the rest of the tick
 
 struct ctleaf {
+	// 8 bytes
     PhysicsObject *object;
 
     // axis-aligned bounding box
@@ -905,21 +907,6 @@ struct ttnode {
         return elevation;
     }
 
-    double elevation_kludgehammer(dvec3 pos, dMesh* mesh, dvec3 gravity_dir) {
-        double p = elevation_projected(pos, mesh, gravity_dir);
-        double n = elevation_naive(pos, mesh);
-        if(isnan(p) && isnan(n)) assert(0);
-        if(isnan(p)) return n;
-        if(isnan(n)) return p;
-        if(n < 0 && abs(p + n) < 100.0){
-            return -p;
-        } else if(abs(p - n) > 100.0){
-            return n;
-        } else {
-            return p;
-        }
-    }
-
     double player_altitude(dvec3 pos, dMesh* mesh, dvec3 gravity_dir) {
         dTri *tri = &mesh->tris[triangle];
         dvec3 a = mesh->verts[tri->verts[0]];
@@ -937,34 +924,6 @@ struct ttnode {
         return d;
     }
 
-    double elevation_projected(dvec3 pos, dMesh* mesh, dvec3 gravity_dir) {
-        dTri *tri = &mesh->tris[triangle];
-        dvec3 a = mesh->verts[tri->verts[0]];
-        dvec3 b = mesh->verts[tri->verts[1]];
-        dvec3 c = mesh->verts[tri->verts[2]];
-        dvec3 ab = b - a;
-        dvec3 ac = c - a;
-        dvec3 norm = normalize(glm::cross(ab, ac));
-        double d = dot(norm, (a - pos)) / dot(norm, gravity_dir);
-        dvec3 intersection = pos + (gravity_dir * d);
-        return glm::length(intersection);
-    }
-   
-    // this one is wrong in both directions
-    double elevation_naive(dvec3 pos, dMesh* mesh) {
-        dTri *tri = &mesh->tris[triangle];
-        double e = 0;
-        double sum_distance = 0;
-        for(uint64_t i = 0; i < 3; i++){
-            double distance = glm::length(pos - tri->verts[i]);
-            sum_distance += distance;
-        }
-        for(uint64_t i = 0; i < 3; i++){
-            double distance = glm::length(pos - tri->verts[i]);
-            e += (sum_distance * 0.5 - distance) * elevations[i];
-        }
-        return e / (sum_distance * 0.5);
-    }
 };
 
 glm::vec3 calculate_center(uint64_t level, uint64_t address, glm::vec3 v0, glm::vec3 v1, glm::vec3 v2, uint64_t wiggle) {
