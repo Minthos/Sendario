@@ -1,8 +1,10 @@
 
 TODO:
-color tiles beyond vegetation LOD according to estimated vegetation so the vegetation doesn't abruptly cut off
-physics
-gameplay (guns? vehicles? resources? crafting?)
+
+multiplayer (very simple server-client state updates, no auth. maybe a uint64_t player id)
+physics (the absolute bare minimum, like gravity and collisions)
+chunked terrain LOD updates (requirement for buildings, roads, destructible terrain)
+
 
 
 LATER:
@@ -11,10 +13,16 @@ universally unambiguous coordinate system (celestial-> zone-> pos)
 rts view with camera panning with keyboard
 fluid simulation
 character creation
+  - jiggle physics
+  - hair
+  - animations
+  - cyborgs and non-humanoid creatures
 speedtree for better trees
 
 
+
 DONE:
+distant terrain approximately color matched to estimated foliage
 fps wasd movement
 re-center the player on a new LOD zone periodically
 clamp to ground
