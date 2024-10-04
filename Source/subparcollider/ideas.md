@@ -70,6 +70,14 @@ to lasers and armor vs lasers, maybe some of them are heisenbergite
 
 Shadow rendering
 
+start at the terrain node closest to the star on the spheroid
+flood-fill the terrain and store two values per node: how tall obstruction the node causes and the elevation
+at which the node is not obstructed
+
+
+----
+
+
 For each occupied and visible node of the physics tree, do a tree traversal towards the star and store a pointer to all
 objects that intersect (doesn't need to be accurate)
 
