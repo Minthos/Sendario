@@ -1,8 +1,18 @@
 
 TODO:
 
-multiplayer (very simple server-client state updates, no auth. maybe a uint64_t player id)
+multiple objects in the collision tree
+test for overlapping objects in the collision tree
+show overlapping objects with a red bounding box in debug mode
+
+rts interface = press tab to toggle top-down camera and 3rd person camera
+selection rectangle
+highlight selected units
+give move commands to units
+spawn new units
+
 physics (the absolute bare minimum, like gravity and collisions)
+multiplayer (very simple server-client state updates, no auth. maybe a uint64_t player id)
 chunked terrain LOD updates (requirement for buildings, roads, destructible terrain)
 
 

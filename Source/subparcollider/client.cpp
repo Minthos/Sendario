@@ -676,7 +676,7 @@ terrain_lock.lock();
         vantage = zone->spheroidPosition(player_global_pos, glitch->terrain.radius);
 terrain_lock.unlock();
 
-        // this is just a "hardcoded heuristic" that should work fine on my computer. a more intelligent way to do this
+        // this is just a dumb heuristic that should work fine on my computer. a more intelligent way to do this
         // would be to evict nodes based on how much free RAM the computer has.
         if((glitch->terrain.nodes.count > gpu_transfer_batch_size * lod) || (LOW_MEMORY_MODE && (frame_counter % 120 == 119))){
             last_eviction += ((frame_counter - last_eviction) / 2);
@@ -729,7 +729,8 @@ int main(int argc, char** argv) {
     sigaction(SIGABRT, &sa, NULL);
 
     auto start_time = now();
-    int seed = 52;
+    //int seed = 52;
+    int seed = 0;
     int lod = 20;
     for(int i = 1; i < argc; i++){
         if(!strncmp(argv[i], "-v", min(2, strlen(argv[i])))){
@@ -873,16 +874,16 @@ int main(int argc, char** argv) {
     player_character->body.ro->shader = shaders["box"];
     player_character->body.ro->texture = textures["isqswjwki55a1.png"];
 
-
-    // seed 52 destinations:
-    // 0x506283d088 has a very steep mountain peak
-    // 0x4b20532488 nearby has over 8000 elevation
-    // 0x27c917dc88 also in that area could be a nice location for a ski resort (player global (741646, 5.94832e+06, 2.17329e+06))
-    //
-    // 0x5263c2aaad has a cool beach with a flat area with furrows in a checkerboard-like pattern, nice place to have a music festival
-    // or maybe a resort town. I got there by glitching through the planet, which was also interesting.
-    //
-    // The beach at 0x519d196b69 is enormous and the area has lots of beautiful scenery
+    units.emplace_back();
+    units[1].addComponent(dMesh::createBox(glm::dvec3(0.0, 0.0, 0.0), 1.0, 1.0, 1.0));
+    units[1].addComponent(dMesh::createBox(glm::dvec3(1.2, 0.0, 0.0), 1.0, 1.0, 0.01));
+    units[1].addComponent(dMesh::createBox(glm::dvec3(-1.2, 0.0, 0.0), 1.0, 0.05, 1.0));
+    units[1].bake();
+    ros.emplace_back(&units[1].body);
+    units[1].body.ro = &ros[0];
+    units[1].body.ro->upload_boxen_mesh();
+    units[1].body.ro->shader = shaders["box"];
+    units[1].body.ro->texture = textures["isqswjwki55a1.png"];
 
     uint32_t terrain_upload_progress = 0;
     // Main loop
@@ -896,6 +897,7 @@ terrain_lock.lock(); // grab mutex
             terrain0->upload_terrain_mesh_chunked(&glitch->body.mesh, 0);
             glitch->body.ro = terrain0;
             player_character->body.zone = 0x2aaaaaaaa8;
+            units[1].body.zone = 0x2aaaaaaaa8;
             zone = glitch->terrain[0x2aaaaaaaa8];
             std::cout << "origo: " << str(origo) << " glitch->terrain.radius:" << glitch->terrain.radius << " zone->elevation(): " << zone->elevation() << "\n";
             player_global_pos = origo + zone->elevation();
@@ -930,27 +932,21 @@ terrain_lock.lock(); // grab mutex
             the_old_terrain.destroy();
             the_old_terrain = glitch->terrain;
             glitch->terrain = terrain_in_waiting;
-
             ttnode* ozone = glitch->terrain[origo]; // the old zone
             ttnode* vzone = glitch->terrain[vantage]; // the new zone
             double avgElevation = (ozone->elevations[0] + vzone->elevations[0]) / 2.0;
             delta = (vantage + glm::normalize(vantage) * avgElevation) - (origo + (glm::normalize(origo) * avgElevation));
-            // delta seems to be correct now
-
             zone = glitch->terrain[vantage];
             local_gravity_normalized = -normalize(vantage);
             player_character->body.pos -= delta;
             player_character->body.zone = zone->path;
             origo = vantage;
             player_global_pos = origo + player_character->body.pos;
-
             if(verbose) {
                 std::cout << "zone: " << zone->str() << "\n";
                 std::cout << "player local (" << player_character->body.pos.x << ", " << player_character->body.pos.y << ", " << player_character->body.pos.z << ")\n";
                 std::cout << "player global (" << player_global_pos.x << ", " << player_global_pos.y << ", " << player_global_pos.z << ")\n";
-//                std::cout << "elevation: " << tile->elevation() << "\n";//_kludgehammer(player_character->body.pos, &glitch->body.mesh) << "\n";
             }
-
             terrain_upload_status = idle;
         }
 terrain_lock.unlock(); // release mutex
@@ -988,8 +984,11 @@ terrain_lock.unlock(); // release mutex
 
         render(terrain0);
 
-        ctleaf l = ctleaf(&player_character->body);
-        CollisionTree t = CollisionTree(dvec3(0.0), &l, 1);
+		nonstd::vector<ctleaf> l;
+        l.emplace_back(ctleaf(&player_character->body));
+        l.emplace_back(ctleaf(&units[1].body));
+        CollisionTree t = CollisionTree(dvec3(0.0), l.data, l.count);
+
         checkGLerror();
 
         static nonstd::vector<ctnode*> stack;
@@ -1082,7 +1081,7 @@ terrain_lock.unlock(); // release mutex
             }
             prevFrameTime = now();
         }
-    }
+    } // end of main loop
     terrain_upload_status = should_exit;
     glDeleteFramebuffers(1, &framebuffer);
     glDeleteTextures(1, &colorTex);
