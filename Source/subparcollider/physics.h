@@ -238,7 +238,7 @@ struct unionvec3 {
 
 struct vec9 {
     unionvec3 lo; // frequencies below the visible spectrum
-    unionvec3 rgb;
+    unionvec3 mid;// visible light
     unionvec3 hi; // frequencies above the visible spectrum
 };
 
@@ -448,7 +448,8 @@ struct texvert {
     // yes mr. pcie customs officer that is definitely a float. if the bit pattern looks like an integer that's just a coincidence. how are your wife and kids?
 };
 
-void mkquad(nonstd::vector<texvert> *dest, glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 uvw, int32_t type_id){
+// foliage geometry quad, no relation to quadtrees
+void mktreequad(nonstd::vector<texvert> *dest, glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 uvw, int32_t type_id){
     dest->push_back({a, type_id, uvw});
     dest->push_back({b, type_id, uvw});
     dest->push_back({c, type_id, uvw});
@@ -461,25 +462,25 @@ void mkquad(nonstd::vector<texvert> *dest, glm::vec3 a, glm::vec3 b, glm::vec3 c
 void mktree(nonstd::vector<texvert> *dest, float h_trunk, float r_trunk, float h_canopy, float r_canopy, glm::vec3 origin){
     float h_root = -0.5;
     // trunk, should be at least 4 quads
-    mkquad(dest,
+    mktreequad(dest,
             glm::vec3(-r_trunk, h_root, -r_trunk) + origin,
             glm::vec3(r_trunk, h_root, -r_trunk) + origin,
             glm::vec3(-r_trunk, h_trunk, -r_trunk) + origin,
             glm::vec3(r_trunk, h_trunk, -r_trunk) + origin,
             glm::vec3(0.0f), VERTEX_TYPE_TREETRUNK);
-    mkquad(dest,
+    mktreequad(dest,
             glm::vec3(r_trunk, h_root, r_trunk) + origin,
             glm::vec3(-r_trunk, h_root, r_trunk) + origin,
             glm::vec3(r_trunk, h_trunk, r_trunk) + origin,
             glm::vec3(-r_trunk, h_trunk, r_trunk) + origin,
             glm::vec3(0.333333f), VERTEX_TYPE_TREETRUNK);
-    mkquad(dest,
+    mktreequad(dest,
             glm::vec3(r_trunk, h_root, -r_trunk) + origin,
             glm::vec3(r_trunk, h_root, r_trunk) + origin,
             glm::vec3(r_trunk, h_trunk, -r_trunk) + origin,
             glm::vec3(r_trunk, h_trunk, r_trunk) + origin,
             glm::vec3(0.666667f), VERTEX_TYPE_TREETRUNK);
-    mkquad(dest,
+    mktreequad(dest,
             glm::vec3(-r_trunk, h_root, -r_trunk) + origin,
             glm::vec3(-r_trunk, h_root, r_trunk) + origin,
             glm::vec3(-r_trunk, h_trunk, -r_trunk) + origin,
@@ -487,13 +488,13 @@ void mktree(nonstd::vector<texvert> *dest, float h_trunk, float r_trunk, float h
             glm::vec3(1.0f), VERTEX_TYPE_TREETRUNK);
 
     // canopy, should be at least 4 triangles
-    mkquad(dest,
+    mktreequad(dest,
             glm::vec3(-r_canopy, h_trunk, -r_canopy) + origin,
             glm::vec3(-r_canopy, h_trunk, r_canopy) + origin,
             glm::vec3(0.0, h_trunk + h_canopy, 0.0) + origin,
             glm::vec3(r_canopy, h_trunk, r_canopy) + origin,
             glm::vec3(0.0f), VERTEX_TYPE_LEAF);
-    mkquad(dest,
+    mktreequad(dest,
             glm::vec3(r_canopy, h_trunk, r_canopy) + origin,
             glm::vec3(r_canopy, h_trunk, -r_canopy) + origin,
             glm::vec3(0.0, h_trunk + h_canopy, 0.0) + origin,
@@ -781,17 +782,17 @@ struct ctnode {
         hvec3 size = hi - lo;
         if(size.y > size.x && size.y > size.z) {
             std::sort(primitives + first, primitives + last + 1, [](const ctleaf& a, const ctleaf& b) -> bool {
-                return a.lo.x + a.hi.x < b.hi.x + b.lo.x;
+                return (int32_t)a.lo.x + (int32_t)a.hi.x < (int32_t)b.hi.x + (int32_t)b.lo.x;
             });
         }
         else if (size.y > size.x && size.y > size.z) {
             std::sort(primitives + first, primitives + last + 1, [](const ctleaf& a, const ctleaf& b) -> bool {
-                return a.lo.y + a.hi.y < b.hi.y + b.lo.y;
+                return (int32_t)a.lo.y + (int32_t)a.hi.y < (int32_t)b.hi.y + (int32_t)b.lo.y;
             });
         }
         else {
             std::sort(primitives + first, primitives + last + 1, [](const ctleaf& a, const ctleaf& b) -> bool {
-                return a.lo.z + a.hi.z < b.hi.z + b.lo.z;
+                return (int32_t)a.lo.z + (int32_t)a.hi.z < (int32_t)b.hi.z + (int32_t)b.lo.z;
             });
         }
         // split them in a dumb way that is not optimal but better than worst case
@@ -1477,66 +1478,6 @@ struct state_update {
     uint64_t count;
     uint64_t tick;
 };
-
-////
-
-// begin ChatGPT o1 preview generated code
-/*
-bool checkBroadPhaseCollision(PhysicsObject* a, PhysicsObject* b) {
-    double distanceSquared = glm::length2(a->pos - b->pos);
-    double radiusSum = a->radius + b->radius;
-    return distanceSquared <= radiusSum * radiusSum;
-}
-
-void resolveCollision(PhysicsObject* a, PhysicsObject* b) {
-    dvec3 rv = b->vel - a->vel;
-    dvec3 normal = glm::normalize(b->pos - a->pos);
-    double velAlongNormal = glm::dot(rv, normal);
-    if (velAlongNormal > 0)
-        return;
-    // restitution (bounciness)
-    double e = 1.0; // Perfectly elastic collision
-    // impulse scalar
-    double j = -(1 + e) * velAlongNormal;
-    j /= (1 / a->mass) + (1 / b->mass);
-    dvec3 impulse = j * normal;
-    a->vel -= (1 / a->mass) * impulse;
-    b->vel += (1 / b->mass) * impulse;
-}
-
-void buildCollisionTree(std::vector<PhysicsObject*>& objects, CollisionTree& tree) {
-    uint32_t N = objects.size();
-    ctleaf* leaves = new ctleaf[N];
-    for (uint32_t i = 0; i < N; ++i) {
-        leaves[i] = ctleaf(objects[i]);
-    }
-    tree = CollisionTree(dvec3(0.0), leaves, N);
-}
-
-void gameLoop(double deltaTime) {
-    for (Unit& unit : units) {
-        unit.body.pos += unit.body.vel * deltaTime;
-        unit.body.updateAABB();
-    }
-    std::vector<PhysicsObject*> objects;
-    for (Unit& unit : units) {
-        objects.push_back(&unit.body);
-    }
-    CollisionTree collisionTree;
-    buildCollisionTree(objects, collisionTree);
-    std::vector<std::pair<PhysicsObject*, PhysicsObject*>> potentialCollisions;
-    collisionTree.findPotentialCollisions(potentialCollisions);
-    for (auto& pair : potentialCollisions) {
-        PhysicsObject* a = pair.first;
-        PhysicsObject* b = pair.second;
-        if (checkBroadPhaseCollision(a, b) && checkAABBCollision(a, b)) {
-            resolveCollision(a, b);
-        }
-    }
-    collisionTree.destroy();
-}
-*/
-// end ChatGPT o1 preview generated code
 
 
 

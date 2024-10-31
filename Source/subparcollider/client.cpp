@@ -903,6 +903,7 @@ terrain_lock.lock(); // grab mutex
             player_global_pos = origo + zone->elevation();
             local_gravity_normalized = -normalize(origo);
             player_character->body.pos = dvec3(0, zone->elevation(), 0);
+            units[1].body.pos = dvec3(1.0, zone->elevation(), 2.0);
             delta = dvec3(0,0,0);
             terrain_upload_status = idle;
         }
@@ -1002,13 +1003,10 @@ terrain_lock.unlock(); // release mutex
                 ctleaf *leaf = &t.leaves[node->first_leaf];
                 render(leaf->object->ro);
 #ifdef DEBUG
-// this was causing opengl errors
-// ok, created rebind_buffers_chunked and that seems to have done the trick. maybe that means I'm doing something else wrong..
                 dvec3 hi = node->hi.todvec3();
                 dvec3 lo = node->lo.todvec3();
                 dvec3 center = (hi + lo) * 0.5;
                 dvec3 size = (hi - lo);
-                // it's really fucking weird that size has a 0 component
                 if( ! (size.x == 0 || size.y == 0 || size.z == 0) ){
                     PhysicsObject greencube = PhysicsObject(dMesh::createBox(center, size.x, size.y, size.z), nil);
                     RenderObject ro = RenderObject(&greencube);
@@ -1021,6 +1019,8 @@ terrain_lock.unlock(); // release mutex
                     render(&ro);
                     checkGLerror();
 //                    glEnable(GL_CULL_FACE);
+                } else {
+					printf("REALLY WEIRD!\n");
                 }
 #endif
             }

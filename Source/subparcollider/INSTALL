@@ -21,3 +21,10 @@ sudo ./llvm.sh 18
 # to fix clang c++ linker error
 sudo apt-get install libc++abi-dev libc++-dev libstdc++-12-dev
 
+
+# for debugging, to disable the program not responding popup
+# gsettings set org.gnome.mutter check-alive-timeout 0
+# gsettings set org.cinnamon.muffin check-alive-timeout 0
+
+
+

@@ -7,9 +7,7 @@ layout(location = 1) in vec3 vertexTexCoord;
 uniform mat4 current;
 uniform mat4 previous;
 
-// TODO: switch to using a uniform buffer to reduce the number of opengl calls
-// Define the UBO and its binding point
-//layout(std140, binding = 0) uniform Transformations {
+//layout(std140, binding = 0) buffer Transformations {
 //    mat4 current;
 //    mat4 previous;
 //} transform;

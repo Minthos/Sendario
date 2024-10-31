@@ -67,12 +67,21 @@ to lasers and armor vs lasers, maybe some of them are heisenbergite
 
 ----
 
+Occlusion lookup table
+
+Each vertex can get a 32-bit bit field indicating from which directions it's occluded by the mesh it belongs to...
+Hmm...
+Kinda breaks for objects with joints since the jointed limbs move..
+
+----
 
 Shadow rendering
 
 start at the terrain node closest to the star on the spheroid
-flood-fill the terrain and store two values per node: how tall obstruction the node causes and the elevation
-at which the node is not obstructed
+flood-fill the terrain and store three values per node:
+ - incoming light reaches what elevation?
+ - the node causes partial obstruction to what elevation?
+ - the node causes total obstruction to what elevation?
 
 
 ----
