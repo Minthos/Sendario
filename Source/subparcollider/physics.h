@@ -749,7 +749,7 @@ AABB calculateBounds(ctleaf* p, uint32_t first, uint32_t last) {
     AABB bounds;
     bounds.min = hvec3(32767);
     bounds.max = hvec3(-32768);
-    for (uint32_t i = first; i < last; ++i) {
+    for (uint32_t i = first; i <= last; ++i) {
         bounds.min = hvec3::min(bounds.min, p[i].lo);
         bounds.max = hvec3::max(bounds.max, p[i].hi);
     }
