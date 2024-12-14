@@ -1,9 +1,15 @@
 
 TODO:
 
-multiple objects in the collision tree
+encapsulate logic for spawning units and tracking unit positions relative to the terrain zones and collision tree
+
+
+
+
+ - done! multiple objects in the collision tree
 test for overlapping objects in the collision tree
 show overlapping objects with a red bounding box in debug mode
+
 
 rts interface = press tab to toggle top-down camera and 3rd person camera
 selection rectangle

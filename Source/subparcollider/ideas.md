@@ -9,6 +9,12 @@ No FTL travel initially. Advanced-ish fusion technology can make the travel time
 
 Make new planets available on a regular schedule depending on how crowded planets get. The planets should be within lightyears of each other. That gives me the option to introduce FTL travel to the tech tree a few years into the game.
 
+----
+
+Material objects can not teleport or fast travel, but a player's focus can move to any unit or building they have permission to control. This way it will be possible for players who usually live far apart to meet and play together any place they can acquire a unit to control. Purchasing a unit from the local market, borrowing a unit from a friend or ally, etc.
+
+Work contracts. Courier, construction, various mercenary contracts. Can be open to anyone or based on a manual review/negotiation process. Everyone gets a permanent record of their performance (employers and contractors, individuals and groups). Detailed controls over who can view it and how much they get to see.
+
 
 
 ----

@@ -1026,6 +1026,7 @@ terrain_lock.unlock(); // release mutex
             }
         }
         t.destroy();
+        l.destroy();
         checkGLerror();
 
         // Bind back to the default framebuffer
@@ -1088,12 +1089,15 @@ terrain_lock.unlock(); // release mutex
     glDeleteTextures(1, &velocityTex);
     glfwTerminate();
     terrain_thread.join();
+
     delete the_old_terrain.generator;
     delete terrain0;
     delete glitch;
     for(int i = 0; i < ros.size(); i++) {
         ros[i].po->mesh.destroy();
     }
+	ros.destroy();
+	units.destroy();
     std::cout << "\n" << std::chrono::duration_cast<std::chrono::seconds>(now() - start_time).count() <<
         " seconds closer to the singularity.\n";
     std::cout << "What are you building anon?\n";
