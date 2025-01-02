@@ -139,7 +139,7 @@ TerrainGenerator::TerrainGenerator(int pseed, float proughness) {
     seed = pseed;
     roughness = proughness;
     fnFractal->SetSource( fnSimplex );
-    fnFractal->SetOctaveCount( 10 );
+    fnFractal->SetOctaveCount( 13 );
 }
 
 float TerrainGenerator::getElevation(dvec3 pos) {
