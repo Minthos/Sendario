@@ -14,15 +14,20 @@ physics tick
 3. broad phase box-box and box-terrain intersections
 4. narrow phase triangle-triangle intersections (compute two transformation matrices that will transform one object's triangles into another object's coordinate space before and after the position updates in step 2 were applied
 5. push on all colliding triangles as if they are not connected to anything
-6. calculate how much force that would require, somehow* balance the force of the collision among the affected triangles per colliding pair of objects
-7. give up and implement XPBD in gpu shader
-8. that's actually a good idea anyway as a learning experience, can salvage ideas for my own implementation
+6. push back based on depth of penetration and material properties like strength and compliance (XPBR \*)
+7. triangles that move more than some threshold determined by the material's hardness don't fully return to their original position. that means we have a destructive collision and may need to subdivide the triangle to represent its new shape.
+8. remember that corners are infinitely sharp in the simulation and that can cause deviation from expected outcomes
 9. calculate how much volume is displaced by each triangle's movement
 10. send shockwaves created by the displaced volume?
 11. recalculate moment of inertia for the whole object
+12. generate a report for each destructive collision, containing the following:
+    - timestamp
+    - object ids of the two objects
+    - mass, position, velocity, orientation and spin of both objects before and after the collision
+    - if any pieces broke off: object id, mass, position, velocity, orientation and spin of the new pieces
+    - updated object space positions for any vertices that have been permanently dislocated
 
-*) matthias müller-fischer recommends using multiple sub-steps and solving rigid constraints locally, dunno how that translates to what I'm doing
-
+\*) matthias müller-fischer uses many sub-steps (20 ish to 100 ish) and solving constraints locally instead of many iterations per sub-step
 
 
 classic benchmark: pyramid of 650 stacked cubes resting on a flat surface and being affected by gravity, measure the position of the top cube over time and plot the horizontal and vertical deviation on a chart. ideally they should wobble a bit vertically but not horizontally and settle on a stable deviation determined by the softness of the cubes relative to the pull of gravity.
