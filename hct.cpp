@@ -44,6 +44,21 @@ the smallest resolution we need is just to serve as origo for floating point cal
 indoor grid should have (2.4m)^3 default cell size to represent standard rooms and corridors.
 1/4 of 2.4 is 0.6, 1/4 of 0.6 is 0.15, 1/4 of 0.15 is 0.0375. maybe best not to go any lower.
 
+hmm, a 0.0375 m resolution gives a 64 bit integer coordinate system 6.917529027641082e+17 meters range.
+that's 73.11625650186113 light years apparently. should be more than enough
+to model a star system. now I'm tempted to use this as global coordinate system that's unambiguous throughout a
+star system. local physics simulations can be done with floating point values offset from cells in this grid.
+
+but.. I'm still going to want separate grids for indoor environments so gravity, walls and floors can be axis-aligned.
+and I want the grid for a planet to be relative to the planet, not the star.
+
+ok so, the 2.4m cell is the base of the local coordinate system used for physics and rendering. objects that cross into another cell must add or subtract 2.4m to the correct coordinate value so they will be positioned relative to the new
+cell.
+
+the player character's cell is the base of the local coordinate system used for rendering.
+
+need to refactor hct to integer coordinates.
+
 ----
 
 I just had an idea for mercenary work.

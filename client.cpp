@@ -30,8 +30,8 @@
 #include <ucontext.h>
 
 // Rendering quality settings
-float anisotropy = 4.0f; // should be 4 with no upscaling, 16 with upscaling
-int antialiasing = 1; // 1 (no upscaling) and 2 (4 samples per pixel) are good values
+float anisotropy = 16.0f; // should be 4 with no upscaling, 16 with upscaling
+int antialiasing = 2; // 1 (no upscaling) and 2 (4 samples per pixel) are good values
 int motion_blur_mode = 1; // 0 = off, 1 = nonlinear (sharp), 2 = linear (blurry)
 float motion_blur_invstr = 5.0f; // inverse of motion blur amount. 1.0 = very high. 5.0 = low.
 #ifdef DEBUG
@@ -502,7 +502,7 @@ void reshape(GLFWwindow* window, int width, int height) {
     screenwidth = width;
     screenheight = height;
     resizeFramebuffer(screenwidth, screenheight);
-    std::cout << "Resized window to " << height << "x" << width << "\n";
+    std::cout << "Resized window to " << width << "x" << height << "\n";
 }
 
 void render(RenderObject *obj) {
@@ -793,7 +793,7 @@ int main(int argc, char** argv) {
         std::cout << "af: anisotropic filtering. 0, to 16.\n";
         std::cout << "blur: the amount of motion blur. 0 to 50.\n";
         std::cout << "\nexamples:\nlow: ./takeoff aa=1 af=0 blur=0 bs=10000 lod=10\n";
-        std::cout << "default: ./takeoff aa=1 af=4 blur=3 lod=20\n";
+        std::cout << "default: ./takeoff aa=2 af=16 blur=3 lod=20\n";
         std::cout << "high: ./takeoff aa=2 af=16 blur=2 lod=50\n";
         std::cout << "LODmaxxing: ./takeoff aa=1 af=4 blur=2 lod=80 --lowmem\n";
         std::cout << "ultra: ./takeoff aa=4 af=16 blur=2 lod=100\n\n";
