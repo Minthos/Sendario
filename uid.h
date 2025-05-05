@@ -4,7 +4,7 @@
 #include <endian.h>
 #include <stdint.h>
 #include <cassert>
-#include "physics.h" // for nonstd::vector
+#include "physics.h"
 
 struct UID {
     uint64_t data[2];
@@ -13,29 +13,23 @@ struct UID {
     void setPID(uint64_t);
     uint64_t getOID();
     void setOID(uint64_t);
-    uint32_t getIdx();
+    uint32_t getIdx() const;
     void setIdx(uint32_t);
 
     uint64_t hash() const;
 };
 
 struct UIDHashTable {
-    struct Entry {
-        UID key;
-        uint32_t value;
-    };
-
-    nonstd::vector<nonstd::vector<Entry>> buckets;
+    nonstd::vector<UID> slots;
     size_t size = 0;
 
-    UIDHashTable(size_t initial_capacity = 16);
-    ~UIDHashTable();
+    void init(size_t initial_capacity = 16);
+    void destroy();
 
-    void insert(const UID& key, uint32_t value);
-    bool find(const UID& key, uint32_t& out_value);
-    bool remove(const UID& key);
+    void insert(const UID& key);
+    void remove(const UID& key);
     void clear();
-    void reserve(size_t new_capacity);
+    uint32_t operator[](const UID& key);
 };
 
 #endif // UID_H

@@ -17,8 +17,12 @@ void UID::setOID(uint64_t in) {
     data[0] = (data[0] & 0x0000FFFFFFFFFFFF) | ((in & 0x000000000000FFFF) << 48);
     data[1] = (data[1] & 0xFFFFFFFF00000000) | ((in & 0x0000FFFFFFFF0000) >> 16);
 }
-uint32_t UID::getIdx() { return ((uint32_t*)(data))[3]; }
-void UID::setIdx(uint32_t in) { ((uint32_t*)(data))[3] = in; }
+uint32_t UID::getIdx() const {
+    return (uint32_t)(data[1] >> 32); 
+}
+void UID::setIdx(uint32_t in) { 
+    data[1] = (data[1] & 0x00000000FFFFFFFF) | ((uint64_t)in << 32); 
+}
 uint64_t UID::hash() const {
     uint64_t h = data[0] ^ (data[1] & 0x00000000FFFFFFFF);
     h ^= h >> 33;
@@ -29,13 +33,21 @@ uint64_t UID::hash() const {
     return h;
 }
 
-UIDHashTable::UIDHashTable(size_t initial_capacity) {
-    initial_capacity = std::max(size_t(16), initial_capacity);
-    slots.resize(initial_capacity, UID{0, 0});
+void UIDHashTable::init(size_t initial_capacity) {
+    slots = nonstd::vector<UID>();
+    slots.reserve(initial_capacity);
+    bzero(slots.data(), slots.size() * sizeof(UID));
+    size = 0;
 }
 
-UIDHashTable::~UIDHashTable() {
-    clear();
+void UIDHashTable::destroy() {
+    slots.destroy();
+    size = 0;
+}
+
+void UIDHashTable::clear() {
+    bzero(slots.data(), slots.size() * sizeof(UID));
+    size = 0;
 }
 
 void UIDHashTable::insert(const UID& key) {
@@ -54,26 +66,8 @@ void UIDHashTable::insert(const UID& key) {
         }
         if (slot.data[0] == key.data[0] &&
             (slot.data[1] & 0x00000000FFFFFFFF) == (key.data[1] & 0x00000000FFFFFFFF)) {
-            slot = key; // Update existing
+            slot = key;
             return;
-        }
-        idx = (idx + 1) % slots.size(); // Linear probing
-        probe_count++;
-    }
-    assert(false);
-}
-
-bool UIDHashTable::find(const UID& key) {
-    size_t idx = key.hash() % slots.size();
-    size_t probe_count = 0;
-    while (probe_count < slots.size()) {
-        const UID& slot = slots[idx];
-        if (slot.data[0] == 0 && slot.data[1] == 0) {
-            return false;
-        }
-        if (slot.data[0] == key.data[0] &&
-            (slot.data[1] & 0x00000000FFFFFFFF) == (key.data[1] & 0x00000000FFFFFFFF)) {
-            return true;
         }
         idx = (idx + 1) % slots.size(); // Linear probing
         probe_count++;
@@ -113,53 +107,41 @@ bool UIDHashTable::remove(const UID& key) {
     assert(false);
 }
 
-void UIDHashTable::clear() {
-    for (auto& slot : slots) {
-        slot = UID{0, 0};
-    }
-    size = 0;
-}
-
 void UIDHashTable::reserve(size_t new_capacity) {
-    nonstd::vector<UID> new_slots(new_capacity, UID{0, 0});
-    bzero(new_slots.data(), new_slots.size() * sizeof(UID));
-    size_t old_size = size;
-    size = 0;
-
     nonstd::vector<UID> *old_slots = &slots;
+    nonstd::vector<UID> new_slots;
+    new_slots.reserve(new_capacity);
+    bzero(new_slots.data(), new_slots.size() * sizeof(UID));
     slots = new_slots;
     
-    // Rehash all non-empty slots from old array (now in new_slots)
-    for (const auto slot : old_slots) {
-        if (!(slot->data[0] == 0 && slot->data[1] == 0)) {
-            insert(*slot);
+    for (const UID& slot : *old_slots) {
+        if (slot.data[0] != 0 || slot.data[1] != 0) {
+            slots = new_slots;
+            insert(slot);
         }
     }
-
+    
     old_slots->destroy();
-    size = old_size;
 }
 
-bool UIDHashTable::operator[](const UID& key) const {
+uint32_t UIDHashTable::operator[](const UID& key) {
     size_t idx = key.hash() % slots.size();
     size_t probe_count = 0;
     while (probe_count < slots.size()) {
         const UID& slot = slots[idx];
         if (slot.data[0] == 0 && slot.data[1] == 0) {
-            return false;
+            slot = key;
+            size++;
         }
         if (slot.data[0] == key.data[0] &&
             (slot.data[1] & 0x00000000FFFFFFFF) == (key.data[1] & 0x00000000FFFFFFFF)) {
-            return true;
+            return slot.getIdx();
         }
         idx = (idx + 1) % slots.size(); // Linear probing
         probe_count++;
     }
-    return false;
+    assert(false);
 }
 
-#endif
 
-
-
-
+#endif // __BYTE_ORDER == __LITTLE_ENDIAN
