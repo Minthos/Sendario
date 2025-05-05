@@ -50,8 +50,14 @@ TEST_CASE("UIDHashTable operations", "[uid_hash]") {
         uid1.setPID(1); uid1.setOID(1); uid1.setIdx(100);
         uid2.setPID(2); uid2.setOID(2); uid2.setIdx(200);
         
+        REQUIRE(table.size == 0);
+        REQUIRE(table.slots.capacity >= 4);
         table.insert(uid1);
+        REQUIRE(table.size == 1);
+        REQUIRE(table.slots.capacity >= 4);
         table.insert(uid2);
+        REQUIRE(table.size == 2);
+        REQUIRE(table.slots.capacity >= 4);
         
         REQUIRE(table[uid1] == 100);
         REQUIRE(table[uid2] == 200);
