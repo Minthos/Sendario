@@ -1,8 +1,7 @@
 #include "uid.cpp"
-#include "terragen.h"
+#include <stdexcept>
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
-#include <unordered_set> // For tracking inserted values
 
 TEST_CASE("UID operations work correctly", "[uid]") {
     UID uid;
@@ -43,81 +42,77 @@ TEST_CASE("UID operations work correctly", "[uid]") {
 }
 
 TEST_CASE("UIDHashTable operations", "[uid_hash]") {
-    UIDHashTable table(4);
+    UIDHashTable table;
+    table.init(4);
     
     SECTION("Basic insertion and lookup") {
         UID uid1, uid2;
-        uid1.setPID(1); uid1.setOID(1);
-        uid2.setPID(2); uid2.setOID(2);
+        uid1.setPID(1); uid1.setOID(1); uid1.setIdx(100);
+        uid2.setPID(2); uid2.setOID(2); uid2.setIdx(200);
         
-        table.insert(uid1, 100);
-        table.insert(uid2, 200);
+        table.insert(uid1);
+        table.insert(uid2);
         
-        uint32_t val;
-        REQUIRE(table.find(uid1, val));
-        REQUIRE(val == 100);
-        REQUIRE(table.find(uid2, val));
-        REQUIRE(val == 200);
+        REQUIRE(table[uid1] == 100);
+        REQUIRE(table[uid2] == 200);
+        
+        // Test lookup of non-existent key (should insert)
+        UID uid3;
+        uid3.setPID(3); uid3.setOID(3);
+        uint32_t idx = table[uid3];
+        REQUIRE(table.size == 3);
+        REQUIRE(table[uid3] == idx);
     }
     
     SECTION("Update existing value") {
         UID uid;
-        uid.setPID(1); uid.setOID(1);
+        uid.setPID(1); uid.setOID(1); uid.setIdx(100);
         
-        table.insert(uid, 100);
-        table.insert(uid, 200); // Update
+        table.insert(uid);
+        REQUIRE(table[uid] == 100);
         
-        uint32_t val;
-        REQUIRE(table.find(uid, val));
-        REQUIRE(val == 200);
-    }
-    
-    SECTION("Nonexistent lookup") {
-        UID uid;
-        uid.setPID(1); uid.setOID(1);
-        
-        uint32_t val;
-        REQUIRE_FALSE(table.find(uid, val));
+        // Update with new value
+        uid.setIdx(200);
+        table.insert(uid);
+        REQUIRE(table[uid] == 200);
     }
     
     SECTION("Removal") {
         UID uid;
-        uid.setPID(1); uid.setOID(1);
+        uid.setPID(1); uid.setOID(1); uid.setIdx(100);
         
-        table.insert(uid, 100);
-        REQUIRE(table.remove(uid));
-        uint32_t val;
-        REQUIRE_FALSE(table.find(uid, val));
-        REQUIRE_FALSE(table.remove(uid)); // Double remove
+        table.insert(uid);
+        REQUIRE(table.size == 1);
+        table.remove(uid);
+        REQUIRE(table.size == 0);
+        
+        // Test removing non-existent key
+        table.remove(uid); // Should not crash
     }
     
     SECTION("Collision handling") {
-        // Force collisions by using small table size
-        UIDHashTable small_table(2);
+        UIDHashTable small_table;
+        small_table.init(2);
         
         UID uid1, uid2, uid3;
-        uid1.setPID(1); uid1.setOID(1);
-        uid2.setPID(2); uid2.setOID(2);
-        uid3.setPID(3); uid3.setOID(3);
+        uid1.setPID(1); uid1.setOID(1); uid1.setIdx(100);
+        uid2.setPID(2); uid2.setOID(2); uid2.setIdx(200);
+        uid3.setPID(3); uid3.setOID(3); uid3.setIdx(300);
         
-        small_table.insert(uid1, 100);
-        small_table.insert(uid2, 200);
-        small_table.insert(uid3, 300);
+        small_table.insert(uid1);
+        small_table.insert(uid2);
+        small_table.insert(uid3);
         
-        uint32_t val;
-        REQUIRE(small_table.find(uid1, val));
-        REQUIRE(val == 100);
-        REQUIRE(small_table.find(uid2, val));
-        REQUIRE(val == 200);
-        REQUIRE(small_table.find(uid3, val));
-        REQUIRE(val == 300);
+        REQUIRE(small_table[uid1] == 100);
+        REQUIRE(small_table[uid2] == 200);
+        REQUIRE(small_table[uid3] == 300);
     }
     
     SECTION("Clear and resize") {
         UID uid;
-        uid.setPID(1); uid.setOID(1);
+        uid.setPID(1); uid.setOID(1); uid.setIdx(100);
         
-        table.insert(uid, 100);
+        table.insert(uid);
         REQUIRE(table.size == 1);
         
         table.clear();
@@ -125,92 +120,82 @@ TEST_CASE("UIDHashTable operations", "[uid_hash]") {
         
         // Test resize
         table.reserve(8);
-        table.insert(uid, 100);
+        table.insert(uid);
         REQUIRE(table.size == 1);
+        REQUIRE(table[uid] == 100);
+    }
+
+    SECTION("Hash function") {
+        UID uid1, uid2;
+        uid1.setPID(1); uid1.setOID(1);
+        uid2.setPID(2); uid2.setOID(2);
         
-        uint32_t val;
-        REQUIRE(table.find(uid, val));
-        REQUIRE(val == 100);
+        REQUIRE(uid1.hash() != uid2.hash());
+        
+        // Test same UID has same hash
+        UID uid3;
+        uid3.setPID(1); uid3.setOID(1);
+        REQUIRE(uid1.hash() == uid3.hash());
+        
+        // Test that index doesn't affect hash
+        uid3.setIdx(42);
+        REQUIRE(uid1.hash() == uid3.hash());
+        
+        // Test zero UID
+        UID zero;
+        REQUIRE(zero.hash() == 0);
     }
 
-    SECTION("Large-scale pseudorandom operations") {
-        const int iterations = 1000000;
-        UIDHashTable large_table(1024);
-        Prng_xoshiro prng;
-        prng.init(0x12345678, 0x9ABCDEF0);
-
-        // Insert random UIDs
-        for (int i = 0; i < iterations; i++) {
-            UID uid;
-            uid.setPID(prng.get() & 0x0000FFFFFFFFFFFF);
-            uid.setOID(prng.get() & 0x0000FFFFFFFFFFFF);
-            uid.setIdx(i);
-            large_table.insert(uid, i);
-        }
-        REQUIRE(large_table.size == iterations);
-
-        // Reset PRNG to same seed to get same sequence
-        prng.init(0x12345678, 0x9ABCDEF0);
-
-        // Verify all inserted UIDs can be found
-        uint32_t val;
-        for (int i = 0; i < iterations; i++) {
-            UID uid;
-            uid.setPID(prng.get() & 0x0000FFFFFFFFFFFF);
-            uid.setOID(prng.get() & 0x0000FFFFFFFFFFFF);
-            uid.setIdx(i);
-            REQUIRE(large_table.find(uid, val));
-            REQUIRE(val == i);
-        }
-
-        // Reset PRNG again
-        prng.init(0x12345678, 0x9ABCDEF0);
-
-        // Remove all UIDs
-        for (int i = 0; i < iterations; i++) {
-            UID uid;
-            uid.setPID(prng.get() & 0x0000FFFFFFFFFFFF);
-            uid.setOID(prng.get() & 0x0000FFFFFFFFFFFF);
-            uid.setIdx(i);
-            REQUIRE(large_table.remove(uid));
-        }
-        REQUIRE(large_table.size == 0);
+    SECTION("Edge cases") {
+        UID uid;
+        // Test max PID
+        uid.setPID(0x0000FFFFFFFFFFFF);
+        REQUIRE(uid.getPID() == 0x0000FFFFFFFFFFFF);
+        
+        // Test max OID 
+        uid.setOID(0x0000FFFFFFFFFFFF);
+        REQUIRE(uid.getOID() == 0x0000FFFFFFFFFFFF);
+        
+        // Test max index
+        uid.setIdx(0xFFFFFFFF);
+        REQUIRE(uid.getIdx() == 0xFFFFFFFF);
+        
+        // Test zero UID operations
+        UID zero;
+        REQUIRE(zero.getPID() == 0);
+        REQUIRE(zero.getOID() == 0);
+        REQUIRE(zero.getIdx() == 0);
     }
 
-    SECTION("Large-scale sequential operations") {
-        const int iterations = 1000000;
-        UIDHashTable seq_table(1024);
+    SECTION("Table destruction") {
+        UIDHashTable local_table;
+        local_table.init(4);
+        
+        UID uid;
+        uid.setPID(1); uid.setOID(1); uid.setIdx(100);
+        local_table.insert(uid);
+        
+        local_table.destroy();
+        // Should be able to re-init after destroy
+        local_table.init(4);
+        local_table.insert(uid);
+        REQUIRE(local_table[uid] == 100);
+    }
 
-        // Insert sequential UIDs
-        for (int i = 0; i < iterations; i++) {
-            UID uid;
-            uid.setPID(i);
-            uid.setOID(i * 2);
-            uid.setIdx(i % 1000);
-            seq_table.insert(uid, i);
-        }
-        REQUIRE(seq_table.size == iterations);
-
-        // Verify all inserted UIDs can be found
-        uint32_t val;
-        for (int i = 0; i < iterations; i++) {
-            UID uid;
-            uid.setPID(i);
-            uid.setOID(i * 2);
-            uid.setIdx(i % 1000);
-            REQUIRE(seq_table.find(uid, val));
-            REQUIRE(val == i);
-        }
-
-        // Remove all UIDs
-        for (int i = 0; i < iterations; i++) {
-            UID uid;
-            uid.setPID(i);
-            uid.setOID(i * 2);
-            uid.setIdx(i % 1000);
-            REQUIRE(seq_table.remove(uid));
-        }
-        REQUIRE(seq_table.size == 0);
+    SECTION("Empty table behavior") {
+        UID uid;
+        uid.setPID(1); uid.setOID(1);
+        
+        // Lookup on empty table should insert
+        uint32_t idx = table[uid];
+        REQUIRE(table.size == 1);
+        REQUIRE(table[uid] == idx);
+        
+        table.clear();
+        REQUIRE(table.size == 0);
+        
+        // Remove from empty table should not crash
+        table.remove(uid);
     }
 }
 

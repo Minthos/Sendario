@@ -36,7 +36,7 @@ uint64_t UID::hash() const {
 void UIDHashTable::init(size_t initial_capacity) {
     slots = nonstd::vector<UID>();
     slots.reserve(initial_capacity);
-    bzero(slots.data(), slots.size() * sizeof(UID));
+    bzero(slots.data, slots.size() * sizeof(UID));
     size = 0;
 }
 
@@ -46,7 +46,7 @@ void UIDHashTable::destroy() {
 }
 
 void UIDHashTable::clear() {
-    bzero(slots.data(), slots.size() * sizeof(UID));
+    bzero(slots.data, slots.size() * sizeof(UID));
     size = 0;
 }
 
@@ -111,7 +111,7 @@ void UIDHashTable::reserve(size_t new_capacity) {
     nonstd::vector<UID> *old_slots = &slots;
     nonstd::vector<UID> new_slots;
     new_slots.reserve(new_capacity);
-    bzero(new_slots.data(), new_slots.size() * sizeof(UID));
+    bzero(new_slots.data, new_slots.size() * sizeof(UID));
     slots = new_slots;
     
     for (const UID& slot : *old_slots) {
@@ -128,7 +128,7 @@ uint32_t UIDHashTable::operator[](const UID& key) {
     size_t idx = key.hash() % slots.size();
     size_t probe_count = 0;
     while (probe_count < slots.size()) {
-        const UID& slot = slots[idx];
+        UID& slot = slots[idx];
         if (slot.data[0] == 0 && slot.data[1] == 0) {
             slot = key;
             size++;

@@ -24,11 +24,12 @@ struct UIDHashTable {
     size_t size = 0;
 
     void init(size_t initial_capacity = 16);
+    void reserve(size_t new_capacity);
     void destroy();
+    void clear();
 
     void insert(const UID& key);
-    void remove(const UID& key);
-    void clear();
+    bool remove(const UID& key);
     uint32_t operator[](const UID& key);
 };
 
