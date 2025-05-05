@@ -123,20 +123,20 @@ bool UIDHashTable::remove(const UID& key) {
 
 void UIDHashTable::reserve(size_t new_capacity) {
     assert(new_capacity > slots.capacity);
-    nonstd::vector<UID> *old_slots = &slots;
+    nonstd::vector<UID> old_slots = slots;
     nonstd::vector<UID> new_slots;
     new_slots.reserve(new_capacity);
     bzero(new_slots.data, new_slots.capacity * sizeof(UID));
     slots = new_slots;
     size = 0;
 
-    for (size_t i = 0; i < old_slots->capacity; i++) {
-        if ((*old_slots)[i].data[0] != 0 || (*old_slots)[i].data[1] != 0) {
-            insert((*old_slots)[i]);
+    for (size_t i = 0; i < old_slots.capacity; i++) {
+        if (old_slots[i].data[0] != 0 || old_slots[i].data[1] != 0) {
+            insert(old_slots[i]);
         }
     }
     
-    old_slots->destroy();
+    old_slots.destroy();
 }
 
 uint32_t UIDHashTable::operator[](const UID& key) {
