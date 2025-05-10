@@ -69,9 +69,13 @@ old_debug: $(CPP_SRC) $(SWIFT_SRC)
 	g++ -g -c $(CPP_SRC) -fpermissive -fPIC $(LIBS)
 	swiftc -j8 -g -D DEBUG -import-objc-header $(OBJC_HEADERS) $(SWIFT_SRC) $(CPP_SRC:.cpp=.o) -o subparcollider $(LIBDIR) $(INCDIR) $(LIBS)
 
+test_uid_profile: test_uid.cpp uid.cpp uid.h sha256.o
+	$(COMPILER) $(TAKEOFF_FLAGS) -pg test_uid.cpp terragen.o sha256.o libFastNoise.a -o test_uid -fPIC $(LIBDIR) $(INCDIR)
+	time ./test_uid; gprof test_uid; rm test_uid
+
 test_uid: test_uid.cpp uid.cpp uid.h sha256.o
 	$(COMPILER_DEBUG) $(TAKEOFF_DEBUG_FLAGS) test_uid.cpp terragen.o sha256.o libFastNoise.a -o test_uid -fPIC $(LIBDIR) $(INCDIR)
-	./test_uid; rm test_uid
+	time ./test_uid; rm test_uid
 
 test_uid_valgrind: test_uid.cpp uid.cpp uid.h sha256.o
 	$(COMPILER_DEBUG) $(TAKEOFF_DEBUG_FLAGS) test_uid.cpp terragen.o sha256.o libFastNoise.a -o test_uid -fPIC $(LIBDIR) $(INCDIR)
@@ -82,6 +86,7 @@ debug: takeoff_debug
 release: takeoff_release
 old: old_optimized
 test: test_uid
+testprof: test_uid_profile
 testvalgrind: test_uid_valgrind
 
 .PHONY: quick debug release test
