@@ -1,5 +1,6 @@
 #include "uid.h"
 #include <stdexcept>
+#include <iomanip>
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 
@@ -22,15 +23,15 @@ void UID::setOID(uint64_t in) {
 }
 
 uint32_t UID::getIdx() const {
-    return (uint32_t)(data[1] >> 32); 
+    return data32[3]; 
 }
 
 void UID::setIdx(uint32_t in) { 
-    data[1] = (data[1] & 0x00000000FFFFFFFF) | ((uint64_t)in << 32); 
+    data32[3] = in;
 }
 
 uint64_t UID::hash() const {
-    uint64_t h = data[0] ^ (data[1] & 0x00000000FFFFFFFF);
+    uint64_t h = data[0] ^ data32[2];
     h ^= h >> 33;
     h *= 0xff51afd7ed558ccd;
     h ^= h >> 33;
@@ -58,13 +59,19 @@ void UIDHashTable::clear() {
 }
 
 void UIDHashTable::insert(const UID& key) {
+    if(key.data[0] == 0 && key.data32[2] == 0) {
+        zero_value = key.getIdx();
+        if(!(flags & 1))
+            size++;
+        flags |= 1;
+        return;
+    }
+
     if (((size + 1) * 2) >= slots.capacity) { // Load factor < 0.5
         reserve(max(16, slots.capacity * 2));
     }
 
     assert(slots.capacity > 0);
-    std::cerr << "before insert: " << slots.capacity << "\n";
-    std::cerr << "before insert: " << size << "\n";
     size_t idx = key.hash() % slots.capacity;
     size_t probe_count = 0;
     while (probe_count < slots.capacity) {
@@ -72,15 +79,10 @@ void UIDHashTable::insert(const UID& key) {
         if (slot.data[0] == 0 && slot.data[1] == 0) {
             slot = key;
             size++;
-            std::cerr << "after insert: " << slots.capacity << "\n";
-            std::cerr << "after insert: " << size << "\n";
             return;
         }
-        if (slot.data[0] == key.data[0] &&
-            (slot.data[1] & 0x00000000FFFFFFFF) == (key.data[1] & 0x00000000FFFFFFFF)) {
+        if (slot.data[0] == key.data[0] && slot.data32[2] == key.data32[2]) {
             slot = key;
-            std::cerr << "after update: " << slots.capacity << "\n";
-            std::cerr << "after update: " << size << "\n";
             return;
         }
         idx = (idx + 1) % slots.capacity; // Linear probing
@@ -89,16 +91,23 @@ void UIDHashTable::insert(const UID& key) {
     assert(false);
 }
 
-bool UIDHashTable::remove(const UID& key) {
+void UIDHashTable::remove(const UID& key) {
+    if(key.data[0] == 0 && key.data32[2] == 0) {
+        assert(flags & 1);
+        zero_value = 0;
+        size--;
+        flags &= (~1);
+        return;
+    }
+
     size_t idx = key.hash() % slots.capacity;
     size_t probe_count = 0;
     while (probe_count < slots.capacity) {
         UID& slot = slots[idx];
         if (slot.data[0] == 0 && slot.data[1] == 0) {
-            return false;
+            return;
         }
-        if (slot.data[0] == key.data[0] &&
-            (slot.data[1] & 0x00000000FFFFFFFF) == (key.data[1] & 0x00000000FFFFFFFF)) {
+        if (slot.data[0] == key.data[0] && slot.data32[2] == key.data32[2]) {
             size--;
             slot = UID{0, 0};
 
@@ -113,7 +122,7 @@ bool UIDHashTable::remove(const UID& key) {
                 }
                 next_idx = (next_idx + 1) % slots.capacity;
             }
-            return true;
+            return;
         }
         idx = (idx + 1) % slots.capacity; // Linear probing
         probe_count++;
@@ -122,13 +131,13 @@ bool UIDHashTable::remove(const UID& key) {
 }
 
 void UIDHashTable::reserve(size_t new_capacity) {
-    assert(new_capacity > slots.capacity);
+    assert(new_capacity > size);
     nonstd::vector<UID> old_slots = slots;
     nonstd::vector<UID> new_slots;
     new_slots.reserve(new_capacity);
     bzero(new_slots.data, new_slots.capacity * sizeof(UID));
     slots = new_slots;
-    size = 0;
+    size = 0 + (flags & 1);
 
     for (size_t i = 0; i < old_slots.capacity; i++) {
         if (old_slots[i].data[0] != 0 || old_slots[i].data[1] != 0) {
@@ -139,24 +148,27 @@ void UIDHashTable::reserve(size_t new_capacity) {
     old_slots.destroy();
 }
 
-uint32_t UIDHashTable::operator[](const UID& key) {
+uint32_t& UIDHashTable::operator[](const UID& key) {
+    if(key.data[0] == 0 && key.data32[2] == 0) {
+        if(flags & 1)
+            return zero_value;
+        throw std::out_of_range("Key not found");
+    }
+
     size_t idx = key.hash() % slots.capacity;
     size_t probe_count = 0;
     while (probe_count < slots.capacity) {
-        UID& slot = slots[idx];
+UID& slot = slots[idx];
         if (slot.data[0] == 0 && slot.data[1] == 0) {
-            slot = key;
-            size++;
+            throw std::out_of_range("Key not found");
         }
-        if (slot.data[0] == key.data[0] &&
-            (slot.data[1] & 0x00000000FFFFFFFF) == (key.data[1] & 0x00000000FFFFFFFF)) {
-            return slot.getIdx();
+        if (slot.data[0] == key.data[0] && slot.data32[2] == key.data32[2]) {
+            return (uint32_t&)(slot.data32[3]);
         }
-        idx = (idx + 1) % slots.capacity; // Linear probing
+        idx = (idx + 1) % slots.capacity;
         probe_count++;
     }
     assert(false);
 }
-
 
 #endif // __BYTE_ORDER == __LITTLE_ENDIAN

@@ -1,7 +1,9 @@
 #include "uid.cpp"
+#include "terragen.h"
 #include <stdexcept>
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
+#include <iomanip>
 
 TEST_CASE("UID operations work correctly", "[uid]") {
     UID uid;
@@ -62,12 +64,13 @@ TEST_CASE("UIDHashTable operations", "[uid_hash]") {
         REQUIRE(table[uid1] == 100);
         REQUIRE(table[uid2] == 200);
         
-        // Test lookup of non-existent key (should insert)
+        // Test lookup of non-existent key
         UID uid3;
         uid3.setPID(3); uid3.setOID(3);
-        uint32_t idx = table[uid3];
-        REQUIRE(table.size == 3);
-        REQUIRE(table[uid3] == idx);
+        uint32_t idx;
+        REQUIRE_THROWS(idx = table[uid3]);
+        REQUIRE(table.size == 2);
+        REQUIRE_THROWS(table[uid3] == idx);
     }
     
     SECTION("Update existing value") {
@@ -179,25 +182,66 @@ TEST_CASE("UIDHashTable operations", "[uid_hash]") {
         
         local_table.destroy();
         // Should be able to re-init after destroy
-        local_table.init(4);
+local_table.init(4);
         local_table.insert(uid);
         REQUIRE(local_table[uid] == 100);
     }
 
-    SECTION("Empty table behavior") {
-        UID uid;
-        uid.setPID(1); uid.setOID(1);
+    SECTION("Large-scale operations with pseudorandom UIDs") {
         
-        // Lookup on empty table should insert
-        uint32_t idx = table[uid];
-        REQUIRE(table.size == 1);
-        REQUIRE(table[uid] == idx);
-        
-        table.clear();
-        REQUIRE(table.size == 0);
-        
-        // Remove from empty table should not crash
-        table.remove(uid);
+        UIDHashTable large_table;
+        large_table.init(1024);
+        for(uint64_t epoch = 0; epoch < 100; epoch++) {
+            //const uint64_t seed_a = 1 ^ epoch;
+            //const uint64_t seed_b = 2 ^ epoch;
+            const uint64_t seed_a = 0x123456789ABCDEF0 ^ epoch;
+            const uint64_t seed_b = 0xFEDCBA9876543210 ^ epoch;
+    //        const int num_operations = 800000000;
+            const int num_operations = 8000000;
+            const int check_interval = num_operations / 10;
+            
+            Prng_xoshiro rng;
+            rng.init(seed_a, seed_b);
+
+            // Insert phase
+            for (int i = 0; i < num_operations; i++) {
+                UID uid;
+                uint64_t pid = rng.get() % 0x0001000000000000;
+                uint64_t oid = rng.get() % 0x0001000000000000;
+                //std::cerr << "Raw PID: " << std::hex << pid << " OID: " << oid << "\n";
+                uid.setPID(pid);
+                uid.setOID(oid);
+                uid.setIdx(i % 0xFFFF);
+                //std::cerr << "Stored UID: " << std::hex << uid.data[0] << " " << uid.data[1] << "\n";
+                if(uid.data[0] == 0 && uid.data32[2] == 0) {
+                    std::cerr << "nullified!\n";
+                }
+
+                large_table.insert(uid);
+                
+                if (i % check_interval == 0) {
+                    // Verify the inserted UID is present
+//                    large_table[uid] = (i % 0xFFFF);
+                    REQUIRE(large_table[uid] == (i % 0xFFFF));
+                }
+            }
+            
+            // Reset RNG to regenerate same sequence
+            rng.init(seed_a, seed_b);
+            
+            // Delete phase
+            for (int i = 0; i < num_operations; i++) {
+                UID uid;
+                uid.setPID(rng.get() % 0x0001000000000000);
+                uid.setOID(rng.get() % 0x0001000000000000);
+                
+                large_table.remove(uid);
+            }
+            
+            CHECK(large_table.size == 0); // it's supposed to be 0
+            
+            large_table.destroy();
+        }
     }
 }
 

@@ -7,7 +7,10 @@
 #include "physics.h"
 
 struct UID {
-    uint64_t data[2];
+    union {
+        uint64_t data[2];
+        uint32_t data32[4];
+    };
 
     uint64_t getPID();
     void setPID(uint64_t);
@@ -22,6 +25,8 @@ struct UID {
 struct UIDHashTable {
     nonstd::vector<UID> slots;
     size_t size = 0;
+    uint32_t zero_value = 0;
+    uint32_t flags = 0;
 
     void init(size_t initial_capacity = 16);
     void reserve(size_t new_capacity);
@@ -29,8 +34,8 @@ struct UIDHashTable {
     void clear();
 
     void insert(const UID& key);
-    bool remove(const UID& key);
-    uint32_t operator[](const UID& key);
+    void remove(const UID& key);
+    uint32_t& operator[](const UID& key);
 };
 
 #endif // UID_H

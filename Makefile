@@ -39,7 +39,6 @@ terragen.o: terragen.cpp FastNoise2/include/FastNoise/FastNoise.h
 
 sha256.o: SHA-Intrinsics/sha256-x86.c
 	$(COMPILER) $(TAKEOFF_FLAGS) -pg -c SHA-Intrinsics/sha256-x86.c -o sha256.o
-	$(COMPILER) $(TAKEOFF_FLAGS) -pg -c SHA-Intrinsics/sha256-x86.c -o sha256-x86.o
 
 sha256_debug.o: SHA-Intrinsics/sha256.c
 	$(COMPILER_DEBUG) $(TAKEOFF_DEBUG_FLAGS) -c SHA-Intrinsics/sha256.c -o sha256_debug.o
@@ -70,10 +69,10 @@ old_debug: $(CPP_SRC) $(SWIFT_SRC)
 	g++ -g -c $(CPP_SRC) -fpermissive -fPIC $(LIBS)
 	swiftc -j8 -g -D DEBUG -import-objc-header $(OBJC_HEADERS) $(SWIFT_SRC) $(CPP_SRC:.cpp=.o) -o subparcollider $(LIBDIR) $(INCDIR) $(LIBS)
 
-test_uid: test_uid.cpp uid.cpp uid.h
-	$(COMPILER_DEBUG) $(TAKEOFF_DEBUG_FLAGS) test_uid.cpp terragen.o sha256-x86.o libFastNoise.a -o test_uid -fPIC $(LIBDIR) $(INCDIR)
-#	./test_uid; rm test_uid
-	valgrind --track-origins=yes ./test_uid; rm test_uid
+test_uid: test_uid.cpp uid.cpp uid.h sha256.o
+	$(COMPILER_DEBUG) $(TAKEOFF_DEBUG_FLAGS) test_uid.cpp terragen.o sha256.o libFastNoise.a -o test_uid -fPIC $(LIBDIR) $(INCDIR)
+	./test_uid; rm test_uid
+#	valgrind --track-origins=yes ./test_uid; rm test_uid
 
 quick: takeoff
 debug: takeoff_debug
