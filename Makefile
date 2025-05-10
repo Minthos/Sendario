@@ -70,7 +70,7 @@ old_debug: $(CPP_SRC) $(SWIFT_SRC)
 	swiftc -j8 -g -D DEBUG -import-objc-header $(OBJC_HEADERS) $(SWIFT_SRC) $(CPP_SRC:.cpp=.o) -o subparcollider $(LIBDIR) $(INCDIR) $(LIBS)
 
 test_uid: test_uid.cpp uid.cpp uid.h sha256.o
-	$(COMPILER_DEBUG) $(TAKEOFF_DEBUG_FLAGS) test_uid.cpp terragen.o sha256.o libFastNoise.a -o test_uid -fPIC $(LIBDIR) $(INCDIR)
+	$(COMPILER) $(TAKEOFF_FLAGS) test_uid.cpp terragen.o sha256.o libFastNoise.a -o test_uid -fPIC $(LIBDIR) $(INCDIR)
 	./test_uid; rm test_uid
 
 test_uid_valgrind: test_uid.cpp uid.cpp uid.h sha256.o

@@ -155,6 +155,13 @@ template <typename T> struct vector {
 
 };
 
+template<typename... Args>
+std::string constfstr(const char* format, const Args&... args) {
+    std::vector<char> buf(1 + std::snprintf(nullptr, 0, format, args...));
+    std::snprintf(buf.data(), buf.size(), format, args...);
+    return std::string(buf.data(), buf.size() - 1);
+}
+
 std::string fstr(const char* format, ...) {
     va_list args;
     va_start(args, format);

@@ -5,14 +5,14 @@
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 
 // UID methods unchanged
-uint64_t UID::getPID() { return data[0] & 0x0000FFFFFFFFFFFF; }
+uint64_t UID::getPID() const { return data[0] & 0x0000FFFFFFFFFFFF; }
 
 void UID::setPID(uint64_t in) {
     assert((in & 0xFFFF000000000000) == 0);
     data[0] = (data[0] & 0xFFFF000000000000) | (in & 0x0000FFFFFFFFFFFF);
 }
 
-uint64_t UID::getOID() {
+uint64_t UID::getOID() const {
     return (((data[0] & 0xFFFF000000000000) >> 48) | ((data[1] & 0x00000000FFFFFFFF) << 16));
 }
 
@@ -110,15 +110,23 @@ void UIDHashTable::remove(const UID& key) {
         }
         if (slot.data[0] == key.data[0] && slot.data32[2] == key.data32[2]) {
             size--;
-            slot = UID{0, 0};
+            slot = UID{0ULL, 0ULL};
 
             size_t current_idx = idx;
             size_t next_idx = (current_idx + 1) % slots.capacity;
             while (!(slots[next_idx].data[0] == 0 && slots[next_idx].data[1] == 0)) {
                 size_t ideal_idx = slots[next_idx].hash() % slots.capacity;
-                if ((ideal_idx <= current_idx) || (current_idx < next_idx && ideal_idx > next_idx)) {
+                bool should_move = false;
+                if (current_idx < next_idx) {
+                    // Normal case (no wrap between current and next)
+                    should_move = (ideal_idx <= current_idx) || (ideal_idx > next_idx);
+                } else {
+                    // Wrap-around case (next_idx wrapped around to 0)
+                    should_move = (ideal_idx <= current_idx) && (ideal_idx > next_idx);
+                }
+                if (should_move) {
                     slots[current_idx] = slots[next_idx];
-                    slots[next_idx] = UID{0, 0};
+                    slots[next_idx] = UID{0ULL, 0ULL};
                     current_idx = next_idx;
                 }
                 next_idx = (next_idx + 1) % slots.capacity;
@@ -153,15 +161,15 @@ uint32_t& UIDHashTable::operator[](const UID& key) {
     if(key.data[0] == 0 && key.data32[2] == 0) {
         if(flags & 1)
             return zero_value;
-        throw std::out_of_range("Key not found");
+        throw std::out_of_range(constfstr("Key not found: %llX %llX", key.getPID(), key.getOID() ));
     }
 
     size_t idx = key.hash() % slots.capacity;
     size_t probe_count = 0;
     while (probe_count < slots.capacity) {
-UID& slot = slots[idx];
+        UID& slot = slots[idx];
         if (slot.data[0] == 0 && slot.data[1] == 0) {
-            throw std::out_of_range("Key not found");
+            throw std::out_of_range(constfstr("Key not found: (%llX %llX) idx: %lu, capacity: %lu", key.getPID(), key.getOID(), idx, slots.capacity ));
         }
         if (slot.data[0] == key.data[0] && slot.data32[2] == key.data32[2]) {
             return (uint32_t&)(slot.data32[3]);

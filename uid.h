@@ -12,9 +12,9 @@ struct UID {
         uint32_t data32[4];
     };
 
-    uint64_t getPID();
+    uint64_t getPID() const;
     void setPID(uint64_t);
-    uint64_t getOID();
+    uint64_t getOID() const;
     void setOID(uint64_t);
     uint32_t getIdx() const;
     void setIdx(uint32_t);

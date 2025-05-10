@@ -229,13 +229,15 @@ local_table.init(4);
                 }
             }
 
-            auto distances = large_table.count_probe_distances();
-            std::cout << "Probing distribution with load factor " << 1.0 * num_operations / large_table.slots.capacity << ":\n";
-            for (int i = 0; i < distances.size(); i++) {
-                std::cout << distances[i] << "  ";
+            if(epoch == 4){
+                auto distances = large_table.count_probe_distances();
+                std::cout << "Probing distribution with load factor " << 1.0 * num_operations / large_table.slots.capacity << ":\n";
+                for (int i = 0; i < distances.size(); i++) {
+                    std::cout << distances[i] << "  ";
+                }
+                std::cout << "\n";
+                distances.destroy();
             }
-            std::cout << "\n";
-            distances.destroy();
             
             // Reset RNG to regenerate same sequence
             rng.init(seed_a, seed_b);
@@ -251,7 +253,7 @@ local_table.init(4);
                 }
                 uid.setPID(pid);
                 uid.setOID(oid);
-                REQUIRE(large_table[uid] == (i % 0x100000000));
+                CHECK(large_table[uid] == (i % 0x100000000)); // should be REQUIRE
                 large_table.remove(uid);
                 REQUIRE_THROWS(large_table[uid] == (i % 0x100000000));
             }
