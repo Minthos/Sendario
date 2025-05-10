@@ -41,11 +41,11 @@ uint64_t UID::hash() const {
 }
 
 void UIDHashTable::init(size_t initial_capacity) {
+    bzero((void*)this, sizeof(UIDHashTable));
     assert(initial_capacity > 0);
     slots = nonstd::vector<UID>();
     slots.reserve(initial_capacity);
     bzero(slots.data, slots.capacity * sizeof(UID));
-    size = 0;
 }
 
 void UIDHashTable::destroy() {
@@ -83,6 +83,7 @@ void UIDHashTable::insert(const UID& key) {
         }
         if (slot.data[0] == key.data[0] && slot.data32[2] == key.data32[2]) {
             slot = key;
+            std::cout << "double insert\n";
             return;
         }
         idx = (idx + 1) % slots.capacity; // Linear probing
@@ -169,6 +170,42 @@ UID& slot = slots[idx];
         probe_count++;
     }
     assert(false);
+}
+
+nonstd::vector<int> UIDHashTable::count_probe_distances() const {
+    nonstd::vector<int> counts = nonstd::vector<int>();
+    counts.reserve(16);
+    bzero(counts.data, counts.capacity * sizeof(int));
+    counts.count = 16;
+   
+    assert(slots.capacity > 0);
+    assert(size > 0);
+    for (size_t i = 0; i < slots.capacity; i++) {
+        const UID& slot = slots.data[i];
+        if (slot.data[0] == 0 && slot.data[1] == 0) {
+            continue;
+        }
+        
+        // Calculate ideal position
+        size_t ideal_pos = slot.hash() % slots.capacity;
+        
+        // Calculate actual distance moved (handling wrap-around)
+        size_t distance;
+        if (i >= ideal_pos) {
+            distance = i - ideal_pos;
+        } else {
+            distance = slots.capacity - ideal_pos + i;
+        }
+        
+        // Increment appropriate counter (capping at 8)
+        if (distance < counts.count) {
+            counts[distance]++;
+        } else {
+            counts[counts.count - 1]++;
+        }
+    }
+    
+    return counts;
 }
 
 #endif // __BYTE_ORDER == __LITTLE_ENDIAN

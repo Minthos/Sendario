@@ -72,13 +72,17 @@ old_debug: $(CPP_SRC) $(SWIFT_SRC)
 test_uid: test_uid.cpp uid.cpp uid.h sha256.o
 	$(COMPILER_DEBUG) $(TAKEOFF_DEBUG_FLAGS) test_uid.cpp terragen.o sha256.o libFastNoise.a -o test_uid -fPIC $(LIBDIR) $(INCDIR)
 	./test_uid; rm test_uid
-#	valgrind --track-origins=yes ./test_uid; rm test_uid
+
+test_uid_valgrind: test_uid.cpp uid.cpp uid.h sha256.o
+	$(COMPILER_DEBUG) $(TAKEOFF_DEBUG_FLAGS) test_uid.cpp terragen.o sha256.o libFastNoise.a -o test_uid -fPIC $(LIBDIR) $(INCDIR)
+	valgrind --track-origins=yes ./test_uid; rm test_uid
 
 quick: takeoff
 debug: takeoff_debug
 release: takeoff_release
 old: old_optimized
 test: test_uid
+testvalgrind: test_uid_valgrind
 
 .PHONY: quick debug release test
 

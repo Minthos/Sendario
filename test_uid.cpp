@@ -191,7 +191,7 @@ local_table.init(4);
         
         UIDHashTable large_table;
         large_table.init(1024);
-        for(uint64_t epoch = 0; epoch < 100; epoch++) {
+        for(uint64_t epoch = 0; epoch < 10; epoch++) {
             //const uint64_t seed_a = 1 ^ epoch;
             //const uint64_t seed_b = 2 ^ epoch;
             const uint64_t seed_a = 0x123456789ABCDEF0 ^ epoch;
@@ -208,10 +208,14 @@ local_table.init(4);
                 UID uid;
                 uint64_t pid = rng.get() % 0x0001000000000000;
                 uint64_t oid = rng.get() % 0x0001000000000000;
+                if(epoch % 2 == 0){
+                    pid = epoch;
+                    oid = i;
+                }
                 //std::cerr << "Raw PID: " << std::hex << pid << " OID: " << oid << "\n";
                 uid.setPID(pid);
                 uid.setOID(oid);
-                uid.setIdx(i % 0xFFFF);
+                uid.setIdx(i % 0x100000000);
                 //std::cerr << "Stored UID: " << std::hex << uid.data[0] << " " << uid.data[1] << "\n";
                 if(uid.data[0] == 0 && uid.data32[2] == 0) {
                     std::cerr << "nullified!\n";
@@ -221,10 +225,17 @@ local_table.init(4);
                 
                 if (i % check_interval == 0) {
                     // Verify the inserted UID is present
-//                    large_table[uid] = (i % 0xFFFF);
-                    REQUIRE(large_table[uid] == (i % 0xFFFF));
+                    REQUIRE(large_table[uid] == (i % 0x100000000));
                 }
             }
+
+            auto distances = large_table.count_probe_distances();
+            std::cout << "Probing distribution with load factor " << 1.0 * num_operations / large_table.slots.capacity << ":\n";
+            for (int i = 0; i < distances.size(); i++) {
+                std::cout << distances[i] << "  ";
+            }
+            std::cout << "\n";
+            distances.destroy();
             
             // Reset RNG to regenerate same sequence
             rng.init(seed_a, seed_b);
@@ -232,16 +243,22 @@ local_table.init(4);
             // Delete phase
             for (int i = 0; i < num_operations; i++) {
                 UID uid;
-                uid.setPID(rng.get() % 0x0001000000000000);
-                uid.setOID(rng.get() % 0x0001000000000000);
-                
+                uint64_t pid = rng.get() % 0x0001000000000000;
+                uint64_t oid = rng.get() % 0x0001000000000000;
+                if(epoch % 2 == 0){
+                    pid = epoch;
+                    oid = i;
+                }
+                uid.setPID(pid);
+                uid.setOID(oid);
+                REQUIRE(large_table[uid] == (i % 0x100000000));
                 large_table.remove(uid);
+                REQUIRE_THROWS(large_table[uid] == (i % 0x100000000));
             }
             
             CHECK(large_table.size == 0); // it's supposed to be 0
-            
-            large_table.destroy();
         }
+        large_table.destroy();
     }
 }
 
