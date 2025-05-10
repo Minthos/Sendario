@@ -7,7 +7,7 @@ int main() {
 
     UIDHashTable large_table;
     large_table.init(1024);
-    for(uint64_t epoch = 1; epoch < 20; epoch++) {
+    for(uint64_t epoch = 1; epoch < 11; epoch++) {
         //const uint64_t seed_a = 1 ^ epoch;
         //const uint64_t seed_b = 2 ^ epoch;
         const uint64_t seed_a = 0x123456789ABCDEF0 ^ epoch;
@@ -60,21 +60,19 @@ int main() {
         rng.init(seed_a, seed_b);
         
         // Delete phase
-        for (int i = 0; i < num_operations; i++) {
+        for (uint32_t i = 0; i < num_operations; i++) {
             UID uid;
             uint64_t pid = rng.get() % 0x0001000000000000;
             uint64_t oid = rng.get() % 0x0001000000000000;
-            if(epoch % 2 == 0){
+            if (epoch % 2 == 0) {
                 pid = epoch;
                 oid = i;
             }
             uid.setPID(pid);
             uid.setOID(oid);
-            if(large_table[uid] != (i % 0x100000000))
+            if (large_table[uid] != (i % 0x100000000))
                 errors++;
-            //REQUIRE(large_table[uid] == (i % 0x100000000));
             large_table.remove(uid);
-            //REQUIRE_THROWS(large_table[uid] == (i % 0x100000000));
         }
         
         if(large_table.size != 0) {

@@ -163,7 +163,9 @@ uint32_t& UIDHashTable::operator[](const UID& key) {
     if(key.data[0] == 0 && key.data32[2] == 0) {
         if(flags & 1)
             return zero_value;
-        throw std::out_of_range(constfstr("Key not found: %llX %llX", key.getPID(), key.getOID() ));
+        assert(0);
+        // exceptions prevent inlining
+        //throw std::out_of_range(constfstr("Key not found: %llX %llX", key.getPID(), key.getOID() ));
     }
 
     size_t idx = key.hash() % slots.capacity;
@@ -171,7 +173,9 @@ uint32_t& UIDHashTable::operator[](const UID& key) {
     while (probe_count < slots.capacity) {
         UID& slot = slots[idx];
         if (slot.data[0] == 0 && slot.data[1] == 0) {
-            throw std::out_of_range(constfstr("Key not found: (%llX %llX) idx: %lu, capacity: %lu", key.getPID(), key.getOID(), idx, slots.capacity ));
+            assert(0);
+            // exceptions prevent inlining
+//            throw std::out_of_range(constfstr("Key not found: (%llX %llX) idx: %lu, capacity: %lu", key.getPID(), key.getOID(), idx, slots.capacity ));
         }
         if (slot.data[0] == key.data[0] && slot.data32[2] == key.data32[2]) {
             return (uint32_t&)(slot.data32[3]);
