@@ -113,6 +113,13 @@ template <typename T> struct vector {
         bzero(this, sizeof(vector<T>));
     }
 
+    void wipe() {
+        for(size_t i = 0; i < count; ++i){
+            data[i].~T();
+        }
+        bzero(data, capacity * sizeof(T));
+    }
+
     vector<T> copy() {
         vector<T> tmp;
         tmp.data = (T*)malloc(sizeof(T) * count);

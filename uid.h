@@ -31,7 +31,7 @@ struct UIDHashTable {
     void init(size_t initial_capacity = 16);
     void reserve(size_t new_capacity);
     void destroy();
-    void clear();
+    void wipe();
 
     void insert(const UID& key);
     void remove(const UID& key);

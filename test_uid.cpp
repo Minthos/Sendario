@@ -124,7 +124,7 @@ TEST_CASE("UIDHashTable operations", "[uid_hash]") {
         table.insert(uid);
         REQUIRE(table.size == 1);
         
-        table.clear();
+        table.wipe();
         REQUIRE(table.size == 0);
         
         // Test resize
@@ -198,6 +198,7 @@ local_table.init(4);
             const uint64_t seed_b = 0xFEDCBA9876543210 ^ epoch;
     //        const int num_operations = 800000000;
             const int num_operations = 8000000;
+//            const int num_operations = 800;
             const int check_interval = num_operations / 10;
             
             Prng_xoshiro rng;
