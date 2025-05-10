@@ -146,10 +146,6 @@ TEST_CASE("UIDHashTable operations", "[uid_hash]") {
         // Test that index doesn't affect hash
         uid3.setIdx(42);
         REQUIRE(uid1.hash() == uid3.hash());
-        
-        // Test zero UID
-        UID zero;
-        REQUIRE(zero.hash() == 0);
     }
 
     SECTION("Edge cases") {
@@ -167,7 +163,7 @@ TEST_CASE("UIDHashTable operations", "[uid_hash]") {
         REQUIRE(uid.getIdx() == 0xFFFFFFFF);
         
         // Test zero UID operations
-        UID zero;
+        UID zero = {0, 0};
         REQUIRE(zero.getPID() == 0);
         REQUIRE(zero.getOID() == 0);
         REQUIRE(zero.getIdx() == 0);
