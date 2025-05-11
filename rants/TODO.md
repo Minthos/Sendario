@@ -10,6 +10,12 @@
 
 - add mesh to gpu buffer
 - delete mesh from gpu buffer
+
+  RenderObject does this already but I don't like how it's designed.
+  Should load a shape from file and create a mesh template that can be referenced by instances
+  need better design of scene graph/collision tree and also the terrain LOD system
+
+
 - specify nozzle exit: center, radius, thrust vector, nominal chamber pressure, nominal mass flow, max gimbal angle
 - controls
 - navball
