@@ -54,7 +54,7 @@ gas giant - crushing atmosphere, no surface (jupiter, saturn)
 */
 
 
-uint64_t hash(uint64_t seed_a, uint64_t seed_b) {
+uint64_t sha256_hash(uint64_t seed_a, uint64_t seed_b) {
     uint64_t message[8] = {0};
     message[0] = seed_a;
     message[1] = seed_b;
@@ -85,16 +85,20 @@ void Prng_sha256::init(uint64_t seed_a, uint64_t seed_b) {
     message[5] = 0x1f4ab9e07033c8ea;
     message[6] = 0x4d65c992c5759de0;
     message[7] = 0x8d93f95dcaef97bd;
+    for(int i = 0; i < 16; i++) {
+        get();
+    }
 }
 
 uint64_t Prng_sha256::get() {
-    if(index % 8 == 0)
+    if(index == 0)
 #ifdef DEBUG
         sha256_process(state, (uint8_t*)message, sizeof(message));
 #else
         sha256_process_x86(state, (uint8_t*)message, sizeof(message));
 #endif
-    return ((uint64_t*)state)[index++];
+    index = (index + 1) % 4;
+    return ((uint64_t*)state)[index];
 }
 
 double Prng_sha256::uniform() {

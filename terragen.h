@@ -10,7 +10,7 @@ void sha256_process(uint32_t state[8], const uint8_t data[], uint32_t length);
 using glm::dvec3;
 using glm::vec3;
 
-uint64_t hash(uint64_t seed_a, uint64_t seed_b);
+uint64_t sha256_hash(uint64_t seed_a, uint64_t seed_b);
 
 // The sha256 generator produces very high quality pseudorandom numbers that are difficult to predict based
 // on previous output

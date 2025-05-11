@@ -19,6 +19,7 @@ int main() {
         const int check_interval = num_operations / 10;
         
         Prng_xoshiro rng;
+        //Prng_sha256 rng;
         rng.init(seed_a, seed_b);
 
         // Insert phase

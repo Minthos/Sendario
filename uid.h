@@ -37,7 +37,6 @@ struct UIDHashTable {
     void remove(const UID& key);
     uint32_t& operator[](const UID& key);
     
-    // Count how many values have been moved N places from their ideal position (0-8)
     nonstd::vector<int> count_probe_distances() const;
 };
 
