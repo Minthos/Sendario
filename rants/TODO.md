@@ -1,4 +1,121 @@
 
+
+
+# New and Improved! TODO! May 2025
+
+
+## Primary target:
+
+### A rocket with KSP-like controls
+
+- add mesh to gpu buffer
+- delete mesh from gpu buffer
+- specify nozzle exit: center, radius, thrust vector, nominal chamber pressure, nominal mass flow, max gimbal angle
+- controls
+- navball
+- cpu physics
+- scene graph
+
+
+## Secondary target:
+
+### A rocket editor that can load meshes from file (json or blender), position scale and weld them.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+---- old file below, ignore it:
+
+
+
 !!! THIS FILE IS OUT OF DATE !!!
 
 This file has not been updated to reflect the switch to the new rendering system.
