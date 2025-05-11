@@ -848,7 +848,7 @@ struct CollisionTree {
         ctnode* nodes = (ctnode*) malloc(sizeof(ctnode) * (2 * N));
         root = &nodes[0];
         root->count = N;
-        AABB globalBounds = calculateBounds(pleaves, 0, N);
+        AABB globalBounds = calculateBounds(pleaves, 0, N-1);
         root->setBounds(globalBounds);
         uint32_t poolPtr = 1;
         root->subdivide(nodes, &poolPtr, leaves, 0, N - 1);
